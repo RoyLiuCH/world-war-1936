@@ -7084,7 +7084,7 @@ const MP = {
   lastHostSeen:0,
   lastSnapTs:0,
   _wrapped:false, _hbTimer:null, _watchTimer:null, _dead:false,
-  _snapTimer:null, _animTimer:null,
+  _snapTimer:null, _animTimer:null, _joined:false, _lobbyTimer:null,
 };
 window.MP = MP; // const 不自动挂到 window，显式暴露以便各处守卫判断
 function mpRandId(n){ let s=''; const c='abcdefghijklmnopqrstuvwxyz0123456789'; for(let i=0;i<(n||6);i++) s+=c[Math.floor(Math.random()*c.length)]; return s; }
@@ -7099,6 +7099,10 @@ function mpLobbyPub(roomId, payload, retained){
   if(!MP.client) return;
   try{ MP.client.publish(MP_PREFIX+'/lobby/'+roomId, payload, {qos:0, retain:!!retained}); }catch(e){}
 }
+// 页面刷新/关闭时尽力清除房间公告，防止幽灵房间（兜底：大厅侧还有过期自动清除机制）
+window.addEventListener('pagehide', ()=>{
+  try{ if(MP.client && MP.room && MP.isHost && !MP._dead){ mpLobbyPub(MP.room.id, '', true); } }catch(e){}
+});
 function mpCloseModal(){
   let m = document.getElementById('mp-modal-overlay');
   if(m) m.remove();
@@ -7187,8 +7191,13 @@ function openMpLobby(){
   _mpLobbyRooms = {};
   mpConnect(()=>{
     MP.client.subscribe(MP_PREFIX+'/lobby/+', {qos:0});
-    // 大厅探活：广播一次"谁在线"，房间主会刷新房间公告
     mpRenderLobbyList();
+    // 定时重渲染：房主掉线后心跳停止，其房间公告不再刷新，会自动从列表过期消失
+    if(MP._lobbyTimer) clearInterval(MP._lobbyTimer);
+    MP._lobbyTimer = setInterval(()=>{
+      if(!document.getElementById('mp-room-list')){ clearInterval(MP._lobbyTimer); MP._lobbyTimer = null; return; }
+      mpRenderLobbyList();
+    }, 3000);
   }, (msg)=>{
     mpShowModal(`<h2>🌐 联机游玩</h2><p style="color:#f85149;font-size:13px;padding:20px">${msg}</p>
       <div class="save-modal-btns"><button class="btn btn-sm" style="background:transparent;color:#8b949e;border:1px solid #30363d" onclick="mpCloseModal()">关闭</button></div>`);
@@ -7198,7 +7207,7 @@ function mpRenderLobbyList(){
   let box = document.getElementById('mp-room-list');
   if(!box) return;
   let now = Date.now();
-  let rooms = Object.values(_mpLobbyRooms).filter(r=>r && now - r.ts < 30000 && r.phase==='lobby');
+  let rooms = Object.values(_mpLobbyRooms).filter(r=>r && now - r.ts < 12000 && r.phase==='lobby');
   rooms.sort((a,b)=>b.ts-a.ts);
   if(rooms.length===0){
     box.innerHTML = '<div style="color:#8b949e;padding:8px;text-align:center">暂无公开房间 — 创建一个，等好友加入吧</div>';
@@ -7249,12 +7258,16 @@ function mpJoinRoom(roomId){
     MP.id = MP.id || mpRandId(8);
     MP.name = name;
     MP.isHost = false;
+    MP.lastHostSeen = 0;
     MP.room = {id:roomId, name:'', max:0, hostId:null, phase:'lobby', players:[]};
     MP.client.subscribe(MP_PREFIX+'/room/'+roomId+'/#', {qos:0});
     MP.client.publish(MP_PREFIX+'/room/'+roomId+'/join', JSON.stringify({id:MP.id, name:name}), {qos:0});
     mpStartHeartbeat();
     mpShowModal(`<h2>🌐 加入房间…</h2><p style="color:#8b949e;padding:16px;text-align:center">正在连接房间 ${roomId}</p>`);
-    setTimeout(()=>{ if(MP.room && !MP.room.players.find(p=>p.id===MP.id) && !MP.active){ mpJoinFailed('房间已满或已开始游戏'); } }, 3000);
+    setTimeout(()=>{ if(MP.room && !MP.room.players.find(p=>p.id===MP.id) && !MP.active){
+      // 区分真失败与幽灵房间：从未见过房主心跳 = 房间早已没人
+      mpJoinFailed(MP.lastHostSeen ? '加入房间超时，请重试' : '房间已失效：房主已离线（该幽灵房间已自动清除）');
+    } }, 3000);
   }, (msg)=>{ addLog('❌',msg); });
 }
 function mpJoinFailed(msg){
@@ -7282,7 +7295,7 @@ function mpStartHeartbeat(){
   MP._hbTimer = setInterval(()=>{
     if(!MP.room || !MP.client) return;
     mpPub('hb', JSON.stringify({id:MP.id, ts:Date.now()}));
-    if(MP.isHost) mpHostSweep();
+    if(MP.isHost){ mpAnnounceRoom(); mpHostSweep(); } // 房主持续刷新大厅公告时间戳：掉线后公告停止刷新即被视为幽灵房间
     if(MP.active && !MP.isHost && !MP._dead){
       if(Date.now() - MP.lastHostSeen > 15000) mpOnHostLost();
     }
@@ -7338,7 +7351,8 @@ function mpLeaveCleanup(){
   } else if(MP.client && MP.room && MP.active){
     try{ mpPub('leave', JSON.stringify({id:MP.id})); }catch(e){}
   }
-  MP.room = null; MP.isHost = false; MP.active = false;
+  if(MP._lobbyTimer){ clearInterval(MP._lobbyTimer); MP._lobbyTimer=null; }
+  MP.room = null; MP.isHost = false; MP.active = false; MP._joined = false;
 }
 
 // ---------- 房间等待界面 ----------
@@ -7462,7 +7476,16 @@ function mpOnLobbyMessage(topic, payload){
   try{
     if(!payload || !payload.length) return;
     let msg = JSON.parse(payload);
-    if(msg && msg.id){ _mpLobbyRooms[msg.id] = msg; mpRenderLobbyList(); }
+    if(msg && msg.id){
+      if(Date.now() - (msg.ts||0) > 12000){
+        // 幽灵房间：房主心跳已停止超过12秒（刷新/掉线），主动清除 broker 上的保留公告
+        try{ if(MP.client) MP.client.publish(topic, '', {qos:0, retain:true}); }catch(e){}
+        delete _mpLobbyRooms[msg.id];
+      } else {
+        _mpLobbyRooms[msg.id] = msg;
+      }
+      mpRenderLobbyList();
+    }
   }catch(e){}
 }
 
