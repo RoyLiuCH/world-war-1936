@@ -298,6 +298,19 @@ const FOCUS_TREES = {
       {id:'ger_fuel',name:'合成燃料',icon:'⛽',days:14,req:['ger_4year'],desc:'煤变油！摆脱对进口石油的依赖。',effects:{res:{oil:150}}},
       {id:'ger_totwar',name:'全面战争经济',icon:'⚒️',days:21,req:['ger_fuel'],desc:'施佩尔统筹军工生产，产能+30%。',effects:{fac:{mil:3},buff:{prod:30}}},
     ]},
+    {name:'西线战火',nodes:[
+      {id:'ger_westwall',name:'齐格菲防线',icon:'🧱',days:14,req:['ger_rhine'],desc:'西部边境的钢筋混凝土堡垒群，防+15%。',effects:{buff:{def:15}}},
+      {id:'ger_sealion',name:'海狮计划',icon:'🦁',days:21,req:['ger_west'],desc:'登陆不列颠！征服英伦三岛。',effects:{war:'uk',buff:{atk:15,ws:10}}},
+      {id:'ger_blitz',name:'不列颠空战',icon:'✈️',days:14,req:['ger_sealion'],desc:'戈林的鹰日行动：夺取英吉利海峡制空权。',effects:{buff:{atk:15}}},
+      {id:'ger_wolf',name:'狼群战术',icon:'🐺',days:14,req:['ger_blitz'],desc:'邓尼茨的U艇绞索：封锁英国海运命脉。',effects:{buff:{prod:15},res:{steel:60}}},
+      {id:'ger_desert',name:'非洲军团',icon:'🏜️',days:14,req:['ger_west'],desc:'隆美尔驰援意大利，挺进埃及。',effects:{buff:{atk:10}}},
+    ]},
+    {name:'军工科技',nodes:[
+      {id:'ger_panzer',name:'古德里安装甲学说',icon:'⚙️',days:14,req:[],desc:'闪击战理论：装甲集群纵深突破。',effects:{buff:{atk:15}}},
+      {id:'ger_stuka',name:'斯图卡俯冲轰炸机',icon:'🎯',days:14,req:['ger_panzer'],desc:'尖啸死神支援地面攻势。',effects:{buff:{atk:10}}},
+      {id:'ger_v2',name:'V2火箭工程',icon:'🚀',days:21,req:['ger_stuka'],desc:'复仇武器：世界第一枚弹道导弹。',effects:{buff:{atk:20},res:{cash:200}}},
+      {id:'ger_jets',name:'Me-262喷气式战机',icon:'💨',days:21,req:['ger_v2'],desc:'跨越时代的空战革命。',effects:{buff:{atk:15,def:10}}},
+    ]},
   ]},
   ussr:{name:'钢铁洪流',branches:[
     {name:'内部整肃',nodes:[
@@ -311,7 +324,15 @@ const FOCUS_TREES = {
     ]},
     {name:'解放欧洲',nodes:[
       {id:'sov_greatp',name:'伟大卫国战争',icon:'⭐',days:14,req:['sov_deep'],desc:'祖国母亲在召唤！对德宣战，防御+10%。',effects:{war:'germany',buff:{def:10,ws:15}}},
-      {id:'sov_berlin',name:'攻占柏林',icon:'🏰',days:21,req:['sov_greatp'],desc:'红旗插上国会大厦，解放全欧洲。',effects:{buff:{atk:20,ws:10}}},
+      {id:'sov_counter',name:'库尔斯克会战',icon:'💥',days:21,req:['sov_greatp'],desc:'史上最大坦克会战：普罗霍罗夫卡的钢铁碰撞。',effects:{buff:{atk:15,def:10}}},
+      {id:'sov_bagration',name:'巴格拉季昂行动',icon:'🔨',days:21,req:['sov_counter'],desc:'粉碎德军中央集团军群，收复白俄罗斯。',effects:{buff:{atk:20},res:{man:60}}},
+      {id:'sov_berlin',name:'攻占柏林',icon:'🏰',days:21,req:['sov_bagration'],desc:'红旗插上国会大厦，解放全欧洲。',effects:{buff:{atk:20,ws:10}}},
+    ]},
+    {name:'红军改革',nodes:[
+      {id:'sov_tankograd',name:'坦克服厂',icon:'⚙️',days:14,req:['sov_5year'],desc:'乌拉尔的T-34生产线昼夜不停。',effects:{fac:{mil:2},buff:{prod:10}}},
+      {id:'sov_t34',name:'T-34中型坦克',icon:'🚜',days:14,req:['sov_tankograd'],desc:'倾斜装甲+76炮：性价比之王。',effects:{buff:{atk:15}}},
+      {id:'sov_katuysha',name:'喀秋莎火箭炮',icon:'🎵',days:14,req:['sov_t34'],desc:'斯大林风琴的怒吼覆盖敌军阵地。',effects:{buff:{atk:10}}},
+      {id:'sov_guard',name:'近卫军制度',icon:'🎖️',days:14,req:['sov_katuysha'],desc:'近卫部队荣誉称号：精锐中的精锐。',effects:{buff:{atk:10,ws:10}}},
     ]},
   ]},
   japan:{name:'八纮一宇',branches:[
@@ -328,6 +349,13 @@ const FOCUS_TREES = {
     {name:'海军扩建',nodes:[
       {id:'jap_fleet',name:'八八舰队',icon:'⚓',days:14,req:[],desc:'建造世界第三大海军。',effects:{res:{steel:80}}},
       {id:'jap_carrier',name:'航母机动部队',icon:'🛩️',days:21,req:['jap_fleet'],desc:'南云忠一的航母打击群成型。',effects:{buff:{prod:15}}},
+      {id:'jap_yamato',name:'大和号战列舰',icon:'🚢',days:21,req:['jap_carrier'],desc:'史上最大战列舰下水。',effects:{res:{steel:120},buff:{def:10}}},
+      {id:'jap_zero',name:'零式战斗机',icon:'✈️',days:14,req:['jap_carrier'],desc:'机动性冠绝太平洋的舰载机。',effects:{buff:{atk:15}}},
+      {id:'jap_kamikaze',name:'神风特攻',icon:'💥',days:14,req:['jap_zuharu'],desc:'一机换一舰的绝望突击。',effects:{buff:{atk:20,ws:-5}}},
+    ]},
+    {name:'轴心协调',nodes:[
+      {id:'jap_axis',name:'加入轴心国',icon:'⚫',days:10,req:['jap_marco'],desc:'与德意结成三国同盟，关系+40。',effects:{rel:{t:'germany',d:40},buff:{stab:5}}},
+      {id:'jap_nanking',name:'伪政府扶植',icon:'🎭',days:14,req:['jap_three'],desc:'以华制华：在占领区扶植傀儡政权。',effects:{buff:{prod:15}}},
     ]},
   ]},
   italy:{name:'新罗马帝国',branches:[
@@ -341,6 +369,11 @@ const FOCUS_TREES = {
       {id:'ita_littorio',name:'利托里奥级战列舰',icon:'⚓',days:14,req:[],desc:'地中海是我们的海！',effects:{res:{steel:80},buff:{prod:10}}},
       {id:'ita_mare',name:'我们的海',icon:'🌊',days:21,req:['ita_littorio'],desc:'制霸地中海，恢复罗马荣光。',effects:{buff:{atk:10,def:10}}},
     ]},
+    {name:'轴心之路',nodes:[
+      {id:'ita_axis',name:'罗马-柏林轴心',icon:'⚫',days:10,req:[],desc:'墨索里尼与希特勒结盟：与德关系+50。',effects:{rel:{t:'germany',d:50},buff:{stab:5}}},
+      {id:'ita_pactsteel',name:'钢铁条约',icon:'🤝',days:10,req:['ita_axis'],desc:'德意军事同盟正式化，产能+10%。',effects:{buff:{prod:10,ws:5}}},
+      {id:'ita_war',name:'对法宣战',icon:'⚔️',days:14,req:['ita_pactsteel'],desc:'趁法国崩溃之际分一杯羹。',effects:{war:'france',buff:{atk:10}}},
+    ]},
   ]},
   france:{name:'共和国的抉择',branches:[
     {name:'防御准备',nodes:[
@@ -350,6 +383,11 @@ const FOCUS_TREES = {
     {name:'政治抉择',nodes:[
       {id:'fra_appease',name:'绥靖政策',icon:'🤝',days:10,req:[],desc:'张伯伦式妥协：与德国关系+30，换取虚假和平。',effects:{rel:{t:'germany',d:30},buff:{stab:5}}},
       {id:'fra_resist',name:'宁死不降',icon:'🇫🇷',days:14,req:[],desc:'一战老兵的血性：对德宣战，防御+15%。',effects:{war:'germany',buff:{def:15,ws:10}}},
+    ]},
+    {name:'自由法国',nodes:[
+      {id:'fra_dunkirk',name:'敦刻尔克大撤退',icon:'🚢',days:10,req:['fra_resist'],desc:'发电机行动：33万军队撤往英国。',effects:{buff:{def:10}}},
+      {id:'fra_resistance',name:'抵抗运动',icon:'✊',days:14,req:['fra_dunkirk'],desc:'地下游击网络骚扰占领军。',effects:{buff:{def:10,prod:10}}},
+      {id:'fra_normandy',name:'跟随霸王行动',icon:'🌊',days:21,req:['fra_resistance'],desc:'自由法国随盟军重返欧陆。',effects:{buff:{atk:15,ws:10}}},
     ]},
   ]},
   uk:{name:'日不落的黄昏',branches:[
@@ -362,6 +400,14 @@ const FOCUS_TREES = {
     {name:'帝国空军',nodes:[
       {id:'uk_radar',name:'本土链雷达',icon:'📡',days:10,req:[],desc:'道丁系统预警网络。',effects:{buff:{def:10}}},
       {id:'uk_spitfire',name:'喷火战斗机',icon:'✈️',days:14,req:['uk_radar'],desc:'不列颠空战的利爪。',effects:{buff:{prod:15}}},
+      {id:'uk_battle',name:'不列颠空战胜利',icon:'🛡️',days:14,req:['uk_spitfire'],desc:'从未有如此多的人，从如此少的人那里得到如此多。',effects:{buff:{def:15,ws:10}}},
+      {id:'uk_bomber',name:'战略轰炸机司令部',icon:'💥',days:21,req:['uk_battle'],desc:'千机轰炸德意志腹地。',effects:{buff:{atk:15}}},
+    ]},
+    {name:'全球战场',nodes:[
+      {id:'uk_guarantee',name:'对波安全保证',icon:'🛡️',days:10,req:[],desc:'1939年3月：波兰独立受到英国保护（德国进攻波兰时自动参战）。',effects:{buff:{stab:5}}},
+      {id:'uk_desert',name:'北非战役',icon:'🏜️',days:14,req:['uk_guarantee'],desc:'韦维尔和蒙哥马利鏖战利比亚。',effects:{buff:{atk:10}}},
+      {id:'uk_elalamein',name:'阿拉曼战役',icon:'⚡',days:14,req:['uk_desert'],desc:'蒙哥马利的大捷：德意联军被逐出埃及。',effects:{buff:{atk:15,ws:10}}},
+      {id:'uk_burma',name:'缅甸远征军',icon:'🌿',days:14,req:['uk_desert'],desc:'与日军在丛林战场周旋。',effects:{buff:{atk:10},res:{man:40}}},
     ]},
   ]},
   usa:{name:'民主兵工厂',branches:[
@@ -374,6 +420,13 @@ const FOCUS_TREES = {
     {name:'工业巨人',nodes:[
       {id:'us_industry',name:'工业巨人觉醒',icon:'🏭',days:14,req:[],desc:'自由企业的战争动员。',effects:{fac:{civ:3,mil:2}}},
       {id:'us_manhattan',name:'曼哈顿计划',icon:'☢️',days:30,req:['us_industry'],desc:'绝密的核武器工程。',effects:{buff:{atk:10},res:{cash:300}}},
+      {id:'us_nuke',name:'三位一体核试验',icon:'💥',days:21,req:['us_manhattan'],desc:'"我现在成了死神，世界的毁灭者。"解锁核武器生产力。',effects:{buff:{atk:20},res:{cash:200}}},
+      {id:'us_liberty',name:'自由轮下饺子',icon:'🚢',days:14,req:['us_industry'],desc:'霍夫曼的预制件流水线：一天一艘船。',effects:{buff:{prod:20}}},
+    ]},
+    {name:'太平洋战争',nodes:[
+      {id:'us_midway',name:'中途岛海战',icon:'🌀',days:14,req:['us_day'],desc:'AF的伏击：击沉四艘日本航母。',effects:{buff:{atk:15}}},
+      {id:'us_island',name:'跳岛战术',icon:'🏝️',days:14,req:['us_midway'],desc:'越过一个岛，轰炸下一个岛。',effects:{buff:{atk:10,prod:10}}},
+      {id:'us_iam',name:'重返菲律宾',icon:'🎖️',days:21,req:['us_island'],desc:'"我回来了！"麦克阿瑟涉水上岸。',effects:{buff:{atk:15,ws:10}}},
     ]},
   ]},
   poland:{name:'波兰永不亡',branches:[
@@ -381,6 +434,8 @@ const FOCUS_TREES = {
       {id:'pol_alliance',name:'英波同盟',icon:'🤝',days:10,req:[],desc:'获得英国的安全保证。',effects:{rel:{t:'uk',d:40},buff:{stab:10}}},
       {id:'pol_mobilize',name:'总动员令',icon:'📢',days:10,req:['pol_alliance'],desc:'一切为了保卫共和国！',effects:{res:{man:40},buff:{def:15,ws:10}}},
       {id:'pol_bear',name:'熊之准备',icon:'🐻',days:14,req:['pol_mobilize'],desc:'预判德国的进攻计划：防御+10%。',effects:{buff:{def:10}}},
+      {id:'pol_uprising',name:'华沙起义',icon:'✊',days:14,req:['pol_bear'],desc:'华沙军民的悲壮抵抗。',effects:{buff:{def:15,ws:10}}},
+      {id:'pol_exile',name:'流亡政府',icon:'🛫',days:10,req:['pol_uprising'],desc:'政府流亡伦敦，永不承认灭亡。',effects:{buff:{stab:10,def:10}}},
     ]},
   ]},
 };
@@ -390,10 +445,17 @@ const FOCUS_GENERIC = {name:'国家发展',branches:[
     {id:'gen_defense',name:'国防现代化',icon:'🎖️',days:10,req:[],desc:'更新军队装备。',effects:{buff:{atk:5,def:5}}},
     {id:'gen_fort',name:'边境要塞化',icon:'🏰',days:14,req:['gen_defense'],desc:'在边境修筑防御工事。',effects:{buff:{def:15}}},
     {id:'gen_army',name:'扩军备战',icon:'⚔️',days:14,req:['gen_fort'],desc:'扩充常备军规模。',effects:{res:{man:40},buff:{atk:10}}},
+    {id:'gen_elite',name:'精锐化改造',icon:'🎯',days:14,req:['gen_army'],desc:'淘汰旧装备，组建精锐师。',effects:{buff:{atk:10}}},
   ]},
   {name:'经济建设',nodes:[
     {id:'gen_industry',name:'五年建设计划',icon:'🏭',days:14,req:[],desc:'国家主导的工业化。',effects:{fac:{civ:2}}},
     {id:'gen_mil',name:'军工国有化',icon:'⚙️',days:14,req:['gen_industry'],desc:'工厂转产军事装备。',effects:{fac:{mil:2},buff:{prod:10}}},
+    {id:'gen_railway',name:'铁路网扩建',icon:'🚂',days:14,req:['gen_industry'],desc:'大动脉贯通全国：产能+15%。',effects:{buff:{prod:15}}},
+  ]},
+  {name:'战时动员',nodes:[
+    {id:'gen_warpre',name:'战争动员法',icon:'📜',days:14,req:[],desc:'授予政府战时特别权力。',effects:{buff:{ws:10,prod:10}}},
+    {id:'gen_ration',name:'配给制',icon:'🍞',days:10,req:['gen_warpre'],desc:'勒紧裤腰带支援前线。',effects:{res:{man:30},buff:{prod:10}}},
+    {id:'gen_laststand',name:'全民抗战',icon:'🔥',days:21,req:['gen_ration'],desc:'焦土政策：寸土必争！',effects:{buff:{def:20,ws:10}}},
   ]},
 ]};
 function getFocusTree(cid){ return FOCUS_TREES[cid] || FOCUS_GENERIC; }
@@ -3124,6 +3186,8 @@ function gameTick(){
         addLog('📊','本周民意波动：战争支持率 ' + (delta >= 0 ? '+' : '') + delta + '% → ' + Math.floor(c.warSupport) + '%');
       }
     }
+    // 阵营逐步卷入评估：战争持续时同阵营国家按关系+好战度小概率参战
+    checkAllianceEntries();
   }
   
   // Check historical events (every tick)
@@ -3716,6 +3780,63 @@ function checkSurrender(){
   }
 }
 
+// ==================== 历史安全保证（阵营不再全员自动参战） ====================
+// 1939年3月英法对波兰提供安全保证（进攻波兰=英法参战）；英法军事同盟互保
+// 保证仅针对敌对/轴心攻击者生效：历史上苏联入侵波兰东部时英法未对苏宣战（不愿两线树敌）
+// 其余阵营伙伴不再"一秒全员参战"：改为 checkAllianceEntries 每周评估逐步卷入
+// 美国孤立主义：只随国策（国耻日/诺曼底）或被入侵参战
+const GUARANTEE_DEFS = {
+  poland:['uk','france'],
+  france:['uk'],
+  uk:['france'],
+};
+
+// 保证是否对该攻击者生效：攻击者是轴心国，或与保证国关系恶劣时才触发
+function guaranteeApplies(guarantor, attacker){
+  if(!countries[attacker]) return false;
+  let atkFaction = getFaction(attacker);
+  if(atkFaction === 'axis') return true; // 轴心侵略 → 履行保证
+  let gFaction = getFaction(guarantor);
+  if(gFaction && atkFaction && gFaction !== atkFaction){
+    // 异阵营且关系敌对（如共产国际与同盟关系破裂）才触发
+    let rel = game.relations[guarantor] ? (game.relations[guarantor][attacker] || 0) : 0;
+    return rel < -30;
+  }
+  return false;
+}
+
+// 阵营逐步卷入评估（每周调用）：战争持续越久，同阵营国家越可能按关系+好战度卷入
+// 规则：保密约国不卷入；美国孤立主义不卷入；傀儡只能随宗主参战
+function checkAllianceEntries(){
+  let wars = game.wars.slice();
+  for(let w of wars){
+    for(let side of [w.defender, w.attacker]){
+      let sideFaction = getFaction(side);
+      if(!sideFaction) continue;
+      let enemy = (side === w.defender) ? w.attacker : w.defender;
+      for(let cid in countries){
+        let c = countries[cid];
+        if(cid === side || cid === enemy || !c || c.eliminated || cid === 'rebels') continue;
+        if(getFaction(cid) !== sideFaction) continue;
+        if(COUNTRY_DEFS[cid] && COUNTRY_DEFS[cid].puppetOf) continue; // 傀儡只能随宗主参战
+        if(areAtWar(cid, enemy) || areAllies(cid, enemy)) continue;
+        if(hasPact(cid, enemy)) continue; // 与敌方有互不侵犯条约：不卷入
+        // 美国孤立主义：只有走完国策（国耻日/诺曼底登陆）才可能卷入对外战争
+        if(cid === 'usa' && !(c.focusDone && (c.focusDone.us_day || c.focusDone.us_normandy))) continue;
+        let rel = game.relations[cid] ? (game.relations[cid][side] || 0) : 0;
+        let agg = c.aggression || 50;
+        let chance = (rel - 20 + agg) / 900; // 每周小概率：关系好+好战度高才卷得快
+        if(chance > 0 && Math.random() < chance){
+          if(joinWarSafely(cid, enemy)){
+            addLog('🌐', COUNTRY_DEFS[cid].short + ' 卷入战争，加入 ' + COUNTRY_DEFS[side].short + ' 一方');
+            joinPuppetsToWar(cid, enemy);
+          }
+        }
+      }
+    }
+  }
+}
+
 function declareWar(attacker, defender){
   if(areAtWar(attacker,defender)) return;
   // 互不侵犯条约：条约期内禁止宣战（国策宣战会先撕毁条约再调这里）
@@ -3749,46 +3870,30 @@ function declareWar(attacker, defender){
   // 攻击方的傀儡也自动参战
   joinPuppetsToWar(attacker, defender);
   
-  // 盟友参战 — 同阵营盟友自动加入己方
-  for(let cid in countries){
-    if(cid===attacker||cid===defender) continue;
-    if(countries[cid].eliminated) continue;
-    if(areAtWar(cid, attacker)||areAtWar(cid, defender)) continue;
-    // 傀儡国不能绕过宗主独立参战——只能通过 joinPuppetsToWar（宗主参战）进入战争
-    if(COUNTRY_DEFS[cid] && COUNTRY_DEFS[cid].puppetOf) continue;
-    
-    // 阵营盟友加入防守方
-    if(areAllies(cid, defender) && !areAllies(cid, attacker)){
-      if(joinWarSafely(cid, attacker)){
-        addLog('🤝',COUNTRY_DEFS[cid].short+' 作为盟友加入 '+COUNTRY_DEFS[defender].short+' 阵营作战');
-        // Puppets of this ally also join
-        joinPuppetsToWar(cid, attacker);
-      }
-      continue;
-    }
-    // 阵营盟友加入进攻方
-    if(areAllies(cid, attacker) && !areAllies(cid, defender)){
-      if(joinWarSafely(cid, defender)){
-        addLog('🤝',COUNTRY_DEFS[cid].short+' 作为盟友加入 '+COUNTRY_DEFS[attacker].short+' 阵营作战');
-        // Puppets of this ally also join
-        joinPuppetsToWar(cid, defender);
-      }
-      continue;
-    }
-    
-    // 非阵营国家按关系值决定是否参战
-    let relDef = game.relations[cid] ? (game.relations[cid][defender]||0) : 0;
-    let relAtk = game.relations[cid] ? (game.relations[cid][attacker]||0) : 0;
-    if(relDef > 50){
-      if(joinWarSafely(cid, attacker)){
-        addLog('🤝',COUNTRY_DEFS[cid].short+' 加入 '+COUNTRY_DEFS[defender].short+' 一方');
-      }
-    } else if(relAtk > 50){
-      if(joinWarSafely(cid, defender)){
-        addLog('🤝',COUNTRY_DEFS[cid].short+' 加入 '+COUNTRY_DEFS[attacker].short+' 一方');
-      }
-    }
+  // ---- 历史安全保证参战（替代旧的"阵营全员一秒参战"） ----
+  // 1) 被进攻国的宗主国参战（打自治领=打宗主）
+  // 2) 历史保证国参战：英法→波兰、英法互保（GUARANTEE_DEFS）
+  // 3) 与进攻方保密约的国家不参战；美国孤立主义不参战
+  // 其余阵营伙伴改为每周评估逐步卷入（checkAllianceEntries）
+  let joiners = [];
+  let defMaster = COUNTRY_DEFS[defender] && COUNTRY_DEFS[defender].puppetOf;
+  if(defMaster && countries[defMaster] && !countries[defMaster].eliminated){
+    joiners.push({cid:defMaster, why:'保护自治领'});
   }
+  (GUARANTEE_DEFS[defender] || []).forEach(g=>{
+    if(g === attacker) return;
+    if(!guaranteeApplies(g, attacker)) return; // 仅针对轴心/敌对攻击者履行保证
+    if(countries[g] && !countries[g].eliminated) joiners.push({cid:g, why:'履行安全保证'});
+  });
+  joiners.forEach(j=>{
+    let cid = j.cid;
+    if(cid === attacker || areAtWar(cid, attacker) || areAllies(cid, attacker)) return;
+    if(hasPact(cid, attacker)) return; // 保密约不参战
+    if(joinWarSafely(cid, attacker)){
+      addLog('🛡️', COUNTRY_DEFS[cid].short + ' ' + j.why + '，对 ' + COUNTRY_DEFS[attacker].short + ' 宣战！');
+      joinPuppetsToWar(cid, attacker); // 参战国的自治领跟随
+    }
+  });
   updateUI();
   checkGuideProgress();
 }
@@ -6050,7 +6155,11 @@ function renderActiveTab(){
           content.innerHTML += `<span style="color:${surrColor};font-size:10px">🏳️投降:${Math.floor(surr)}%</span> `;
         }
         if(!r.atWar && !r.dead && !isAlly){
-          content.innerHTML += `<button class="btn-sm war" style="font-size:10px;margin-right:2px" onclick="declareWar('${game.player}','${r.cid}')">宣战</button>`;
+          // 安全保证提示：宣战该国会引来保证国参战（仅敌对/轴心攻击者触发）
+          let guarantors = (GUARANTEE_DEFS[r.cid]||[]).filter(g=>countries[g] && !countries[g].eliminated && g!==game.player && guaranteeApplies(g, game.player));
+          let guarTag = guarantors.length>0 ? `<span style="font-size:9px;color:#d29922">🛡️ ${guarantors.map(g=>COUNTRY_DEFS[g].short).join('/')}保证</span> ` : '';
+          let guarTip = guarantors.length>0 ? `确认对 ${cd.short} 宣战？\n${guarantors.map(g=>COUNTRY_DEFS[g].short).join('、')} 将履行安全保证立即参战！` : `确认对 ${cd.short} 宣战？`;
+          content.innerHTML += `${guarTag}<button class="btn-sm war" style="font-size:10px;margin-right:2px" onclick="if(confirm('${guarTip.replace(/'/g,"\\'").replace(/\n/g,'\\n')}'))declareWar('${game.player}','${r.cid}')">宣战</button>`;
           // 外交操作：中立国可邀请入阵营 / 外交援助
           if(!getFaction(r.cid) && !cd.puppetOf && getFaction(game.player)){
             content.innerHTML += `<button class="btn-sm" style="font-size:10px;background:#1a3a5c;color:#58a6ff;margin-right:2px" onclick="inviteToFaction('${r.cid}')">🤝 邀请入阵营(300💰)</button>`;
