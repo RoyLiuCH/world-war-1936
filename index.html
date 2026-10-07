@@ -162,6 +162,8 @@ canvas{display:block}
     <div class="pts" style="margin-left:8px"><button class="btn-sm" style="font-size:10px;padding:2px 6px" onclick="openSaveModal()" title="保存游戏进度">💾 存档</button></div>
     <div class="pts"><button class="btn-sm" style="font-size:10px;padding:2px 6px" onclick="openLoadModal()" title="读取游戏存档">📂 读档</button></div>
     <div class="pts">⭐ 国策: <b id="t-pts">0</b></div>
+    <div class="pts"><button id="btn-focus" class="btn-sm" style="font-size:10px;padding:2px 6px;background:#3d2e0f;border-color:#f0c040;color:#f0c040" onclick="openFocusTree()" title="历史国策树：苏德条约、巴巴罗萨计划…">🎯 国策树</button></div>
+    <div class="res" id="t-focus" style="color:#f0c040;font-size:11px;display:none" title="当前推行的国策"></div>
     <div class="res" id="t-season" style="color:#58a6ff;font-size:12px"></div>
     <div class="res" id="t-mp" style="display:none;color:#56d364;font-size:12px" title="联机对战状态"></div>
     <div class="pts"><button id="btn-sfx" class="btn-sm" style="font-size:10px;padding:2px 6px" onclick="toggleSfx()" title="开/关音效">🔊 音效</button></div>
@@ -273,6 +275,128 @@ const COUNTRY_DEFS = {
   // 地方叛军：战争支持率跌破40%时由内乱生成的隐藏势力（不可被选择，平时不存在）
   rebels:{id:'rebels',name:'地方叛军',short:'叛军',color:'#6b3f2a',neutral:true,leader:'叛乱首领',flag:'🏴',aggression:0,hidden:true}
 };
+
+// ==================== 国策树系统（仿钢铁雄心 HOI4） ====================
+// 每国若干分支线（branch），节点 req 为同国树内前置节点 id
+// effects: war(宣战) annex(和平吞并AI国) buff(加成) pact(互不侵犯条约) fac(直接工厂) res(资源) rel(关系)
+const FOCUS_TREES = {
+  germany:{name:'德意志的复兴',branches:[
+    {name:'欧洲扩张',nodes:[
+      {id:'ger_rhine',name:'进军莱茵兰',icon:'🚩',days:10,req:[],desc:'撕毁《凡尔赛条约》，重新军事化莱茵兰。西方列强只会抗议。',effects:{buff:{ws:10,stab:5}}},
+      {id:'ger_anschluss',name:'德奥合并',icon:'🇦🇹',days:14,req:['ger_rhine'],desc:'吞并奥地利工业，实现大德意志的第一步。',effects:{fac:{mil:2,civ:1},buff:{ws:5}}},
+      {id:'ger_munich',name:'慕尼黑阴谋',icon:'📋',days:14,req:['ger_anschluss'],desc:'绥靖政策的顶点：兵不血刃拿下捷克军工。',effects:{fac:{mil:2},res:{steel:80,equipment:60},buff:{ws:5}}},
+      {id:'ger_danzig',name:'但泽或战争',icon:'⚔️',days:10,req:['ger_munich'],desc:'向波兰发出最后通牒：交出但泽走廊，否则战争！',effects:{war:'poland',buff:{atk:10}}},
+      {id:'ger_west',name:'施里芬计划2.0',icon:'🗺️',days:21,req:['ger_danzig'],desc:'绕过马奇诺防线，取道低地国家直捣巴黎。',effects:{war:'france',war2:'netherlands',buff:{atk:10}}},
+    ]},
+    {name:'东方路线',nodes:[
+      {id:'ger_pact',name:'苏德互不侵犯条约',icon:'📜',days:10,req:[],desc:'与斯大林秘密瓜分东欧，确保东方安全（12个月内互不开战）。',effects:{pact:'ussr',rel:{t:'ussr',d:30}}},
+      {id:'ger_barbarossa',name:'巴巴罗萨计划',icon:'🦅',days:21,req:['ger_pact'],desc:'撕毁条约，三路大军闪击苏联！攻苏+25%。',effects:{war:'ussr',buff:{atk:25,ws:10}},need:{warFirst:'poland'}},
+      {id:'ger_ostland',name:'东方总督辖区',icon:'🏚️',days:14,req:['ger_barbarossa'],desc:'在占领区实施总督统治，压榨战争资源。',effects:{buff:{prod:20,res:{steel:100}}}},
+    ]},
+    {name:'战时经济',nodes:[
+      {id:'ger_4year',name:'四年计划',icon:'🏭',days:14,req:[],desc:'国家主导的重工业化冲刺，新增民用工厂。',effects:{fac:{civ:3}}},
+      {id:'ger_fuel',name:'合成燃料',icon:'⛽',days:14,req:['ger_4year'],desc:'煤变油！摆脱对进口石油的依赖。',effects:{res:{oil:150}}},
+      {id:'ger_totwar',name:'全面战争经济',icon:'⚒️',days:21,req:['ger_fuel'],desc:'施佩尔统筹军工生产，产能+30%。',effects:{fac:{mil:3},buff:{prod:30}}},
+    ]},
+  ]},
+  ussr:{name:'钢铁洪流',branches:[
+    {name:'内部整肃',nodes:[
+      {id:'sov_purge',name:'大清洗',icon:'⚖️',days:14,req:[],desc:'肃反运动清洗军官团：稳定性下降，但权威集中攻+10%。',effects:{buff:{atk:10,stab:-10}}},
+      {id:'sov_5year',name:'五年计划',icon:'🏭',days:21,req:[],desc:'乌拉尔工业大迁徙，后方建成军工基地。',effects:{fac:{mil:3,civ:2}}},
+      {id:'sov_deep',name:'纵深防御',icon:'🛡️',days:14,req:['sov_5year'],desc:'大纵深作战理论：防+15%，人力+50。',effects:{buff:{def:15},res:{man:50}}},
+    ]},
+    {name:'外交斡旋',nodes:[
+      {id:'sov_pact',name:'苏德互不侵犯条约',icon:'📜',days:10,req:[],desc:'与德国秘密瓜分东欧，争取备战时间（12个月内互不开战）。',effects:{pact:'germany',rel:{t:'germany',d:30}}},
+      {id:'sov_neutral',name:'对日中立条约',icon:'🕊️',days:10,req:['sov_pact'],desc:'与日本签订中立条约，稳住远东（12个月）。',effects:{pact:'japan',rel:{t:'japan',d:20}}},
+    ]},
+    {name:'解放欧洲',nodes:[
+      {id:'sov_greatp',name:'伟大卫国战争',icon:'⭐',days:14,req:['sov_deep'],desc:'祖国母亲在召唤！对德宣战，防御+10%。',effects:{war:'germany',buff:{def:10,ws:15}}},
+      {id:'sov_berlin',name:'攻占柏林',icon:'🏰',days:21,req:['sov_greatp'],desc:'红旗插上国会大厦，解放全欧洲。',effects:{buff:{atk:20,ws:10}}},
+    ]},
+  ]},
+  japan:{name:'八纮一宇',branches:[
+    {name:'中国事变',nodes:[
+      {id:'jap_marco',name:'卢沟桥事变',icon:'🌉',days:10,req:[],desc:'宛平城外的枪声，全面侵华战争爆发。',effects:{war:'china',buff:{atk:10}}},
+      {id:'jap_three',name:'以战养战',icon:'💸',days:14,req:['jap_marco'],desc:'在占领区疯狂掠夺资源。',effects:{buff:{prod:15},res:{steel:100,oil:50}}},
+      {id:'jap_spear',name:'刺刀突击',icon:'🗡️',days:14,req:['jap_three'],desc:'白刃战精神注入部队。',effects:{buff:{atk:15,ws:10}}},
+    ]},
+    {name:'南进政策',nodes:[
+      {id:'jap_nomonhan',name:'诺门罕停战',icon:'🐫',days:10,req:[],desc:'对苏联保持中立，全力南进。',effects:{pact:'ussr',rel:{t:'ussr',d:20}}},
+      {id:'jap_south',name:'南进政策',icon:'🌴',days:21,req:['jap_nomonhan'],desc:'夺取东南亚的资源地带：对美英宣战！',effects:{war:'usa',war2:'uk',buff:{atk:10}}},
+      {id:'jap_zuharu',name:'偷袭珍珠港',icon:'✈️',days:14,req:['jap_south'],desc:'虎！虎！虎！重创美国太平洋舰队。',effects:{buff:{atk:20,ws:10}}},
+    ]},
+    {name:'海军扩建',nodes:[
+      {id:'jap_fleet',name:'八八舰队',icon:'⚓',days:14,req:[],desc:'建造世界第三大海军。',effects:{res:{steel:80}}},
+      {id:'jap_carrier',name:'航母机动部队',icon:'🛩️',days:21,req:['jap_fleet'],desc:'南云忠一的航母打击群成型。',effects:{buff:{prod:15}}},
+    ]},
+  ]},
+  italy:{name:'新罗马帝国',branches:[
+    {name:'复兴罗马',nodes:[
+      {id:'ita_ethiopia',name:'侵略埃塞俄比亚',icon:'🛡️',days:10,req:[],desc:'为洗刷阿杜瓦之耻，出兵东非。战争支持率+10。',effects:{buff:{atk:10,ws:10}}},
+      {id:'ita_spain',name:'武装干涉西班牙',icon:'🇪🇸',days:14,req:['ita_ethiopia'],desc:'派遣志愿军援助佛朗哥。',effects:{buff:{atk:5,ws:5}}},
+      {id:'ita_albania',name:'控制阿尔巴尼亚',icon:'🗺️',days:10,req:['ita_spain'],desc:'控制亚得里亚海东岸，获得资源。',effects:{fac:{civ:1},res:{steel:40}}},
+      {id:'ita_greece',name:'进攻希腊',icon:'⚔️',days:14,req:['ita_albania'],desc:'墨索里尼的"平行战争"：向希腊宣战。',effects:{war:'greece',buff:{atk:10}}},
+    ]},
+    {name:'殖民帝国',nodes:[
+      {id:'ita_littorio',name:'利托里奥级战列舰',icon:'⚓',days:14,req:[],desc:'地中海是我们的海！',effects:{res:{steel:80},buff:{prod:10}}},
+      {id:'ita_mare',name:'我们的海',icon:'🌊',days:21,req:['ita_littorio'],desc:'制霸地中海，恢复罗马荣光。',effects:{buff:{atk:10,def:10}}},
+    ]},
+  ]},
+  france:{name:'共和国的抉择',branches:[
+    {name:'防御准备',nodes:[
+      {id:'fra_maginot',name:'马奇诺防线',icon:'🏰',days:14,req:[],desc:'铜墙铁壁！边境省份要塞升级。',effects:{buff:{def:20}}},
+      {id:'fra_mobilize',name:'总动员',icon:'📢',days:14,req:['fra_maginot'],desc:'全民皆兵，扩充后备役。',effects:{res:{man:50},buff:{def:10}}},
+    ]},
+    {name:'政治抉择',nodes:[
+      {id:'fra_appease',name:'绥靖政策',icon:'🤝',days:10,req:[],desc:'张伯伦式妥协：与德国关系+30，换取虚假和平。',effects:{rel:{t:'germany',d:30},buff:{stab:5}}},
+      {id:'fra_resist',name:'宁死不降',icon:'🇫🇷',days:14,req:[],desc:'一战老兵的血性：对德宣战，防御+15%。',effects:{war:'germany',buff:{def:15,ws:10}}},
+    ]},
+  ]},
+  uk:{name:'日不落的黄昏',branches:[
+    {name:'至暗时刻',nodes:[
+      {id:'uk_appease',name:'绥靖政策',icon:'☂️',days:10,req:[],desc:'一代人的和平？与德国周旋。',effects:{rel:{t:'germany',d:20},buff:{stab:5}}},
+      {id:'uk_churchill',name:'丘吉尔上台',icon:'🎩',days:10,req:[],desc:'我们将战斗到底！战争支持率+20。',effects:{buff:{ws:20,stab:5}}},
+      {id:'uk_dunkirk',name:'敦刻尔克精神',icon:'🚢',days:14,req:['uk_churchill'],desc:'撤退不是失败：防御+15%。',effects:{buff:{def:15}}},
+      {id:'uk_overlord',name:'霸王行动',icon:'🌊',days:21,req:['uk_dunkirk'],desc:'反攻欧陆！对德宣战，攻击+20%。',effects:{war:'germany',buff:{atk:20}}},
+    ]},
+    {name:'帝国空军',nodes:[
+      {id:'uk_radar',name:'本土链雷达',icon:'📡',days:10,req:[],desc:'道丁系统预警网络。',effects:{buff:{def:10}}},
+      {id:'uk_spitfire',name:'喷火战斗机',icon:'✈️',days:14,req:['uk_radar'],desc:'不列颠空战的利爪。',effects:{buff:{prod:15}}},
+    ]},
+  ]},
+  usa:{name:'民主兵工厂',branches:[
+    {name:'孤立与参战',nodes:[
+      {id:'us_isolation',name:'孤立主义',icon:'🛋️',days:10,req:[],desc:'远离欧洲的战争：稳定+10，战支-10。',effects:{buff:{stab:10,ws:-10}}},
+      {id:'us_lendlease',name:'租借法案',icon:'📦',days:14,req:['us_isolation'],desc:'民主兵工厂开动：产能+25%。',effects:{buff:{prod:25}}},
+      {id:'us_day',name:'国耻日',icon:'🔥',days:14,req:['us_lendlease'],desc:'珍珠港的浓烟唤醒巨人：对日宣战！战支+30。',effects:{war:'japan',buff:{ws:30,atk:15}}},
+      {id:'us_normandy',name:'诺曼底登陆',icon:'🚢',days:21,req:['us_day'],desc:'霸王行动：对德宣战，攻击+20%。',effects:{war:'germany',buff:{atk:20}}},
+    ]},
+    {name:'工业巨人',nodes:[
+      {id:'us_industry',name:'工业巨人觉醒',icon:'🏭',days:14,req:[],desc:'自由企业的战争动员。',effects:{fac:{civ:3,mil:2}}},
+      {id:'us_manhattan',name:'曼哈顿计划',icon:'☢️',days:30,req:['us_industry'],desc:'绝密的核武器工程。',effects:{buff:{atk:10},res:{cash:300}}},
+    ]},
+  ]},
+  poland:{name:'波兰永不亡',branches:[
+    {name:'求存图强',nodes:[
+      {id:'pol_alliance',name:'英波同盟',icon:'🤝',days:10,req:[],desc:'获得英国的安全保证。',effects:{rel:{t:'uk',d:40},buff:{stab:10}}},
+      {id:'pol_mobilize',name:'总动员令',icon:'📢',days:10,req:['pol_alliance'],desc:'一切为了保卫共和国！',effects:{res:{man:40},buff:{def:15,ws:10}}},
+      {id:'pol_bear',name:'熊之准备',icon:'🐻',days:14,req:['pol_mobilize'],desc:'预判德国的进攻计划：防御+10%。',effects:{buff:{def:10}}},
+    ]},
+  ]},
+};
+// 无专属树的国家使用通用树
+const FOCUS_GENERIC = {name:'国家发展',branches:[
+  {name:'国防建设',nodes:[
+    {id:'gen_defense',name:'国防现代化',icon:'🎖️',days:10,req:[],desc:'更新军队装备。',effects:{buff:{atk:5,def:5}}},
+    {id:'gen_fort',name:'边境要塞化',icon:'🏰',days:14,req:['gen_defense'],desc:'在边境修筑防御工事。',effects:{buff:{def:15}}},
+    {id:'gen_army',name:'扩军备战',icon:'⚔️',days:14,req:['gen_fort'],desc:'扩充常备军规模。',effects:{res:{man:40},buff:{atk:10}}},
+  ]},
+  {name:'经济建设',nodes:[
+    {id:'gen_industry',name:'五年建设计划',icon:'🏭',days:14,req:[],desc:'国家主导的工业化。',effects:{fac:{civ:2}}},
+    {id:'gen_mil',name:'军工国有化',icon:'⚙️',days:14,req:['gen_industry'],desc:'工厂转产军事装备。',effects:{fac:{mil:2},buff:{prod:10}}},
+  ]},
+]};
+function getFocusTree(cid){ return FOCUS_TREES[cid] || FOCUS_GENERIC; }
 
 // ==================== 国家难度评级（1星简单 → 5星极难） ====================
 const DIFFICULTY = {
@@ -844,6 +968,10 @@ function initCountry(cid){
     manpowerPool:totalMan*5,
     isAI:true,
     aiTimer:0,
+    focus:null, // 当前进行的国策 {nodeId, progress}
+    focusDone:{}, // 已完成的国策 {nodeId:true}
+    focusBonus:{atk:0,def:0,prod:0}, // 国策积累的加成
+    pacts:{}, // 互不侵犯条约 {对方cid: 到期游戏tick}
     capitals:myProvs.filter(p=>p.capital).map(p=>p.id),
     _fuelShortage:false, // 燃料短缺标记
     fuelRatio:1 // 燃料充足度 0-1
@@ -1183,8 +1311,143 @@ function getAIBonus(cid, skillId){
 
 // Universal bonus getter — works for both player and AI
 function getCombatBonus(cid, skillId){
-  if(cid === game.player) return getSkillBonus(skillId);
-  return getAIBonus(cid, skillId);
+  let base = (cid === game.player) ? getSkillBonus(skillId) : getAIBonus(cid, skillId);
+  // 国策树加成叠加（攻击2/防御3/生产1）
+  let c = countries[cid];
+  if(c && c.focusBonus){
+    if(skillId===2) base += c.focusBonus.atk||0;
+    else if(skillId===3) base += c.focusBonus.def||0;
+    else if(skillId===1) base += c.focusBonus.prod||0;
+  }
+  return base;
+}
+
+// ==================== 国策树：核心逻辑 ====================
+// 检查节点是否满足前置与附加条件
+function focusNodeState(cid, node){
+  let c = countries[cid];
+  if(!c) return 'locked';
+  if(c.focusDone && c.focusDone[node.id]) return 'done';
+  if(c.focus && c.focus.nodeId===node.id) return 'active';
+  if(node.req && !node.req.every(r=>c.focusDone[r])) return 'locked';
+  // 附加条件：need.warFirst = 必须先与某国处于战争（如巴巴罗萨需先打波兰）
+  if(node.need && node.need.warFirst){
+    if(!areAtWar(cid, node.need.warFirst)) return 'locked';
+  }
+  // 宣战类节点：目标已灭亡/已交战则视为已完成
+  if(node.effects && (node.effects.war || node.effects.war2)){
+    for(let wk of ['war','war2']){
+      let t = node.effects[wk];
+      if(t && (countries[t].eliminated || areAtWar(cid,t))) return 'done';
+    }
+  }
+  return 'available';
+}
+// 找到国策节点（按id搜全国树）
+function findFocusNode(cid, nodeId){
+  let tree = getFocusTree(cid);
+  for(let b of tree.branches){ for(let n of b.nodes){ if(n.id===nodeId) return n; } }
+  return null;
+}
+// 开始国策（每次只能进行一个）
+function startFocus(cid, nodeId){
+  let c = countries[cid];
+  let node = findFocusNode(cid, nodeId);
+  if(!c || !node || c.eliminated) return false;
+  if(c.focus){ if(cid===game.player) addLog('⚠️','已有国策进行中：'+(findFocusNode(cid,c.focus.nodeId)||{}).name); return false; }
+  if(focusNodeState(cid,node)!=='available'){
+    if(cid===game.player) addLog('⚠️','该国策尚不满足前置条件');
+    return false;
+  }
+  c.focus = {nodeId:nodeId, progress:0};
+  if(cid===game.player) addLog('🎯','开始推行国策：'+node.icon+' '+node.name+'（'+node.days+'天）');
+  return true;
+}
+// 每日推进（gameTick 调用，AI 与玩家都走这里）
+function advanceFocus(){
+  for(let cid in countries){
+    let c = countries[cid];
+    if(!c || c.eliminated || !c.focus) continue;
+    if(cid==='rebels') continue;
+    let node = findFocusNode(cid, c.focus.nodeId);
+    if(!node){ c.focus=null; continue; }
+    // 宣战目标已达成时立即完成
+    c.focus.progress++;
+    if(c.focus.progress >= node.days){
+      c.focusDone[node.id] = true;
+      c.focus = null;
+      applyFocusEffects(cid, node);
+      if(cid===game.player){ addLog('✅','国策完成：'+node.icon+' '+node.name); SFX.build(); }
+    }
+  }
+}
+// 执行国策效果
+function applyFocusEffects(cid, node){
+  let c = countries[cid];
+  let e = node.effects||{};
+  // 宣战（自动撕毁与目标的条约）
+  for(let wk of ['war','war2']){
+    if(e[wk]){
+      let t = e[wk];
+      if(countries[t] && !countries[t].eliminated && !areAtWar(cid,t)){
+        delete c.pacts[t]; if(countries[t]) delete countries[t].pacts[cid];
+        declareWar(cid, t);
+      }
+    }
+  }
+  // 加成
+  if(e.buff){
+    let b = e.buff;
+    if(!c.focusBonus) c.focusBonus = {atk:0,def:0,prod:0};
+    if(b.atk) c.focusBonus.atk += b.atk;
+    if(b.def) c.focusBonus.def += b.def;
+    if(b.prod) c.focusBonus.prod += b.prod;
+    if(b.stab) c.stability = Math.max(0, Math.min(100, c.stability + b.stab));
+    if(b.ws) c.warSupport = Math.max(0, Math.min(100, c.warSupport + b.ws));
+  }
+  // 直接工厂（随机分配到己方省份）
+  if(e.fac){
+    let myProvs = provinces.filter(p=>p.controller===cid);
+    for(let i=0;i<(e.fac.mil||0) && myProvs.length>0;i++){
+      let p = myProvs[Math.floor(Math.random()*myProvs.length)];
+      p.milFactories++;
+    }
+    for(let i=0;i<(e.fac.civ||0) && myProvs.length>0;i++){
+      let p = myProvs[Math.floor(Math.random()*myProvs.length)];
+      p.civFactories++;
+    }
+  }
+  // 资源
+  if(e.res){
+    let r = e.res;
+    if(r.steel) c.steel += r.steel;
+    if(r.oil) c.oil += r.oil*200;
+    if(r.cash) c.cash += r.cash;
+    if(r.man) c.manpowerPool += r.man;
+    if(r.equipment) c.equipment['步兵装备'] = (c.equipment['步兵装备']||0) + r.equipment;
+  }
+  // 关系
+  if(e.rel && game.relations[cid]){
+    let cur = game.relations[cid][e.rel.t]||0;
+    game.relations[cid][e.rel.t] = Math.max(-100, Math.min(100, cur + e.rel.d));
+    if(game.relations[e.rel.t]) game.relations[e.rel.t][cid] = Math.max(-100, Math.min(100, (game.relations[e.rel.t][cid]||0) + Math.floor(e.rel.d/2)));
+  }
+  // 互不侵犯条约（双方生效，12个月=360天）
+  if(e.pact && countries[e.pact] && !countries[e.pact].eliminated){
+    let until = game.tick + 360;
+    c.pacts[e.pact] = until;
+    countries[e.pact].pacts[cid] = until;
+    if(game.relations[cid]) game.relations[cid][e.pact] = Math.min(100, (game.relations[cid][e.pact]||0) + 20);
+    if(game.relations[e.pact]) game.relations[e.pact][cid] = Math.min(100, (game.relations[e.pact][cid]||0) + 20);
+    addLog('📜', COUNTRY_DEFS[cid].short+' 与 '+COUNTRY_DEFS[e.pact].short+' 签订互不侵犯条约（12个月）');
+  }
+}
+// 查询两国是否有互不侵犯条约
+function hasPact(a, b){
+  let ca = countries[a], cb = countries[b];
+  if(!ca || !cb) return false;
+  let t = ca.pacts && ca.pacts[b];
+  return t && game.tick < t;
 }
 
 // National doctrine bonus — permanent combat modifiers based on historical military doctrines
@@ -2865,7 +3128,10 @@ function gameTick(){
   
   // Check historical events (every tick)
   checkEvents();
-  
+
+  // 国策树：每日推进（AI 与玩家统一走这里）
+  advanceFocus();
+
   // Update sea control (every 3 ticks for performance)
   if(game.tick % 3 === 0) updateSeaControl();
   
@@ -3452,6 +3718,14 @@ function checkSurrender(){
 
 function declareWar(attacker, defender){
   if(areAtWar(attacker,defender)) return;
+  // 互不侵犯条约：条约期内禁止宣战（国策宣战会先撕毁条约再调这里）
+  if(hasPact(attacker, defender)){
+    if(attacker===game.player){
+      let left = Math.max(0, Math.ceil((countries[attacker].pacts[defender]||0) - game.tick));
+      addLog('📜','与 '+COUNTRY_DEFS[defender].short+' 签有互不侵犯条约（剩余 '+left+' 天），条约期内无法宣战');
+    }
+    return;
+  }
   // 盟友之间禁止互相开战
   if(areAllies(attacker, defender)){
     addLog('🤝', COUNTRY_DEFS[attacker].short + ' 与 ' + COUNTRY_DEFS[defender].short + ' 是盟友关系，不能互相开战！');
@@ -4698,6 +4972,19 @@ function runAI(){
     if(!c._origProvCount || c._origProvCount < myProvs.length) c._origProvCount = myProvs.length;
     
     let agg = c.aggression || 50;
+    // ---- AI 国策：无进行中国策时，按树顺序挑一个可点的开始（走历史路线） ----
+    if(!c.focus && Math.random()<0.5){
+      let tree = getFocusTree(cid);
+      outer: for(let branch of tree.branches){
+        for(let node of branch.nodes){
+          if(focusNodeState(cid,node)==='available'){
+            startFocus(cid, node.id);
+            break outer;
+          }
+        }
+      }
+    }
+
     // Aggressive nations think faster (shorter timer)
     let timerMax = Math.max(5, 40 - agg * 0.35);
     c.aiTimer--;
@@ -5498,6 +5785,7 @@ function updateTopBar(){
   document.getElementById('t-mil').textContent = milF;
   document.getElementById('t-pts').textContent = game.skillPoints;
   document.getElementById('t-date').textContent = fmtDate();
+  updateFocusTopbar(); // 国策树进度
   // 季节显示
   let season = getSeasonName();
   let seasonEl = document.getElementById('t-season');
@@ -6845,6 +7133,11 @@ function doLoadFromSlot(slot){
       c.fuelRatio = sc.fuelRatio !== undefined ? sc.fuelRatio : 1;
       c._fuelShortage = sc._fuelShortage || false;
       c._aiFuelSaver = 0;
+      // 国策树恢复（旧存档默认空状态）
+      c.focus = sc.focus || null;
+      c.focusDone = sc.focusDone || {};
+      c.focusBonus = sc.focusBonus || {atk:0,def:0,prod:0};
+      c.pacts = sc.pacts || {};
     }
     countries[save.player].isAI = false;
 
@@ -6953,7 +7246,11 @@ function buildSaveData(){
       oil: c.oil || 0,
       steel: c.steel || 0,
       fuelRatio: c.fuelRatio || 1,
-      _fuelShortage: c._fuelShortage || false
+      _fuelShortage: c._fuelShortage || false,
+      focus: c.focus ? {...c.focus} : null,
+      focusDone: {...(c.focusDone||{})},
+      focusBonus: {...(c.focusBonus||{atk:0,def:0,prod:0})},
+      pacts: {...(c.pacts||{})}
     };
   }
   return saveData;
@@ -7159,6 +7456,109 @@ function dropNukeAI(cid, targetProvinceId, targetCtrl){
   c.stability = Math.max(0, c.stability - 10);
   
   addLog('☢️',COUNTRY_DEFS[cid].short + ' 在 ' + p.name + ' 投下了原子弹！毁灭了 ' + destroyed + ' 个敌军师团！');
+}
+
+// ==================== 国策树 UI ====================
+function focusEffectText(node){
+  let e = node.effects||{}, parts=[];
+  let b = e.buff||{};
+  if(b.atk) parts.push('攻击+'+b.atk+'%');
+  if(b.def) parts.push('防御+'+b.def+'%');
+  if(b.prod) parts.push('产能+'+b.prod+'%');
+  if(b.stab) parts.push('稳定'+(b.stab>0?'+':'')+b.stab+'%');
+  if(b.ws) parts.push('战支'+(b.ws>0?'+':'')+b.ws+'%');
+  if(e.fac){ let f=[]; if(e.fac.mil)f.push('军工+'+e.fac.mil); if(e.fac.civ)f.push('民工+'+e.fac.civ); parts.push(f.join(' ')); }
+  if(e.res){ let f=[]; if(e.res.steel)f.push('钢铁+'+e.res.steel); if(e.res.oil)f.push('石油+'+e.res.oil); if(e.res.cash)f.push('资金+'+e.res.cash); if(e.res.man)f.push('人力+'+e.res.man); if(e.res.equipment)f.push('步兵装备+'+e.res.equipment); parts.push(f.join(' ')); }
+  if(e.war) parts.push('⚔️ 对'+COUNTRY_DEFS[e.war].short+'宣战');
+  if(e.war2) parts.push('⚔️ 对'+COUNTRY_DEFS[e.war2].short+'宣战');
+  if(e.pact) parts.push('📜 与'+COUNTRY_DEFS[e.pact].short+'互不侵犯(12个月)');
+  if(e.rel) parts.push('与'+COUNTRY_DEFS[e.rel.t].short+'关系'+(e.rel.d>0?'+':'')+e.rel.d);
+  return parts.join(' · ');
+}
+function openFocusTree(){
+  if(!game.player){ return; }
+  let cid = game.player;
+  let c = countries[cid];
+  let tree = getFocusTree(cid);
+  let cd = COUNTRY_DEFS[cid];
+  // 分支列渲染
+  let cols = tree.branches.map(branch=>{
+    let nodes = branch.nodes.map(node=>{
+      let st = focusNodeState(cid, node);
+      let style, badge, prog='';
+      if(st==='done'){ style='border-color:#56d364;background:#12261e;color:#7ee787'; badge='✓'; }
+      else if(st==='active'){
+        style='border-color:#f0c040;background:#2b230d;color:#f0c040';
+        badge='⏳';
+        let pct = Math.floor(c.focus.progress/node.days*100);
+        prog = `<div style="height:4px;background:#30363d;border-radius:2px;margin-top:4px;overflow:hidden"><div style="height:100%;width:${pct}%;background:#f0c040"></div></div>
+          <div style="font-size:9px;color:#8b949e;margin-top:2px">${c.focus.progress}/${node.days}天</div>`;
+      }
+      else if(st==='available'){ style='border-color:#58a6ff;background:#0d1a2b;color:#c9d1d9'; badge='▶'; }
+      else { style='border-color:#30363d;background:#161b22;color:#484f58'; badge='🔒'; }
+      let clickable = st==='available' ? `onclick="focusDetail('${node.id}')"` : '';
+      let cursor = st==='available' ? 'pointer' : 'default';
+      return `<div style="border:1px solid;border-radius:6px;padding:6px 8px;margin-bottom:4px;${style};cursor:${cursor};min-width:120px" ${clickable}>
+        <div style="display:flex;align-items:center;gap:6px;font-size:12px">
+          <span style="font-size:14px">${node.icon}</span>
+          <b style="flex:1">${node.name}</b>
+          <span style="font-size:10px">${badge}</span>
+        </div>
+        <div style="font-size:9px;opacity:0.7;margin-top:2px">${node.days}天</div>
+        ${prog}
+      </div>`;
+    }).join(`<div style="text-align:center;color:#484f58;font-size:12px;line-height:8px">↓</div>`);
+    return `<div style="flex:1;min-width:130px">
+      <div style="text-align:center;color:#f0c040;font-size:11px;font-weight:bold;margin-bottom:6px;padding:4px;background:#1c1610;border-radius:4px;border:1px solid #3d2e0f">🧭 ${branch.name}</div>
+      ${nodes}
+    </div>`;
+  }).join('<div style="width:10px"></div>');
+  let cur = c.focus ? findFocusNode(cid, c.focus.nodeId) : null;
+  mpShowModal(`
+    <h2>${cd.flag||'🎯'} ${cd.name} — ${tree.name}</h2>
+    ${cur?`<div style="font-size:11px;color:#f0c040;margin-bottom:8px">⏳ 正在推行：<b>${cur.icon} ${cur.name}</b>（${c.focus.progress}/${cur.days}天）</div>`
+      :'<div style="font-size:11px;color:#58a6ff;margin-bottom:8px">💡 点击可点亮的国策查看详情并开始推行（同一时间只能进行一个）</div>'}
+    <div style="display:flex;gap:10px;overflow-x:auto;padding:4px 0;max-height:55vh;overflow-y:auto">${cols}</div>
+    <div class="save-modal-btns">
+      <button class="btn btn-sm" style="background:transparent;color:#8b949e;border:1px solid #30363d" onclick="mpCloseModal()">关闭</button>
+    </div>
+  `);
+}
+// 国策详情确认弹层
+function focusDetail(nodeId){
+  let cid = game.player;
+  let node = findFocusNode(cid, nodeId);
+  if(!node) return;
+  let c = countries[cid];
+  let locked = '';
+  if(c.focus) locked = `<p style="color:#f85149;font-size:11px">⚠️ 当前正在推行《${(findFocusNode(cid,c.focus.nodeId)||{}).name}》，需完成或放弃后才能开始新国策</p>`;
+  let canStart = !c.focus;
+  mpShowModal(`
+    <h2>${node.icon} ${node.name}</h2>
+    <p style="color:#c9d1d9;font-size:13px;line-height:1.6">${node.desc}</p>
+    <div style="border:1px solid #30363d;border-radius:6px;padding:8px;margin:10px 0;font-size:12px">
+      <div style="color:#8b949e;font-size:10px;margin-bottom:4px">效果</div>
+      <span style="color:#7ee787">${focusEffectText(node)||'—'}</span>
+      <div style="color:#8b949e;font-size:10px;margin-top:6px">耗时 ${node.days} 天</div>
+      ${node.need&&node.need.warFirst?`<div style="color:#d29922;font-size:10px;margin-top:4px">前置条件：需先与 ${COUNTRY_DEFS[node.need.warFirst].short} 处于战争状态</div>`:''}
+    </div>
+    ${locked}
+    <div class="save-modal-btns">
+      <button class="btn btn-sm" style="background:transparent;color:#8b949e;border:1px solid #30363d" onclick="openFocusTree()">← 返回国策树</button>
+      ${canStart?`<button class="btn btn-go" onclick="startFocus('${cid}','${nodeId}');openFocusTree()">🎯 开始推行</button>`:''}
+    </div>
+  `);
+}
+// 顶栏国策进度显示（updateTopBar 调用）
+function updateFocusTopbar(){
+  let el = document.getElementById('t-focus');
+  if(!el || !game.player) return;
+  let c = countries[game.player];
+  if(c && c.focus){
+    let node = findFocusNode(game.player, c.focus.nodeId);
+    if(node){ el.style.display=''; el.textContent = node.icon+' '+node.name+' '+c.focus.progress+'/'+node.days+'天'; return; }
+  }
+  el.style.display='none';
 }
 
 // ==================== 联机对战系统（MQTT · 主机权威） ====================
@@ -7850,6 +8250,10 @@ function mpApplySnapshot(save){
       c.steel = sc.steel !== undefined ? sc.steel : c.steel;
       c.fuelRatio = sc.fuelRatio !== undefined ? sc.fuelRatio : 1;
       c._fuelShortage = sc._fuelShortage || false;
+      c.focus = sc.focus || null;
+      c.focusDone = sc.focusDone || {};
+      c.focusBonus = sc.focusBonus || {atk:0,def:0,prod:0};
+      c.pacts = sc.pacts || {};
       c.isAI = true;
     }
     if(mpMeta.players){
@@ -7916,6 +8320,11 @@ function mpInstallClientWrappers(){
   });
   // 国策系统是全局共享资源，联机模式暂不开放
   window.buySkill = function(){ addLog('🌐','联机模式暂不开放国策系统'); };
+  // 国策树：转发到主机执行（主机权威）
+  window.startFocus = function(fcid, nodeId){
+    if(fcid && fcid !== MP.myCountry){ return; }
+    mpSendCmd({t:'focus', node:nodeId});
+  };
   // 移动：打包本回合点击的所有部队
   let origMove = window.moveUnit;
   window.moveUnit = function(u, pid){
@@ -7964,6 +8373,12 @@ function mpExecCmd(cmd){
   }
   if(cmd.t==='speed'){
     if(typeof cmd.s==='number' && cmd.s>=0 && cmd.s<=3){ setSpeed(cmd.s); }
+    return;
+  }
+  if(cmd.t==='focus'){
+    // 国策树：玩家对自己的国家推行国策
+    let node = findFocusNode(cmd.c, cmd.node);
+    if(node && startFocus(cmd.c, cmd.node)) mpPublishSnapshot(true);
     return;
   }
   if(cmd.t==='fn'){
