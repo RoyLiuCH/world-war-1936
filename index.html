@@ -3192,7 +3192,12 @@ function captureProvince(provinceId, attackerCountry){
   let p = provinces[provinceId];
   let oldOwner = p.controller;
   p.controller = attackerCountry;
-  
+
+  // 战争破坏：攻占的省份工业受损 — 修复"零工厂开局纯屯兵、打下别国白嫖现成工厂"的滚雪球漏洞
+  if(p.milFactories>0 && Math.random()<0.6){ p.milFactories--; }
+  if(p.civFactories>0 && Math.random()<0.35){ p.civFactories--; }
+  if(p.fortLevel>0){ p.fortLevel = Math.max(0, p.fortLevel-1); }
+
   // 战争支持率：攻城略地=胜仗（+3），失地=败仗（-5）
   let atkC = countries[attackerCountry];
   if(atkC && atkC.warSupport !== undefined) atkC.warSupport = Math.min(100, atkC.warSupport + 3);
@@ -4701,25 +4706,44 @@ function runAI(){
     
     let myTotalPower = myUnits.reduce((s,u)=>s+(u.hp/u.maxHp)*UNIT_TYPES[u.type].atk, 0);
     let myIdleUnits = myUnits.filter(u=>!u.moving && !u.fighting);
+
+    // ---- 威胁评估：军力远超我方且接壤的国家视为威胁（含玩家屯兵速攻流） ----
+    let threatIds = [];
+    let threatPower = 0;
+    for(let tid in countries){
+      if(tid===cid || tid==='rebels' || countries[tid].eliminated) continue;
+      let tPow = (unitsByCountry[tid]||[]).reduce((s,u)=>s+(u.hp/u.maxHp)*UNIT_TYPES[u.type].atk, 0);
+      if(tPow <= myTotalPower*1.1) continue; // 只警惕明显强于我的邻居
+      let adjacent = myProvs.some(mp=>getNeighbors(mp.id).some(n=>provinces[n] && provinces[n].controller===tid));
+      if(adjacent){ threatIds.push(tid); threatPower += tPow; }
+    }
+    let threatened = threatIds.length>0 && threatPower > myTotalPower*1.5;
+    // 本土正被敌国占领（有失地）
+    let homelandOccupied = provinces.some(p=>p.cid===cid && p.controller!==cid && p.controller!=='rebels' && areAtWar(cid, p.controller));
+    if(threatened || homelandOccupied){ c.aiTimer = Math.max(3, Math.floor(c.aiTimer*0.5)); } // 危急时刻反应加倍
     
     // ---- BUILD (skip if in exile) ----
     if(!inExile){
-      // 60% chance to build civ factories, 40% mil
+      // 60% chance to build civ factories, 40% mil；受威胁时全部转军工备战
       let needCiv = (c.civFactories < myProvs.length + 2) || (c.cash > 500 && Math.random()<0.6);
       let needBuild = myProvs.reduce((s,p)=>s+(p.buildQueue.length>0?1:0),0) < myProvs.length;
       if(needBuild && c.cash > 200){
         let target = myProvs[Math.floor(Math.random()*myProvs.length)];
-        let type = needCiv ? 'civ' : 'mil';
+        let type = (threatened || homelandOccupied) ? 'mil' : (needCiv ? 'civ' : 'mil');
         target.buildQueue.push({type,progress:0,total:type==='civ'?200:250});
         c.cash -= 150;
       }
-      
-      // AI builds forts on border provinces (25% chance per AI tick)
-      if(c.cash > 300 && Math.random()<0.25){
+
+      // AI builds forts on border provinces；受威胁时频率翻倍且优先修在威胁方向
+      if(c.cash > 300 && Math.random() < (threatened ? 0.55 : 0.25)){
         let borderProvs = myProvs.filter(mp=>{
           let ns = getNeighbors(mp.id);
           return ns.some(n=>provinces[n] && provinces[n].controller !== cid);
         });
+        if(threatened && borderProvs.length>0){
+          let danger = borderProvs.filter(mp=>getNeighbors(mp.id).some(n=>provinces[n] && threatIds.includes(provinces[n].controller)));
+          if(danger.length>0) borderProvs = danger;
+        }
         if(borderProvs.length>0){
           let target = borderProvs[Math.floor(Math.random()*borderProvs.length)];
           if(target.fortLevel < 3 && !target.buildQueue.some(bq=>bq.type==='fort')){
@@ -4754,6 +4778,7 @@ function runAI(){
     // ---- TRAIN (skip if in exile — no provinces to deploy) ----
     if(!inExile){
       let targetUnits = Math.floor(myProvs.length * 1.5 + agg*0.2);
+      if(threatened || homelandOccupied) targetUnits += Math.floor(myProvs.length*0.5) + 6; // 危急时刻扩军备战
       // AI builds destroyers if it has coastal provinces (provinces on sea routes)
       let coastalProvs = myProvs.filter(mp=>{
         return getNeighbors(mp.id).some(n=>{
@@ -4783,11 +4808,21 @@ function runAI(){
       let types;
       if(fuelSaving){
         types = ['infantry','infantry','infantry','garrison','garrison'];
+      } else if(threatened || homelandOccupied){
+        types = ['infantry','infantry','infantry','garrison','motorized']; // 防御优先：便宜量大上得快
       } else if(agg>=70) types = ['armor','armor','motorized','motorized','infantry'];
       else if(agg>=40) types = ['motorized','motorized','infantry','infantry','garrison'];
       else types = ['infantry','infantry','garrison','garrison'];
       let t = types[Math.floor(Math.random()*types.length)];
       let provs = myProvs.filter(p=>getUnitsAt(p.id,cid).length<3);
+      // 新部队优先部署在危险边境（面对威胁国或敌占区方向）
+      if(provs.length>0 && (threatIds.length>0 || homelandOccupied)){
+        let warEdge = provs.filter(p=>getNeighbors(p.id).some(n=>{
+          let np = provinces[n];
+          return np && np.controller!==cid && (threatIds.includes(np.controller) || areAtWar(cid, np.controller));
+        }));
+        if(warEdge.length>0) provs = warEdge;
+      }
       if(provs.length>0){
         let p = provs[Math.floor(Math.random()*provs.length)];
         createUnit(p.id, t);
@@ -4864,6 +4899,11 @@ function runAI(){
         if(myTotalPower > tPower*2) score += 20;
         if(myProvs.length > tProvs.length) score += 15;
         if(tProvs.length<=3) score += 10; // Easy prey
+        // 扩张惩罚：对方已吞并大量外国领土（屯兵推平邻国的扩张者）会被视为公敌，邻国更倾向于先发制人
+        let tExpansion = tProvs.filter(p=>p.cid!==tid).length;
+        if(tExpansion >= 3) score += Math.min(45, tExpansion*3);
+        // 威胁反制：对方军力远超我且接壤（正在对我屯兵）→ 防御性先发制人加分
+        if(threatIds.includes(tid)) score += 20;
         
         // Aggression multiplier
         score *= (agg/50);
@@ -5190,7 +5230,60 @@ function runAI(){
       continue; // Skip normal attack logic for exile
     }
     
-    if(atWarWith.length===0) continue;
+    // ---- 和平期调防：受威胁时把内地闲散部队逐步调往危险边境（不再原地发呆等人推） ----
+    if(atWarWith.length===0){
+      if(threatIds.length>0){
+        let dangerBorder = myProvs.filter(mp=>getNeighbors(mp.id).some(n=>provinces[n] && threatIds.includes(provinces[n].controller)));
+        if(dangerBorder.length>0){
+          for(let uid in unitsByProv){
+            let force = unitsByProv[uid];
+            if(!force || force.length===0) continue;
+            let pid = parseInt(uid);
+            if(dangerBorder.some(dp=>dp.id===pid)) continue; // 已在危险边境
+            if(getUnitsAt(pid,cid).length<=1) continue; // 内地至少保留 1 支
+            let movers = force.slice(Math.floor(force.length/2)); // 每次调走一半驰援
+            let best=null, bestD=Infinity;
+            for(let n of getNeighbors(pid)){
+              let np = provinces[n];
+              if(!np || np.controller!==cid) continue;
+              let sk = Math.min(pid,n)+':'+Math.max(pid,n);
+              if(SEA_ROUTES.has(sk)) continue; // 调防不走海路
+              let d = Math.min.apply(null, dangerBorder.map(dp=>Math.hypot(np.x-dp.x, np.y-dp.y)));
+              if(d<bestD){ bestD=d; best=n; }
+            }
+            if(best!==null) movers.forEach(u=>{ if(!u.moving&&!u.fighting) moveUnit(u,best); });
+          }
+        }
+      }
+      continue;
+    }
+
+    // ---- 战时驰援：远离前线的闲散部队向最近战线推进（优先收复失地），不再坐视本土被蚕食 ----
+    {
+      let lostHome = provinces.filter(p=>p.cid===cid && p.controller!==cid && atWarWith.includes(p.controller)).map(p=>p.id);
+      let front = provinces.filter(p=>p.controller!==cid && atWarWith.includes(p.controller)).map(p=>p.id);
+      let targets = lostHome.length>0 ? lostHome : front;
+      if(targets.length>0){
+        for(let uid in unitsByProv){
+          let force = unitsByProv[uid];
+          if(!force || force.length===0) continue;
+          let pid = parseInt(uid);
+          if(getNeighbors(pid).some(n=>targets.includes(n))) continue; // 已接敌，交给攻击逻辑
+          let hasNaval = force.some(u=>u.type==='destroyer'||u.type==='carrier'||u.type==='submarine'||u.type==='motorized'||u.type==='armor');
+          let best=null, bestD=Infinity;
+          for(let n of getNeighbors(pid)){
+            let np = provinces[n];
+            if(!np) continue;
+            let sk = Math.min(pid,n)+':'+Math.max(pid,n);
+            if(SEA_ROUTES.has(sk) && !hasNaval) continue;
+            if(np.controller!==cid && !atWarWith.includes(np.controller)) continue; // 不借道中立国
+            let d = Math.min.apply(null, targets.map(tp=>Math.hypot(np.x-provinces[tp].x, np.y-provinces[tp].y)));
+            if(d<bestD){ bestD=d; best=n; }
+          }
+          if(best!==null) force.forEach(u=>{ if(!u.moving&&!u.fighting) moveUnit(u,best); });
+        }
+      }
+    }
     
     // Puppet AI: move to support master's wars
     if(isPuppet && cd.puppetOf){
