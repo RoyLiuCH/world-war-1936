@@ -382,14 +382,14 @@ const FOCUS_TREES = {
   germany:{name:'德意志的复兴',branches:[
     {name:'欧洲扩张',nodes:[
       {id:'ger_rhine',name:'进军莱茵兰',icon:'🚩',days:10,req:[],desc:'撕毁《凡尔赛条约》，重新军事化莱茵兰。西方列强只会抗议。',effects:{buff:{ws:10,stab:5}}},
-      {id:'ger_anschluss',name:'德奥合并',icon:'🇦🇹',days:14,req:['ger_rhine'],desc:'兵不血刃吞并奥地利，实现大德意志的第一步。',effects:{annex:'austria',buff:{ws:5}}},
-      {id:'ger_munich',name:'慕尼黑阴谋',icon:'📋',days:14,req:['ger_anschluss'],desc:'绥靖政策的顶点：接管捷克军工。',effects:{annex:'czechoslovakia',res:{steel:80,equipment:60},buff:{ws:5}}},
-      {id:'ger_danzig',name:'但泽或战争',icon:'⚔️',days:10,req:['ger_munich'],desc:'向波兰发出最后通牒：交出但泽走廊，否则战争！',effects:{war:'poland',buff:{atk:10}}},
-      {id:'ger_west',name:'施里芬计划2.0',icon:'🗺️',days:21,req:['ger_danzig'],desc:'绕过马奇诺防线，取道低地国家直捣巴黎。',effects:{war:'france',war2:'netherlands',buff:{atk:10}}},
+      {id:'ger_anschluss',name:'德奥合并',icon:'🇦🇹',days:14,req:['ger_rhine'],desc:'兵不血刃吞并奥地利，实现大德意志的第一步。',effects:{annex:'austria',buff:{ws:5}},need:{year:1938}},
+      {id:'ger_munich',name:'慕尼黑阴谋',icon:'📋',days:14,req:['ger_anschluss'],desc:'绥靖政策的顶点：接管捷克军工。',effects:{annex:'czechoslovakia',res:{steel:80,equipment:60},buff:{ws:5}},need:{year:1938}},
+      {id:'ger_danzig',name:'但泽或战争',icon:'⚔️',days:10,req:['ger_munich'],desc:'向波兰发出最后通牒：交出但泽走廊，否则战争！',effects:{war:'poland',buff:{atk:10}},need:{year:1939}},
+      {id:'ger_west',name:'施里芬计划2.0',icon:'🗺️',days:21,req:['ger_danzig'],desc:'绕过马奇诺防线，取道低地国家直捣巴黎。',effects:{war:'france',war2:'netherlands',buff:{atk:10}},need:{year:1940}},
     ]},
     {name:'东方路线',nodes:[
       {id:'ger_pact',name:'苏德互不侵犯条约',icon:'📜',days:10,req:[],desc:'与斯大林秘密瓜分东欧，确保东方安全（12个月内互不开战）。',effects:{pact:'ussr',rel:{t:'ussr',d:30}}},
-      {id:'ger_barbarossa',name:'巴巴罗萨计划',icon:'🦅',days:21,req:['ger_pact'],desc:'撕毁条约，三路大军闪击苏联！攻苏+25%。',effects:{war:'ussr',buff:{atk:25,ws:10}},need:{warFirst:'poland'}},
+      {id:'ger_barbarossa',name:'巴巴罗萨计划',icon:'🦅',days:21,req:['ger_pact'],desc:'撕毁条约，三路大军闪击苏联！攻苏+25%。',effects:{war:'ussr',buff:{atk:25,ws:10}},need:{year:1941,warFirst:'poland'}},
       {id:'ger_ostland',name:'东方总督辖区',icon:'🏚️',days:14,req:['ger_barbarossa'],desc:'在占领区实施总督统治，压榨战争资源。',effects:{buff:{prod:20,res:{steel:100}}}},
     ]},
     {name:'战时经济',nodes:[
@@ -399,7 +399,7 @@ const FOCUS_TREES = {
     ]},
     {name:'西线战火',nodes:[
       {id:'ger_westwall',name:'齐格菲防线',icon:'🧱',days:14,req:['ger_rhine'],desc:'西部边境的钢筋混凝土堡垒群，防+15%。',effects:{buff:{def:15}}},
-      {id:'ger_sealion',name:'海狮计划',icon:'🦁',days:21,req:['ger_west'],desc:'登陆不列颠！征服英伦三岛。',effects:{war:'uk',buff:{atk:15,ws:10}}},
+      {id:'ger_sealion',name:'海狮计划',icon:'🦁',days:21,req:['ger_west'],desc:'登陆不列颠！征服英伦三岛。',effects:{war:'uk',buff:{atk:15,ws:10}},need:{year:1940}},
       {id:'ger_blitz',name:'不列颠空战',icon:'✈️',days:14,req:['ger_sealion'],desc:'戈林的鹰日行动：夺取英吉利海峡制空权。',effects:{buff:{atk:15}}},
       {id:'ger_wolf',name:'狼群战术',icon:'🐺',days:14,req:['ger_blitz'],desc:'邓尼茨的U艇绞索：封锁英国海运命脉。',effects:{buff:{prod:15},res:{steel:60}}},
       {id:'ger_desert',name:'非洲军团',icon:'🏜️',days:14,req:['ger_west'],desc:'隆美尔驰援意大利，挺进埃及。',effects:{buff:{atk:10}}},
@@ -420,11 +420,11 @@ const FOCUS_TREES = {
     {name:'外交斡旋',nodes:[
       {id:'sov_pact',name:'苏德互不侵犯条约',icon:'📜',days:10,req:[],desc:'与德国秘密瓜分东欧，争取备战时间（12个月内互不开战）。',effects:{pact:'germany',rel:{t:'germany',d:30}}},
       {id:'sov_neutral',name:'对日中立条约',icon:'🕊️',days:10,req:['sov_pact'],desc:'与日本签订中立条约，稳住远东（12个月）。',effects:{pact:'japan',rel:{t:'japan',d:20}}},
-      {id:'sov_baltic',name:'吞并波罗的海',icon:'🧩',days:14,req:['sov_neutral'],desc:'依据苏德秘密议定书势力范围，强行合并立陶宛、拉脱维亚、爱沙尼亚。',effects:{annex:['lithuania','latvia','estonia'],buff:{ws:5}}},
-      {id:'sov_winter',name:'冬季战争',icon:'❄️',days:14,req:['sov_baltic'],desc:'卡累利阿地峡的炮声：对芬兰宣战索取边境领土。',effects:{war:'finland',buff:{atk:5}}},
+      {id:'sov_baltic',name:'吞并波罗的海',icon:'🧩',days:14,req:['sov_neutral'],desc:'依据苏德秘密议定书势力范围，强行合并立陶宛、拉脱维亚、爱沙尼亚。',effects:{annex:['lithuania','latvia','estonia'],buff:{ws:5}},need:{year:1940}},
+      {id:'sov_winter',name:'冬季战争',icon:'❄️',days:14,req:['sov_baltic'],desc:'卡累利阿地峡的炮声：对芬兰宣战索取边境领土。',effects:{war:'finland',buff:{atk:5}},need:{year:1939}},
     ]},
     {name:'解放欧洲',nodes:[
-      {id:'sov_greatp',name:'伟大卫国战争',icon:'⭐',days:14,req:['sov_deep'],desc:'祖国母亲在召唤！对德宣战，防御+10%。',effects:{war:'germany',buff:{def:10,ws:15}}},
+      {id:'sov_greatp',name:'伟大卫国战争',icon:'⭐',days:14,req:['sov_deep'],desc:'祖国母亲在召唤！遭到德国入侵后全民动员，防御+10%、攻+10%。',effects:{buff:{def:10,atk:10,ws:15}},need:{year:1940,warFirst:'germany'}},
       {id:'sov_counter',name:'库尔斯克会战',icon:'💥',days:21,req:['sov_greatp'],desc:'史上最大坦克会战：普罗霍罗夫卡的钢铁碰撞。',effects:{buff:{atk:15,def:10}}},
       {id:'sov_bagration',name:'巴格拉季昂行动',icon:'🔨',days:21,req:['sov_counter'],desc:'粉碎德军中央集团军群，收复白俄罗斯。',effects:{buff:{atk:20},res:{man:60}}},
       {id:'sov_berlin',name:'攻占柏林',icon:'🏰',days:21,req:['sov_bagration'],desc:'红旗插上国会大厦，解放全欧洲。',effects:{buff:{atk:20,ws:10}}},
@@ -438,13 +438,13 @@ const FOCUS_TREES = {
   ]},
   japan:{name:'八纮一宇',branches:[
     {name:'中国事变',nodes:[
-      {id:'jap_marco',name:'卢沟桥事变',icon:'🌉',days:10,req:[],desc:'宛平城外的枪声，全面侵华战争爆发。',effects:{war:'china',buff:{atk:10}}},
+      {id:'jap_marco',name:'卢沟桥事变',icon:'🌉',days:10,req:[],desc:'宛平城外的枪声，全面侵华战争爆发。',effects:{war:'china',buff:{atk:10}},need:{year:1937}},
       {id:'jap_three',name:'以战养战',icon:'💸',days:14,req:['jap_marco'],desc:'在占领区疯狂掠夺资源。',effects:{buff:{prod:15},res:{steel:100,oil:50}}},
       {id:'jap_spear',name:'刺刀突击',icon:'🗡️',days:14,req:['jap_three'],desc:'白刃战精神注入部队。',effects:{buff:{atk:15,ws:10}}},
     ]},
     {name:'南进政策',nodes:[
       {id:'jap_nomonhan',name:'诺门罕停战',icon:'🐫',days:10,req:[],desc:'对苏联保持中立，全力南进。',effects:{pact:'ussr',rel:{t:'ussr',d:20}}},
-      {id:'jap_south',name:'南进政策',icon:'🌴',days:21,req:['jap_nomonhan'],desc:'夺取东南亚的资源地带：对美英宣战！',effects:{war:'usa',war2:'uk',buff:{atk:10}}},
+      {id:'jap_south',name:'南进政策',icon:'🌴',days:21,req:['jap_nomonhan'],desc:'夺取东南亚的资源地带：对美英宣战！',effects:{war:'usa',war2:'uk',buff:{atk:10}},need:{year:1941}},
       {id:'jap_zuharu',name:'偷袭珍珠港',icon:'✈️',days:14,req:['jap_south'],desc:'虎！虎！虎！重创美国太平洋舰队。',effects:{buff:{atk:20,ws:10}}},
     ]},
     {name:'海军扩建',nodes:[
@@ -463,8 +463,8 @@ const FOCUS_TREES = {
     {name:'复兴罗马',nodes:[
       {id:'ita_ethiopia',name:'侵略埃塞俄比亚',icon:'🛡️',days:10,req:[],desc:'为洗刷阿杜瓦之耻，出兵东非。战争支持率+10。',effects:{war:'ethiopia',buff:{atk:10,ws:10}}},
       {id:'ita_spain',name:'武装干涉西班牙',icon:'🇪🇸',days:14,req:['ita_ethiopia'],desc:'派遣志愿军援助佛朗哥。',effects:{buff:{atk:5,ws:5}}},
-      {id:'ita_albania',name:'吞并阿尔巴尼亚',icon:'🗺️',days:10,req:['ita_spain'],desc:'控制亚得里亚海东岸，和平吞并阿尔巴尼亚。',effects:{annex:'albania',res:{steel:40}}},
-      {id:'ita_greece',name:'进攻希腊',icon:'⚔️',days:14,req:['ita_albania'],desc:'墨索里尼的"平行战争"：向希腊宣战。',effects:{war:'greece',buff:{atk:10}}},
+      {id:'ita_albania',name:'吞并阿尔巴尼亚',icon:'🗺️',days:10,req:['ita_spain'],desc:'控制亚得里亚海东岸，和平吞并阿尔巴尼亚。',effects:{annex:'albania',res:{steel:40}},need:{year:1939}},
+      {id:'ita_greece',name:'进攻希腊',icon:'⚔️',days:14,req:['ita_albania'],desc:'墨索里尼的"平行战争"：向希腊宣战。',effects:{war:'greece',buff:{atk:10}},need:{year:1940}},
     ]},
     {name:'殖民帝国',nodes:[
       {id:'ita_littorio',name:'利托里奥级战列舰',icon:'⚓',days:14,req:[],desc:'地中海是我们的海！',effects:{res:{steel:80},buff:{prod:10}}},
@@ -473,7 +473,7 @@ const FOCUS_TREES = {
     {name:'轴心之路',nodes:[
       {id:'ita_axis',name:'罗马-柏林轴心',icon:'⚫',days:10,req:[],desc:'墨索里尼与希特勒结盟：与德关系+50。',effects:{rel:{t:'germany',d:50},buff:{stab:5}}},
       {id:'ita_pactsteel',name:'钢铁条约',icon:'🤝',days:10,req:['ita_axis'],desc:'德意军事同盟正式化，产能+10%。',effects:{buff:{prod:10,ws:5}}},
-      {id:'ita_war',name:'对法宣战',icon:'⚔️',days:14,req:['ita_pactsteel'],desc:'趁法国崩溃之际分一杯羹。',effects:{war:'france',buff:{atk:10}}},
+      {id:'ita_war',name:'对法宣战',icon:'⚔️',days:14,req:['ita_pactsteel'],desc:'趁法国崩溃之际分一杯羹。',effects:{war:'france',buff:{atk:10}},need:{year:1940}},
     ]},
   ]},
   france:{name:'共和国的抉择',branches:[
@@ -483,7 +483,7 @@ const FOCUS_TREES = {
     ]},
     {name:'政治抉择',nodes:[
       {id:'fra_appease',name:'绥靖政策',icon:'🤝',days:10,req:[],desc:'张伯伦式妥协：与德国关系+30，换取虚假和平。',effects:{rel:{t:'germany',d:30},buff:{stab:5}}},
-      {id:'fra_resist',name:'宁死不降',icon:'🇫🇷',days:14,req:[],desc:'一战老兵的血性：对德宣战，防御+15%。',effects:{war:'germany',buff:{def:15,ws:10}}},
+      {id:'fra_resist',name:'宁死不降',icon:'🇫🇷',days:14,req:[],desc:'一战老兵的血性：遭德国入侵后全民抗战，防御+15%、战支+10。',effects:{buff:{def:15,ws:10}},need:{warFirst:'germany'}},
     ]},
     {name:'自由法国',nodes:[
       {id:'fra_dunkirk',name:'敦刻尔克大撤退',icon:'🚢',days:10,req:['fra_resist'],desc:'发电机行动：33万军队撤往英国。',effects:{buff:{def:10}}},
@@ -496,7 +496,7 @@ const FOCUS_TREES = {
       {id:'uk_appease',name:'绥靖政策',icon:'☂️',days:10,req:[],desc:'一代人的和平？与德国周旋。',effects:{rel:{t:'germany',d:20},buff:{stab:5}}},
       {id:'uk_churchill',name:'丘吉尔上台',icon:'🎩',days:10,req:[],desc:'我们将战斗到底！战争支持率+20。',effects:{buff:{ws:20,stab:5}}},
       {id:'uk_dunkirk',name:'敦刻尔克精神',icon:'🚢',days:14,req:['uk_churchill'],desc:'撤退不是失败：防御+15%。',effects:{buff:{def:15}}},
-      {id:'uk_overlord',name:'霸王行动',icon:'🌊',days:21,req:['uk_dunkirk'],desc:'反攻欧陆！对德宣战，攻击+20%。',effects:{war:'germany',buff:{atk:20}}},
+      {id:'uk_overlord',name:'霸王行动',icon:'🌊',days:21,req:['uk_dunkirk'],desc:'反攻欧陆！对德宣战，攻击+20%。',effects:{war:'germany',buff:{atk:20}},need:{year:1944}},
     ]},
     {name:'帝国空军',nodes:[
       {id:'uk_radar',name:'本土链雷达',icon:'📡',days:10,req:[],desc:'道丁系统预警网络。',effects:{buff:{def:10}}},
@@ -515,8 +515,8 @@ const FOCUS_TREES = {
     {name:'孤立与参战',nodes:[
       {id:'us_isolation',name:'孤立主义',icon:'🛋️',days:10,req:[],desc:'远离欧洲的战争：稳定+10，战支-10。',effects:{buff:{stab:10,ws:-10}}},
       {id:'us_lendlease',name:'租借法案',icon:'📦',days:14,req:['us_isolation'],desc:'民主兵工厂开动：产能+25%。',effects:{buff:{prod:25}}},
-      {id:'us_day',name:'国耻日',icon:'🔥',days:14,req:['us_lendlease'],desc:'珍珠港的浓烟唤醒巨人：对日宣战！战支+30。',effects:{war:'japan',buff:{ws:30,atk:15}}},
-      {id:'us_normandy',name:'诺曼底登陆',icon:'🚢',days:21,req:['us_day'],desc:'霸王行动：对德宣战，攻击+20%。',effects:{war:'germany',buff:{atk:20}}},
+      {id:'us_day',name:'国耻日',icon:'🔥',days:14,req:['us_lendlease'],desc:'珍珠港的浓烟唤醒巨人：对日宣战！战支+30。',effects:{war:'japan',buff:{ws:30,atk:15}},need:{year:1941}},
+      {id:'us_normandy',name:'诺曼底登陆',icon:'🚢',days:21,req:['us_day'],desc:'霸王行动：对德宣战，攻击+20%。',effects:{war:'germany',buff:{atk:20}},need:{year:1944}},
     ]},
     {name:'工业巨人',nodes:[
       {id:'us_industry',name:'工业巨人觉醒',icon:'🏭',days:14,req:[],desc:'自由企业的战争动员。',effects:{fac:{civ:3,mil:2}}},
@@ -1648,6 +1648,8 @@ function focusNodeState(cid, node){
   if(node.need && node.need.warFirst){
     if(!areAtWar(cid, node.need.warFirst)) return 'locked';
   }
+  // 附加条件：need.year = 历史年份门槛（如诺曼底1944、巴巴罗萨1941），未到年份锁定
+  if(node.need && node.need.year && game.date.year < node.need.year) return 'locked';
   // 宣战类节点：目标已灭亡/已交战则视为已完成
   if(node.effects && (node.effects.war || node.effects.war2)){
     for(let wk of ['war','war2']){
@@ -4096,7 +4098,7 @@ function guaranteeApplies(guarantor, attacker){
 }
 
 // 阵营逐步卷入评估（每周调用）：战争持续越久，同阵营国家越可能按关系+好战度卷入
-// 规则：保密约国不卷入；美国孤立主义不卷入；傀儡只能随宗主参战
+// 规则：玩家绝不自动卷入（由玩家自己决定）；保密约国不卷入；美国孤立主义不卷入；傀儡只能随宗主参战
 function checkAllianceEntries(){
   let wars = game.wars.slice();
   for(let w of wars){
@@ -4107,17 +4109,20 @@ function checkAllianceEntries(){
       for(let cid in countries){
         let c = countries[cid];
         if(cid === side || cid === enemy || !c || c.eliminated || cid === 'rebels') continue;
+        if(cid === game.player) continue; // ★ 玩家是决策者：绝不因阵营漂移被自动拖入战争
         if(getFaction(cid) !== sideFaction) continue;
         if(COUNTRY_DEFS[cid] && COUNTRY_DEFS[cid].puppetOf) continue; // 傀儡只能随宗主参战
         if(areAtWar(cid, enemy) || areAllies(cid, enemy)) continue;
         if(hasPact(cid, enemy)) continue; // 与敌方有互不侵犯条约：不卷入
+        if(c._joinCd > 0) continue; // 卷入冷却：避免短时间内被多条战线连续拖入
         // 美国孤立主义：只有走完国策（国耻日/诺曼底登陆）才可能卷入对外战争
         if(cid === 'usa' && !(c.focusDone && (c.focusDone.us_day || c.focusDone.us_normandy))) continue;
         let rel = game.relations[cid] ? (game.relations[cid][side] || 0) : 0;
         let agg = c.aggression || 50;
-        let chance = (rel - 20 + agg) / 900; // 每周小概率：关系好+好战度高才卷得快
+        let chance = (rel - 20 + agg) / 2400; // 每周小概率：关系好+好战度高才卷得快
         if(chance > 0 && Math.random() < chance){
           if(joinWarSafely(cid, enemy)){
+            c._joinCd = 60 + Math.floor(Math.random()*60);
             addLog('🌐', COUNTRY_DEFS[cid].short + ' 卷入战争，加入 ' + COUNTRY_DEFS[side].short + ' 一方');
             joinPuppetsToWar(cid, enemy);
           }
@@ -5067,8 +5072,14 @@ function runAI(){
       if(countries[tid].eliminated) continue;
       if(areAtWar(cid,tid)) atWarWith.push(tid);
     }
-    
-    if(!inExile && !isPuppet && (atWarWith.length===0 || agg>=70)){
+    // 开战冷却：刚主动宣过战的国家短期内不再开新战线（避免一个月内连打半个世界）
+    if(c._warCd > 0) c._warCd--;
+
+    // 历史节奏：1938 年及以前 AI 不主动挑起战争，战争只由国策树驱动
+    // （意埃战争、中日战争、德奥合并/慕尼黑等史实节点），避免开局即世界大乱
+    let aiWarAllowed = game.date.year >= 1939;
+
+    if(!inExile && !isPuppet && aiWarAllowed && !(c._warCd > 0) && (atWarWith.length===0 || agg>=70)){
       // Find enemy targets
       let potentialTargets = [];
       for(let tid in countries){
@@ -5080,13 +5091,19 @@ function runAI(){
         let rel = game.relations[cid] ? (game.relations[cid][tid]||0) : 0;
         if(rel > 30) continue; // 友好国家不是攻击目标（防止对前宗主/邻邦莫名宣战）
         
-        // Check if neighbors
-        let myBorder = myProvs.some(mp=>{
-          let ns = getNeighbors(mp.id);
-          return ns.some(n=>provinces[n].controller===tid);
-        });
-        
         let tProvs = provByCtrl[tid] || [];
+        let tProvIds = new Set(tProvs.map(p=>p.id));
+        // 攻击可达性：必须陆路接壤，或存在海路航线（跨海投送），否则鞭长莫及不宣战
+        // （修复"德国跨洋打中国""苏联打荷兰"这类地理上不可能的宣战）
+        let myBorder = myProvs.some(mp=>{
+          if(getNeighbors(mp.id).some(n=>tProvIds.has(n))) return true;
+          for(let tp of tProvs){
+            if(SEA_ROUTES.has(Math.min(mp.id,tp.id)+':'+Math.max(mp.id,tp.id))) return true;
+          }
+          return false;
+        });
+        if(!myBorder) continue;
+
         let tPower = (unitsByCountry[tid]||[]).reduce((s,u)=>s+(u.hp/u.maxHp)*UNIT_TYPES[u.type].atk,0);
         
         // Determine if we should attack
@@ -5118,12 +5135,13 @@ function runAI(){
       let effectiveAgg = Math.min(100, agg + yearEscalation * 100);
       let warThreshold = effectiveAgg>=70 ? 30 : effectiveAgg>=50 ? 55 : effectiveAgg>=35 ? 65 : 78;
       let declareChance = (effectiveAgg>=70 ? 0.35 : effectiveAgg>=50 ? 0.2 : effectiveAgg>=35 ? 0.1 : 0.07);
-      
+
       for(let target of potentialTargets){
         if(target.score > warThreshold && Math.random()<declareChance){
           declareWar(cid, target.tid);
           atWarWith.push(target.tid);
-          if(agg>=80) break; // Only one war at a time even for aggressive
+          c._warCd = 90 + Math.floor(Math.random()*90); // 90~180 天内不再主动宣战
+          break; // ★ 一次决策最多宣战一个国家（修复"一口气对所有达标国宣战"）
         }
       }
     }
