@@ -206,10 +206,10 @@ canvas{display:block}
     <p style="color:#f0c040;font-size:12px">世界正走向战争的边缘。选择你要领导的国家。</p>
     <div style="font-size:11px;color:#8b949e;margin-bottom:6px;line-height:1.6">
       <span style="color:#8b949e">⚫</span> <b>轴心</b>(德/意/日/罗/匈/保/泰) ·
-      <span style="color:#58a6ff">🔵</span> <b>同盟</b>(英/法/中/美/波/加/澳/南非) ·
+      <span style="color:#58a6ff">🔵</span> <b>同盟</b>(英/法/中/美/波/加/澳/南非/新西兰) ·
       <span style="color:#cc3333">🔴</span> <b>共产国际</b>(苏/蒙) ·
-      <span style="color:#8b949e">⚪</span> <b>中立</b>(西/土/荷/比/瑞典/挪威/丹麦/芬兰/南/希/巴/墨)
-      <br><span style="color:#d29922;font-size:10px">🎭 傀儡国(满洲国/蒙/埃及/印度)继承宗主国阵营，不能独立宣战 · ⚠ 同阵营盟友之间不可互相宣战</span>
+      <span style="color:#8b949e">⚪</span> <b>中立</b>(西/土/荷/比/瑞典/挪威/丹麦/芬兰/南/希/巴/墨/瑞士/爱/葡/奥/捷/阿/埃塞/伊拉克/伊朗/波罗的海)
+      <br><span style="color:#d29922;font-size:10px">🎭 傀儡国以"宗主属"命名(日属满洲国/苏属蒙古/英属埃及/英属印度/美属菲律宾/法属印支/荷属东印度)，继承宗主国阵营，不能独立宣战 · ⚠ 同阵营盟友之间不可互相宣战</span>
       <br><span style="color:#ffd700;font-size:10px">★ 难度评级：1★简单 → 5★极难（★★★★★ 开局即被围攻/傀儡国）</span>
     </div>
     <div class="country-select-list" id="country-list"></div>
@@ -269,17 +269,111 @@ const COUNTRY_DEFS = {
   hungary:{id:'hungary',name:'匈牙利王国',short:'匈牙利',color:'#8c4a6a',axis:true,leader:'霍尔蒂·米克洛什',flag:'🇭🇺',aggression:45},
   bulgaria:{id:'bulgaria',name:'保加利亚王国',short:'保加利亚',color:'#6a8c6a',axis:true,leader:'鲍里斯三世',flag:'🇧🇬',aggression:40},
   thailand:{id:'thailand',name:'泰王国',short:'泰国',color:'#cccc44',axis:true,leader:'銮披汶·颂堪',flag:'🇹🇭',aggression:35},
-  egypt:{id:'egypt',name:'埃及王国',short:'埃及',color:'#d4a444',allies:true,puppetOf:'uk',leader:'法鲁克一世',flag:'🇪🇬',aggression:20},
-  india:{id:'india',name:'英属印度',short:'印度',color:'#cc8844',allies:true,puppetOf:'uk',leader:'林利斯戈侯爵',flag:'🇮🇳',aggression:30},
+  // 傀儡国命名规范："宗主国属 + 原国名"（如 英属埃及、日属满洲国、德属法兰西）
+  // _origName/_origShort 记录原名，释放/恢复独立时还原
+  egypt:{id:'egypt',name:'英属埃及王国',short:'英属埃及',_origName:'埃及王国',_origShort:'埃及',color:'#d4a444',allies:true,puppetOf:'uk',leader:'法鲁克一世',flag:'🇪🇬',aggression:20},
+  india:{id:'india',name:'英属印度帝国',short:'英属印度',_origName:'印度帝国',_origShort:'印度',color:'#cc8844',allies:true,puppetOf:'uk',leader:'林利斯戈侯爵',flag:'🇮🇳',aggression:30},
   australia:{id:'australia',name:'澳大利亚联邦',short:'澳大利亚',color:'#4c8c4c',allies:true,leader:'约瑟夫·莱昂斯',flag:'🇦🇺',aggression:35},
   southafrica:{id:'southafrica',name:'南非联邦',short:'南非',color:'#8c7c4a',allies:true,leader:'巴里·赫佐格',flag:'🇿🇦',aggression:25},
   brazil:{id:'brazil',name:'巴西合众国',short:'巴西',color:'#4ca050',neutral:true,leader:'热图利奥·瓦加斯',flag:'🇧🇷',aggression:65},
   mexico:{id:'mexico',name:'墨西哥合众国',short:'墨西哥',color:'#8c4c4c',neutral:true,leader:'拉萨罗·卡德纳斯',flag:'🇲🇽',aggression:15},
-  manchukuo:{id:'manchukuo',name:'满洲国',short:'满洲国',color:'#9c7c5a',axis:true,puppetOf:'japan',leader:'溥仪',flag:'🏴',aggression:30},
-  mongolia:{id:'mongolia',name:'蒙古人民共和国',short:'蒙古',color:'#7c5a9c',comintern:true,puppetOf:'ussr',leader:'霍尔洛·乔巴山',flag:'🇲🇳',aggression:20},
+  manchukuo:{id:'manchukuo',name:'日属满洲国',short:'日属满洲国',_origName:'满洲国',_origShort:'满洲国',color:'#9c7c5a',axis:true,puppetOf:'japan',leader:'溥仪',flag:'🏴',aggression:30},
+  mongolia:{id:'mongolia',name:'苏属蒙古',short:'苏属蒙古',_origName:'蒙古人民共和国',_origShort:'蒙古',color:'#7c5a9c',comintern:true,puppetOf:'ussr',leader:'霍尔洛·乔巴山',flag:'🇲🇳',aggression:20},
+  // ---- 二战参战国扩充（第二轮）：欧洲被吞并国/中立国/英联邦/美国自治领/中东/波罗的海/东南亚殖民地 ----
+  // 奥地利：1938年德奥合并的目标
+  austria:{id:'austria',name:'奥地利联邦国',short:'奥地利',color:'#c96a6a',neutral:true,leader:'库尔特·许士尼格',flag:'🇦🇹',aggression:10},
+  // 捷克斯洛伐克：1938年慕尼黑阴谋的牺牲品，斯柯达军工
+  czechoslovakia:{id:'czechoslovakia',name:'捷克斯洛伐克共和国',short:'捷克斯洛伐克',color:'#7a8fb5',neutral:true,leader:'爱德华·贝奈斯',flag:'🇨🇿',aggression:20},
+  switzerland:{id:'switzerland',name:'瑞士联邦',short:'瑞士',color:'#d4574e',neutral:true,leader:'朱塞佩·莫塔',flag:'🇨🇭',aggression:5},
+  ireland:{id:'ireland',name:'爱尔兰共和国',short:'爱尔兰',color:'#4a9e5f',neutral:true,leader:'埃蒙·德·瓦莱拉',flag:'🇮🇪',aggression:10},
+  portugal:{id:'portugal',name:'葡萄牙共和国',short:'葡萄牙',color:'#3c8a6e',neutral:true,leader:'安东尼奥·萨拉查',flag:'🇵🇹',aggression:10},
+  // 阿尔巴尼亚：1939年意大利入侵目标
+  albania:{id:'albania',name:'阿尔巴尼亚王国',short:'阿尔巴尼亚',color:'#a44a4a',neutral:true,leader:'佐格一世',flag:'🇦🇱',aggression:15},
+  // 埃塞俄比亚：1936年意大利入侵（阿杜瓦复仇）
+  ethiopia:{id:'ethiopia',name:'埃塞俄比亚帝国',short:'埃塞俄比亚',color:'#8f9a3a',neutral:true,leader:'海尔·塞拉西一世',flag:'🇪🇹',aggression:20},
+  newzealand:{id:'newzealand',name:'新西兰',short:'新西兰',color:'#3c7c9c',allies:true,leader:'迈克尔·萨维奇',flag:'🇳🇿',aggression:25},
+  // 菲律宾：美国自治领，1941年日本南侵目标
+  philippines:{id:'philippines',name:'美属菲律宾',short:'美属菲律宾',_origName:'菲律宾自治领',_origShort:'菲律宾',color:'#56b0c4',allies:true,puppetOf:'usa',leader:'曼努埃尔·奎松',flag:'🇵🇭',aggression:15},
+  iraq:{id:'iraq',name:'伊拉克王国',short:'伊拉克',color:'#8c9c4a',neutral:true,leader:'加齐·伊本·费萨尔',flag:'🇮🇶',aggression:30},
+  // 伊朗：1941年英苏联合入侵目标
+  iran:{id:'iran',name:'伊朗王国',short:'伊朗',color:'#c07850',neutral:true,leader:'礼萨·巴列维',flag:'🇮🇷',aggression:25},
+  // 波罗的海三国：1940年苏联强行合并
+  lithuania:{id:'lithuania',name:'立陶宛共和国',short:'立陶宛',color:'#c9b03c',neutral:true,leader:'安塔纳斯·斯梅托纳',flag:'🇱🇹',aggression:10},
+  latvia:{id:'latvia',name:'拉脱维亚共和国',short:'拉脱维亚',color:'#a04a6a',neutral:true,leader:'卡尔利斯·乌尔马尼斯',flag:'🇱🇻',aggression:10},
+  estonia:{id:'estonia',name:'爱沙尼亚共和国',short:'爱沙尼亚',color:'#88b5c9',neutral:true,leader:'康斯坦丁·帕茨',flag:'🇪🇪',aggression:10},
+  // 法属印度支那：1940年日本进驻
+  indochina:{id:'indochina',name:'法属印度支那',short:'法属印支',_origName:'印度支那联邦',_origShort:'印支',color:'#b89a5a',allies:true,puppetOf:'france',leader:'朱尔斯·布勒维耶',flag:'🇻🇳',aggression:15},
+  // 荷属东印度：1942年日本夺取（婆罗洲石油）
+  dutchindies:{id:'dutchindies',name:'荷属东印度',short:'荷属东印度',_origName:'东印度群岛',_origShort:'东印度',color:'#d4903c',neutral:true,puppetOf:'netherlands',leader:'博尼法西乌斯·科尼利斯',flag:'🇮🇩',aggression:10},
   // 地方叛军：战争支持率跌破40%时由内乱生成的隐藏势力（不可被选择，平时不存在）
   rebels:{id:'rebels',name:'地方叛军',short:'叛军',color:'#6b3f2a',neutral:true,leader:'叛乱首领',flag:'🏴',aggression:0,hidden:true}
 };
+
+// COUNTRY_DEFS 原始快照：重开局/读档时还原动态傀儡化、阵营漂移、改名等运行时改动
+const COUNTRY_DEFS_ORIG = JSON.parse(JSON.stringify(COUNTRY_DEFS));
+
+// ==================== 傀儡国命名系统 ====================
+// 宗主国单字简称（德属/英属/苏属…），其余国家取国名首字
+const MASTER_ABBR = {germany:'德', uk:'英', france:'法', ussr:'苏', japan:'日', usa:'美', italy:'意'};
+function masterAbbr(cid){
+  if(MASTER_ABBR[cid]) return MASTER_ABBR[cid];
+  let d = COUNTRY_DEFS[cid];
+  return d ? d.short.charAt(0) : '?';
+}
+// 成为傀儡 → 改名"宗主属 + 原国名"（德属法兰西、意属南斯拉夫…）
+function setPuppetName(cid){
+  let def = COUNTRY_DEFS[cid];
+  if(!def || !def.puppetOf || !COUNTRY_DEFS[def.puppetOf]) return;
+  if(!def._origName){ def._origName = def.name; def._origShort = def.short; }
+  let ab = masterAbbr(def.puppetOf);
+  def.name = ab + '属' + def._origName;
+  def.short = ab + '属' + def._origShort;
+}
+// 恢复独立 → 还原国名
+function restorePuppetName(cid){
+  let def = COUNTRY_DEFS[cid];
+  if(!def || !def._origName) return;
+  def.name = def._origName;
+  def.short = def._origShort;
+}
+// 重开局：把 COUNTRY_DEFS 还原为初始定义（清除上一局的傀儡化/改名/阵营漂移）
+function resetCountryDefs(){
+  for(let cid in COUNTRY_DEFS){
+    let def = COUNTRY_DEFS[cid];
+    let orig = COUNTRY_DEFS_ORIG[cid];
+    if(!orig) continue;
+    for(let k in def) delete def[k];
+    Object.assign(def, JSON.parse(JSON.stringify(orig)));
+  }
+}
+// 收集当前傀儡关系（存档/联机快照用）
+function collectPuppetMap(){
+  let m = {};
+  for(let cid in COUNTRY_DEFS){ if(COUNTRY_DEFS[cid].puppetOf) m[cid] = COUNTRY_DEFS[cid].puppetOf; }
+  return m;
+}
+// 从快照恢复傀儡关系 + 阵营 + 国名（存档读取 / 联机快照应用）
+function applyPuppetState(pmap){
+  if(!pmap) return;
+  for(let cid in COUNTRY_DEFS){
+    let def = COUNTRY_DEFS[cid];
+    let m = pmap[cid];
+    if(m && COUNTRY_DEFS[m]){
+      def.puppetOf = m;
+      let md = COUNTRY_DEFS[m];
+      def.axis = md.axis || false;
+      def.allies = md.allies || false;
+      def.comintern = md.comintern || false;
+      def.neutral = false;
+      setPuppetName(cid);
+    } else if(def.puppetOf && !COUNTRY_DEFS_ORIG[cid].puppetOf){
+      // 原为动态傀儡，快照中已恢复独立
+      def.puppetOf = null;
+      restorePuppetName(cid);
+    }
+    if(countries[cid]) countries[cid].puppetOf = def.puppetOf || null;
+  }
+}
 
 // ==================== 国策树系统（仿钢铁雄心 HOI4） ====================
 // 每国若干分支线（branch），节点 req 为同国树内前置节点 id
@@ -288,8 +382,8 @@ const FOCUS_TREES = {
   germany:{name:'德意志的复兴',branches:[
     {name:'欧洲扩张',nodes:[
       {id:'ger_rhine',name:'进军莱茵兰',icon:'🚩',days:10,req:[],desc:'撕毁《凡尔赛条约》，重新军事化莱茵兰。西方列强只会抗议。',effects:{buff:{ws:10,stab:5}}},
-      {id:'ger_anschluss',name:'德奥合并',icon:'🇦🇹',days:14,req:['ger_rhine'],desc:'吞并奥地利工业，实现大德意志的第一步。',effects:{fac:{mil:2,civ:1},buff:{ws:5}}},
-      {id:'ger_munich',name:'慕尼黑阴谋',icon:'📋',days:14,req:['ger_anschluss'],desc:'绥靖政策的顶点：兵不血刃拿下捷克军工。',effects:{fac:{mil:2},res:{steel:80,equipment:60},buff:{ws:5}}},
+      {id:'ger_anschluss',name:'德奥合并',icon:'🇦🇹',days:14,req:['ger_rhine'],desc:'兵不血刃吞并奥地利，实现大德意志的第一步。',effects:{annex:'austria',buff:{ws:5}}},
+      {id:'ger_munich',name:'慕尼黑阴谋',icon:'📋',days:14,req:['ger_anschluss'],desc:'绥靖政策的顶点：接管捷克军工。',effects:{annex:'czechoslovakia',res:{steel:80,equipment:60},buff:{ws:5}}},
       {id:'ger_danzig',name:'但泽或战争',icon:'⚔️',days:10,req:['ger_munich'],desc:'向波兰发出最后通牒：交出但泽走廊，否则战争！',effects:{war:'poland',buff:{atk:10}}},
       {id:'ger_west',name:'施里芬计划2.0',icon:'🗺️',days:21,req:['ger_danzig'],desc:'绕过马奇诺防线，取道低地国家直捣巴黎。',effects:{war:'france',war2:'netherlands',buff:{atk:10}}},
     ]},
@@ -326,6 +420,8 @@ const FOCUS_TREES = {
     {name:'外交斡旋',nodes:[
       {id:'sov_pact',name:'苏德互不侵犯条约',icon:'📜',days:10,req:[],desc:'与德国秘密瓜分东欧，争取备战时间（12个月内互不开战）。',effects:{pact:'germany',rel:{t:'germany',d:30}}},
       {id:'sov_neutral',name:'对日中立条约',icon:'🕊️',days:10,req:['sov_pact'],desc:'与日本签订中立条约，稳住远东（12个月）。',effects:{pact:'japan',rel:{t:'japan',d:20}}},
+      {id:'sov_baltic',name:'吞并波罗的海',icon:'🧩',days:14,req:['sov_neutral'],desc:'依据苏德秘密议定书势力范围，强行合并立陶宛、拉脱维亚、爱沙尼亚。',effects:{annex:['lithuania','latvia','estonia'],buff:{ws:5}}},
+      {id:'sov_winter',name:'冬季战争',icon:'❄️',days:14,req:['sov_baltic'],desc:'卡累利阿地峡的炮声：对芬兰宣战索取边境领土。',effects:{war:'finland',buff:{atk:5}}},
     ]},
     {name:'解放欧洲',nodes:[
       {id:'sov_greatp',name:'伟大卫国战争',icon:'⭐',days:14,req:['sov_deep'],desc:'祖国母亲在召唤！对德宣战，防御+10%。',effects:{war:'germany',buff:{def:10,ws:15}}},
@@ -365,9 +461,9 @@ const FOCUS_TREES = {
   ]},
   italy:{name:'新罗马帝国',branches:[
     {name:'复兴罗马',nodes:[
-      {id:'ita_ethiopia',name:'侵略埃塞俄比亚',icon:'🛡️',days:10,req:[],desc:'为洗刷阿杜瓦之耻，出兵东非。战争支持率+10。',effects:{buff:{atk:10,ws:10}}},
+      {id:'ita_ethiopia',name:'侵略埃塞俄比亚',icon:'🛡️',days:10,req:[],desc:'为洗刷阿杜瓦之耻，出兵东非。战争支持率+10。',effects:{war:'ethiopia',buff:{atk:10,ws:10}}},
       {id:'ita_spain',name:'武装干涉西班牙',icon:'🇪🇸',days:14,req:['ita_ethiopia'],desc:'派遣志愿军援助佛朗哥。',effects:{buff:{atk:5,ws:5}}},
-      {id:'ita_albania',name:'控制阿尔巴尼亚',icon:'🗺️',days:10,req:['ita_spain'],desc:'控制亚得里亚海东岸，获得资源。',effects:{fac:{civ:1},res:{steel:40}}},
+      {id:'ita_albania',name:'吞并阿尔巴尼亚',icon:'🗺️',days:10,req:['ita_spain'],desc:'控制亚得里亚海东岸，和平吞并阿尔巴尼亚。',effects:{annex:'albania',res:{steel:40}}},
       {id:'ita_greece',name:'进攻希腊',icon:'⚔️',days:14,req:['ita_albania'],desc:'墨索里尼的"平行战争"：向希腊宣战。',effects:{war:'greece',buff:{atk:10}}},
     ]},
     {name:'殖民帝国',nodes:[
@@ -470,9 +566,12 @@ const DIFFICULTY = {
   germany:1, usa:1, ussr:1,
   uk:2, japan:2,
   france:3, spain:3, turkey:3, brazil:3, sweden:3, finland:3,
-  canada:3, australia:3, southafrica:3, mexico:3, romania:3, hungary:3, bulgaria:3,
+  canada:3, australia:3, southafrica:3, mexico:3, romania:3, hungary:3, bulgaria:3, newzealand:3,
   italy:4, china:4, greece:4, belgium:4, netherlands:4, norway:4, denmark:4, yugoslavia:4, thailand:4,
-  poland:5, egypt:5, india:5, manchukuo:5, mongolia:5
+  austria:4, czechoslovakia:4, albania:4, iraq:4, iran:4, lithuania:4, latvia:4, estonia:4,
+  switzerland:4, ireland:4, portugal:4,
+  poland:5, egypt:5, india:5, manchukuo:5, mongolia:5,
+  ethiopia:5, philippines:5, indochina:5, dutchindies:5
 };
 const DIFF_LABEL = {1:'简单',2:'较简单',3:'中等',4:'较难',5:'极难'};
 const DIFF_COLOR = {1:'#7ee787',2:'#7ee787',3:'#f0c040',4:'#ff9d4d',5:'#ff7b72'};
@@ -508,7 +607,23 @@ const DIFF_TIPS = {
   egypt:'英国傀儡，北非绞肉机',
   india:'英国傀儡，人力多但无自主权',
   manchukuo:'日本傀儡，无独立外交',
-  mongolia:'苏联傀儡，任人摆布'
+  mongolia:'苏联傀儡，任人摆布',
+  austria:'德奥合并目标，1938年命运已定',
+  czechoslovakia:'慕尼黑阴谋牺牲品，苏台德危机',
+  switzerland:'永久中立，武装到牙齿的山地',
+  ireland:'中立岛国，远离欧陆战火',
+  portugal:'与英国保持最古老同盟的中立国',
+  albania:'意大利的下一个猎物，弱小无援',
+  ethiopia:'直面意大利入侵，装备悬殊',
+  newzealand:'英联邦成员，远在南太平洋',
+  philippines:'美国自治领，日本南侵第一站',
+  iraq:'夹在英国与轴心之间的石油国',
+  iran:'英苏两强夹击的目标',
+  lithuania:'波罗的海小国，苏联觊觎',
+  latvia:'波罗的海小国，苏联觊觎',
+  estonia:'波罗的海小国，苏联觊觎',
+  indochina:'法国殖民地，日本虎视眈眈',
+  dutchindies:'石油富庶的荷兰殖民地，日本必夺'
 };
 function starsHtml(n){
   let s='';
@@ -644,7 +759,41 @@ const PROVINCE_DEFS = [
 [92,'manchukuo','新京',1060,180,'urban',1,2,1,1,1,3],
 [93,'manchukuo','哈尔滨',1075,165,'plains',0,1,1,1,0,2],
 // Mongolia (Soviet puppet)
-[94,'mongolia','乌兰巴托',975,170,'hills',1,1,0,0,1,2]
+[94,'mongolia','乌兰巴托',975,170,'hills',1,1,0,0,1,2],
+// ---- 二战参战国扩充（追加在末尾，保持旧存档省份ID稳定） ----
+// Austria (德奥合并目标)
+[95,'austria','维也纳',556,253,'urban',1,1,1,0,0,2],
+[96,'austria','因斯布鲁克',508,247,'hills',0,1,0,0,0,1],
+// Czechoslovakia (慕尼黑阴谋，斯柯达军工)
+[97,'czechoslovakia','布拉格',560,222,'urban',1,2,2,1,0,2],
+[98,'czechoslovakia','布尔诺',574,240,'plains',0,1,1,0,0,1],
+// Switzerland (永久中立)
+[99,'switzerland','伯尔尼',464,232,'hills',1,1,1,0,0,1],
+// Ireland (中立岛国)
+[100,'ireland','都柏林',352,112,'plains',1,1,0,0,0,1],
+// Portugal (与英最古老同盟)
+[101,'portugal','里斯本',382,302,'plains',1,1,0,0,0,1],
+// Albania (1939意大利入侵)
+[102,'albania','地拉那',538,350,'hills',1,0,0,0,0,1],
+// Ethiopia (意大利东非战争)
+[103,'ethiopia','亚的斯亚贝巴',665,390,'hills',1,0,0,0,0,2],
+// New Zealand (英联邦，1939对德宣战)
+[104,'newzealand','惠灵顿',1215,448,'hills',1,1,0,0,1,1],
+// Philippines (美国自治领)
+[105,'philippines','马尼拉',1130,288,'urban',1,1,0,0,0,2],
+// Iraq (1941英伊战争)
+[106,'iraq','巴格达',790,318,'plains',1,1,0,0,3,1],
+// Iran (1941英苏入侵)
+[107,'iran','德黑兰',860,295,'urban',1,1,0,0,4,2],
+// 波罗的海三国 (1940苏联合并)
+[108,'lithuania','维尔纽斯',648,158,'plains',1,0,0,0,0,1],
+[109,'latvia','里加',648,130,'urban',1,1,0,0,0,1],
+[110,'estonia','塔林',660,108,'urban',1,0,0,0,0,1],
+// 法属印度支那 (1940日本进驻)
+[111,'indochina','河内',1048,298,'urban',1,1,0,0,0,2],
+[112,'indochina','西贡',1042,330,'plains',0,1,0,0,0,2],
+// 荷属东印度 (1942日本夺取)
+[113,'dutchindies','雅加达',1092,342,'urban',1,2,0,0,4,3]
 ];
 
 // Province adjacency: province pairs that border each other
@@ -730,6 +879,25 @@ const ADJACENCY = [
 [81,84], // 印度-澳大利亚：孟买-堪培拉（印度洋）
 [87,89], // 南非-巴西：开普敦-圣保罗（南大西洋）
 [36,45], // 中国-美国：上海-旧金山（太平洋航线）
+// ---- 二战参战国扩充 ----
+// Austria internal + neighbors
+[95,96],[95,2],[96,2],[95,75],[95,70],
+// Czechoslovakia internal + neighbors
+[97,98],[97,2],[97,5],[97,47],[98,47],[98,75],[97,95],[98,95],
+// Switzerland neighbors
+[99,12],[99,15],[99,17],
+// Portugal neighbors
+[101,49],[101,51],
+// Albania neighbors
+[102,71],[102,72],[102,69],
+// Ethiopia (via Sudan)
+[103,79],
+// Iraq / Iran (via Syria / Persia)
+[106,56],[106,107],[106,79],[107,28],[107,80],
+// 波罗的海三国
+[108,4],[108,25],[108,46],[108,109],[109,110],[110,22],
+// 法属印度支那
+[111,112],[111,37],[111,83],[111,38],[112,82],
 ];
 
 // Sea routes — cross-ocean adjacency requiring naval capability
@@ -760,6 +928,20 @@ markSea(79,81);  // 开罗-孟买（苏伊士/红海）
 markSea(81,84);  // 孟买-堪培拉（印度洋）
 markSea(87,89);  // 开普敦-圣保罗（南大西洋）
 markSea(36,45);  // 上海-旧金山（太平洋航线）
+// ---- 二战参战国扩充航线 ----
+markSea(100,9);   // 都柏林-格拉斯哥（爱尔兰海）
+markSea(100,8);   // 都柏林-利物浦（爱尔兰海）
+markSea(104,84);  // 惠灵顿-堪培拉（塔斯曼海）
+markSea(105,38);  // 马尼拉-广州（南海）
+markSea(105,33);  // 马尼拉-长崎（东海/琉球）
+markSea(67,110);  // 赫尔辛基-塔林（芬兰湾）
+markSea(112,105); // 西贡-马尼拉（南海）
+markSea(113,82);  // 雅加达-曼谷（爪哇海/马六甲）
+markSea(113,105); // 雅加达-马尼拉（南海）
+markSea(113,84);  // 雅加达-堪培拉（帝汶海）
+markSea(113,33);  // 雅加达-长崎（西太平洋）
+markSea(111,33);  // 河内-长崎（日本进驻印支航线）
+markSea(20,103);  // 西西里-亚的斯亚贝巴（意大利东非远征）
 
 // Unit types
 const UNIT_TYPES = {
@@ -960,6 +1142,71 @@ const INITIAL_RELATIONS = [
   {a:'mongolia',b:'japan',val:-35,reason:'诺门罕冲突'},
   {a:'mongolia',b:'china',val:10,reason:'边境邻国'},
   {a:'mongolia',b:'manchukuo',val:-30,reason:'满洲国边境争端'},
+  // ---- 二战参战国扩充 ----
+  // Austria
+  {a:'austria',b:'germany',val:65,reason:'同文同种，德国一体化压力'},
+  {a:'austria',b:'italy',val:10,reason:'墨索里尼一度保证奥独立'},
+  {a:'austria',b:'czechoslovakia',val:-10,reason:'中欧邻国摩擦'},
+  // Czechoslovakia
+  {a:'czechoslovakia',b:'germany',val:-55,reason:'苏台德德意志人问题'},
+  {a:'czechoslovakia',b:'france',val:45,reason:'法捷军事同盟'},
+  {a:'czechoslovakia',b:'uk',val:25,reason:'寻求西方保护'},
+  {a:'czechoslovakia',b:'ussr',val:20,reason:'苏捷互助条约'},
+  {a:'czechoslovakia',b:'hungary',val:-25,reason:'边境领土争端'},
+  {a:'czechoslovakia',b:'poland',val:20,reason:'中欧邻国'},
+  // Switzerland / Ireland / Portugal
+  {a:'switzerland',b:'germany',val:5,reason:'永久中立'},
+  {a:'switzerland',b:'france',val:10,reason:'中立邻国'},
+  {a:'switzerland',b:'italy',val:10,reason:'中立邻国'},
+  {a:'ireland',b:'uk',val:-35,reason:'独立战争余恨，北爱尔兰争端'},
+  {a:'ireland',b:'usa',val:25,reason:'爱尔兰裔美国人'},
+  {a:'ireland',b:'germany',val:10,reason:'敌人的敌人'},
+  {a:'portugal',b:'uk',val:30,reason:'1387年以来的最古老同盟'},
+  {a:'portugal',b:'spain',val:15,reason:'伊比利亚邻国'},
+  {a:'portugal',b:'germany',val:5,reason:'钨贸易但保持中立'},
+  // Albania / Ethiopia
+  {a:'albania',b:'italy',val:-45,reason:'意大利控制野心'},
+  {a:'albania',b:'greece',val:15,reason:'巴尔干邻国'},
+  {a:'albania',b:'yugoslavia',val:-10,reason:'领土摩擦'},
+  {a:'ethiopia',b:'italy',val:-75,reason:'意大利全面入侵'},
+  {a:'ethiopia',b:'uk',val:10,reason:'同情其处境'},
+  {a:'ethiopia',b:'france',val:5,reason:'国联周旋'},
+  // New Zealand / Philippines
+  {a:'newzealand',b:'uk',val:70,reason:'英联邦成员'},
+  {a:'newzealand',b:'australia',val:55,reason:'澳新兄弟邻邦'},
+  {a:'newzealand',b:'usa',val:40,reason:'太平洋伙伴'},
+  {a:'newzealand',b:'japan',val:-30,reason:'日本扩张威胁'},
+  {a:'philippines',b:'usa',val:65,reason:'美国自治领，共同防御'},
+  {a:'philippines',b:'japan',val:-35,reason:'日本南侵威胁'},
+  {a:'philippines',b:'china',val:15,reason:'亚洲邻国'},
+  // Iraq / Iran
+  {a:'iraq',b:'uk',val:15,reason:'英国委任统治后的松散关系'},
+  {a:'iraq',b:'iran',val:-10,reason:'边界与阿拉伯河争端'},
+  {a:'iraq',b:'turkey',val:10,reason:'中东邻国'},
+  {a:'iran',b:'uk',val:-5,reason:'英波石油争端'},
+  {a:'iran',b:'ussr',val:-25,reason:'沙俄/苏联北部威胁'},
+  {a:'iran',b:'turkey',val:10,reason:'中东邻国'},
+  // 波罗的海三国
+  {a:'lithuania',b:'ussr',val:-25,reason:'苏联吞并威胁'},
+  {a:'lithuania',b:'germany',val:-20,reason:'梅默尔领土问题'},
+  {a:'lithuania',b:'poland',val:-30,reason:'维尔纽斯争端'},
+  {a:'lithuania',b:'latvia',val:40,reason:'波罗的海兄弟'},
+  {a:'lithuania',b:'estonia',val:40,reason:'波罗的海兄弟'},
+  {a:'latvia',b:'ussr',val:-30,reason:'苏联吞并威胁'},
+  {a:'latvia',b:'germany',val:-15,reason:'波罗的海德意志人问题'},
+  {a:'latvia',b:'estonia',val:45,reason:'波罗的海兄弟'},
+  {a:'estonia',b:'ussr',val:-35,reason:'苏联吞并威胁'},
+  {a:'estonia',b:'finland',val:40,reason:'芬兰湾兄弟民族'},
+  {a:'estonia',b:'germany',val:-15,reason:'波罗的海德意志人问题'},
+  // 法属印度支那 / 荷属东印度
+  {a:'indochina',b:'france',val:70,reason:'法属殖民地'},
+  {a:'indochina',b:'japan',val:-25,reason:'日本南进觊觎'},
+  {a:'indochina',b:'china',val:5,reason:'亚洲邻国'},
+  {a:'indochina',b:'thailand',val:-20,reason:'印支领土争端'},
+  {a:'dutchindies',b:'netherlands',val:70,reason:'荷属殖民地'},
+  {a:'dutchindies',b:'japan',val:-40,reason:'日本觊觎婆罗洲石油'},
+  {a:'dutchindies',b:'uk',val:20,reason:'东南亚防务伙伴'},
+  {a:'dutchindies',b:'australia',val:15,reason:'近邻防务合作'},
 ];
 
 // ==================== 游戏状态 ====================
@@ -1460,6 +1707,38 @@ function applyFocusEffects(cid, node){
         delete c.pacts[t]; if(countries[t]) delete countries[t].pacts[cid];
         declareWar(cid, t);
       }
+    }
+  }
+  // 和平吞并（德奥合并/慕尼黑阴谋/波罗的海并入苏联等）：不流血获得对方全部省份
+  if(e.annex){
+    let targets = Array.isArray(e.annex) ? e.annex : [e.annex];
+    for(let t of targets){
+      let tc = countries[t];
+      if(!tc || tc.eliminated) continue;
+      let provs = provinces.filter(p=>p.controller===t);
+      provs.forEach(p=>{ p.controller = cid; });
+      // 接收其资源储备的一部分
+      if(countries[cid]){
+        countries[cid].cash += tc.cash || 0;
+        countries[cid].steel += tc.steel || 0;
+        countries[cid].oil += tc.oil || 0;
+        countries[cid].manpowerPool += Math.floor((tc.manpowerPool||0) * 0.5);
+      }
+      tc.eliminated = true;
+      tc.surrenderedTo = cid;
+      // 其残存部队解散
+      let deadIds = new Set(units.filter(u=>u.country===t).map(u=>u.id));
+      units = units.filter(u=>u.country!==t);
+      provinces.forEach(p=>{ p.unitIds = p.unitIds.filter(id=>!deadIds.has(id)); });
+      game.wars = game.wars.filter(w=>w.attacker!==t && w.defender!==t);
+      if(cid===game.player){
+        game.skillPoints += provs.length;
+        addLog('⭐','和平接收 '+provs.length+' 个省份！获得 '+provs.length+' 点国策点数');
+      }
+      if(t===game.player){
+        addLog('💀','你的国家被 '+COUNTRY_DEFS[cid].short+' 和平吞并，游戏结束');
+      }
+      addLog('🤝', COUNTRY_DEFS[cid].short + ' 和平吞并了 ' + COUNTRY_DEFS[t].short + '（'+provs.length+'省）');
     }
   }
   // 加成
@@ -3698,6 +3977,7 @@ function checkSurrender(){
       
       // 将投降国变为宗主国的傀儡
       COUNTRY_DEFS[cid].puppetOf = topAttacker;
+      setPuppetName(cid); // 改名"宗主属 + 原国名"（如 德属法兰西）
       // 继承宗主国阵营
       let masterDef = COUNTRY_DEFS[topAttacker];
       if(masterDef){
@@ -3755,6 +4035,7 @@ function checkSurrender(){
         let pd = COUNTRY_DEFS[pid];
         if(pd.puppetOf === cid){
           pd.puppetOf = topAttacker;
+          setPuppetName(pid); // 傀儡随领土转移改属新宗主
           // Also align faction
           let masterDef2 = COUNTRY_DEFS[topAttacker];
           if(masterDef2){
@@ -3793,6 +4074,11 @@ const GUARANTEE_DEFS = {
   poland:['uk','france'],
   france:['uk'],
   uk:['france'],
+  // 1940年低地国家：德国入侵比/荷=英法履约参战
+  belgium:['uk','france'],
+  netherlands:['uk','france'],
+  // 1941年4月：英国对希腊提供安全保证（意大利入侵希腊=英国参战）
+  greece:['uk'],
 };
 
 // 保证是否对该攻击者生效：攻击者是轴心国，或与保证国关系恶劣时才触发
@@ -3960,7 +4246,13 @@ function freePuppets(deadMasterCid){
     let def = COUNTRY_DEFS[cid];
     if(def && def.puppetOf === deadMasterCid){
       def.puppetOf = null;
-      def.axis = false; def.allies = false; def.comintern = false;
+      restorePuppetName(cid); // 恢复原国名
+      // 恢复其原始阵营（如法国恢复同盟），而不是一律变中立
+      let orig = COUNTRY_DEFS_ORIG[cid];
+      def.axis = (orig && orig.axis) || false;
+      def.allies = (orig && orig.allies) || false;
+      def.comintern = (orig && orig.comintern) || false;
+      def.neutral = !!(orig && orig.neutral);
       // 傀儡是被宗主拖入战争的，宗主亡了就停战求存
       let hadWar = game.wars.some(w=>w.attacker===cid||w.defender===cid);
       if(hadWar){
@@ -4217,6 +4509,7 @@ function playerReleasePuppet(pid){
   let pd = COUNTRY_DEFS[pid];
   if(!pd || pd.puppetOf !== game.player) return;
   pd.puppetOf = null;
+  restorePuppetName(pid); // 恢复原国名
   pd.axis = false; pd.allies = false; pd.comintern = false;
   if(countries[pid]){
     countries[pid].aggression = Math.min(100, (countries[pid].aggression||30) + 15);
@@ -4251,8 +4544,9 @@ function playerAnnexPuppet(pid){
   let deadIds = new Set(units.filter(u=>u.country===pid).map(u=>u.id));
   units = units.filter(u=>u.country!==pid);
   provinces.forEach(p=>{ p.unitIds = p.unitIds.filter(id=>!deadIds.has(id)); });
-  pd.puppetOf = null;
   addLog('🔗', '你吞并了傀儡国 ' + pd.short + '，获得 ' + annexed + ' 块领土');
+  pd.puppetOf = null;
+  restorePuppetName(pid);
   updateUI();
 }
 
@@ -4962,6 +5256,7 @@ function runAI(){
           // Improve relations slightly
           if(game.relations[cid]) game.relations[cid][pid] = Math.min(100, (game.relations[cid][pid]||0) + 15);
           addLog('🔓', COUNTRY_DEFS[cid].short + ' 释放了傀儡国 ' + pd.short + '，恢复其独立');
+          restorePuppetName(pid);
         }
       }
       
@@ -4995,6 +5290,7 @@ function runAI(){
             units = units.filter(u=>u.country!==pid);
             provinces.forEach(p=>{ p.unitIds = p.unitIds.filter(id=>!deadIds.has(id)); });
             addLog('🔗', COUNTRY_DEFS[cid].short + ' 吞并了傀儡国 ' + pd.short);
+            restorePuppetName(pid);
           }
         }
       }
@@ -6447,7 +6743,10 @@ function completeGuidedMission(){
 function returnToCountrySelect(){
   document.getElementById('guide-overlay').style.display = 'none';
   clearGuideHighlights();
-  
+
+  // 还原国家定义为初始状态（清除上一局的傀儡化/改名/阵营漂移）
+  resetCountryDefs();
+
   // Reset game state
   game.player = null;
   game.guidedMission = null;
@@ -6791,11 +7090,16 @@ function doLoadFromSlot(slot){
       p.unitIds.push(u.id);
     }
 
-    // Restore puppet relationships from COUNTRY_DEFS
-    for(let cid in COUNTRY_DEFS){
-      let cd = COUNTRY_DEFS[cid];
-      if(cd.puppetOf){
-        countries[cid].puppetOf = cd.puppetOf;
+    // Restore puppet relationships (存档含快照则优先用快照；旧存档回退到当前定义)
+    if(save.puppets){
+      resetCountryDefs();
+      applyPuppetState(save.puppets);
+    } else {
+      for(let cid in COUNTRY_DEFS){
+        let cd = COUNTRY_DEFS[cid];
+        if(cd.puppetOf){
+          countries[cid].puppetOf = cd.puppetOf;
+        }
       }
     }
 
@@ -6844,7 +7148,8 @@ function buildSaveData(){
     firedEvents: [...firedEvents],
     seaControl: game.seaControl || {},
     factionOverride: game.factionOverride || {},
-    stats: game.stats || {byCountry:{}}
+    stats: game.stats || {byCountry:{}},
+    puppets: collectPuppetMap() // 傀儡关系快照（含国名"XX属XX"状态）
   };
 
   for(let cid in countries){
@@ -7910,9 +8215,15 @@ function mpApplySnapshot(save){
       units.push(u);
       p.unitIds.push(u.id);
     }
-    for(let cid in COUNTRY_DEFS){
-      let cd = COUNTRY_DEFS[cid];
-      if(cd.puppetOf) countries[cid].puppetOf = cd.puppetOf;
+    // 傀儡关系：快照优先（含"XX属XX"国名同步），旧快照回退到当前定义
+    if(save.puppets){
+      resetCountryDefs();
+      applyPuppetState(save.puppets);
+    } else {
+      for(let cid in COUNTRY_DEFS){
+        let cd = COUNTRY_DEFS[cid];
+        if(cd.puppetOf) countries[cid].puppetOf = cd.puppetOf;
+      }
     }
     buildTerritories();
     updateUI(); drawMap(); updateTopBar();
