@@ -4122,6 +4122,8 @@ function gameTick(){
     checkTimedFactionEntries();
     // 世界大战期间：AI 阵营主动拉拢中立国入阵营
     checkAIFactionRecruit();
+    // 傀儡国叛变检查：扩张过度（法理地盘+4）的傀儡会加冕独立
+    checkPuppetRevolt();
     // AI 偶尔向你申请陆军通行权（国境开放）
     aiAskAccessFromPlayer();
   }
@@ -5525,6 +5527,61 @@ function freePuppets(deadMasterCid){
       }
       addLog('🔓', '💔 '+def.short+' 的宗主国灭亡，恢复独立！');
     }
+  }
+}
+
+// ==================== 傀儡国叛变独立（成立王国） ====================
+// 用户需求：傀儡国扩张过头——控制的地盘数 ≥ 自己法理地盘数 + 4——就会叛变宗主，
+//   去掉"X属"前缀成立王国（日属满洲国 → 满洲王国；德属法兰西共和国 → 法兰西共和国），
+//   恢复为独立国家：退出所有战争、与原宗主关系恶化、恢复原始阵营倾向。
+// 保护：玩家自己扮演的傀儡国不自动叛变（加不加冕由玩家决定）；
+//       无法理核心省的地方政权不适用（它们走"解散并入"通道）。
+function puppetKingdomName(cid){
+  let def = COUNTRY_DEFS[cid];
+  if(!def) return null;
+  let base = def._origName || def.name;
+  let s = def._origShort || def.short;
+  // 原名自带政体后缀（王国/帝国/共和国…）→ 恢复原名即可；否则去掉尾"国"加"王国"
+  if(/王国|帝国|共和国|联邦|民国|公国|苏丹国|联合邦/.test(base)) return {name:base, short:s};
+  let k = base.replace(/国$/,'') + '王国';
+  return {name:k, short:k};
+}
+// 每周检查一次：满足条件的傀儡国宣布独立
+function checkPuppetRevolt(){
+  for(let cid in COUNTRY_DEFS){
+    let def = COUNTRY_DEFS[cid], c = countries[cid];
+    if(!def || !c || c.eliminated || cid === 'rebels') continue;
+    if(!def.puppetOf) continue;                                  // 不是傀儡
+    if(cid === game.player) continue;                            // 玩家的傀儡国由玩家自己决定
+    if(def.hidden) continue;
+    let master = def.puppetOf;
+    if(!countries[master] || countries[master].eliminated) continue;
+    // 地方政权（无核心省的占领区产物）不走叛变通道
+    let core = provinces.filter(p=>p.cid===cid).length;
+    if(core === 0) continue;
+    // ★ 叛变条件：控制地盘 ≥ 法理地盘 + 4
+    let held = provinces.filter(p=>p.controller===cid).length;
+    if(held < core + 4) continue;
+    // ---- 宣布独立 ----
+    def.puppetOf = null;
+    let kn = puppetKingdomName(cid);
+    def.name = kn.name; def.short = kn.short;
+    delete def._regimeLabel;
+    // 恢复原始阵营倾向（独立了就不再继承宗主阵营）
+    let orig = COUNTRY_DEFS_ORIG[cid] || {};
+    def.axis = !!orig.axis; def.allies = !!orig.allies; def.comintern = !!orig.comintern; def.neutral = !!orig.neutral;
+    // 与原宗主翻脸：退出所有战争（不再给宗主当炮灰），关系暴跌
+    let wars = game.wars.filter(w=>w.attacker===cid||w.defender===cid).length;
+    if(wars > 0) game.wars = game.wars.filter(w=>w.attacker!==cid && w.defender!==cid);
+    if(game.relations[cid] && game.relations[cid][master] !== undefined){
+      game.relations[cid][master] = Math.max(-80, (game.relations[cid][master]||0) - 60);
+      game.relations[master][cid] = Math.max(-80, (game.relations[master][cid]||0) - 60);
+    }
+    addLog('🔖', def.name + ' 宣布脱离 ' + COUNTRY_DEFS[master].short + ' 加冕独立，成立王国！（'
+      + (wars>0? '退出'+wars+'条战线，' : '') + '控制 ' + held + ' 省）');
+    // 独立庆典：稳定度+15，战争支持率+10
+    c.stability = Math.min(100, (c.stability||50) + 15);
+    c.warSupport = Math.min(100, (c.warSupport||30) + 10);
   }
 }
 
@@ -7982,7 +8039,14 @@ function renderActiveTab(){
           let pProvs = provinces.filter(p=>p.cid===pid && p.controller===pid);
           let localTag = pd._localRegime ? ' 🏛️地方政权' : '';
           let regimeTag = pd._regimeLabel ? ' <span style="font-size:9px;color:#8b949e">'+pd._regimeLabel+'</span>' : '';
-          content.innerHTML += `<div style="font-size:11px;margin:4px 0;color:#c9d1d9">${pd.flag} ${pd.short} (${pProvs.length}省)${localTag}${regimeTag}</div>`;
+          // 叛变风险：傀儡控制地盘达到 法理地盘+4 就会加冕独立
+          let coreN = provinces.filter(p=>p.cid===pid).length;
+          let heldN = provinces.filter(p=>p.controller===pid).length;
+          let revoltTag = '';
+          if(heldN >= coreN + 3){
+            revoltTag = ' <span style="font-size:9px;color:#ff7b72">⚠️叛变风险 '+Math.min(100,Math.round((heldN-(coreN+4)+1)/(coreN+4)*100))+'%（'+heldN+'/'+(coreN+4)+'省）——赶紧「吞并领土」压住它！</span>';
+          }
+          content.innerHTML += `<div style="font-size:11px;margin:4px 0;color:#c9d1d9">${pd.flag} ${pd.short} (${pProvs.length}省)${localTag}${regimeTag}${revoltTag}</div>`;
           content.innerHTML += `<div style="display:flex;gap:4px;margin:2px 0 6px;flex-wrap:wrap">`;
           content.innerHTML += `<button class="btn-sm" style="font-size:10px;background:#2d5a1e;color:#7ee787" onclick="playerReleasePuppet('${pid}')">🔓 释放独立</button>`;
           content.innerHTML += `<button class="btn-sm" style="font-size:10px;background:#5c1a1a;color:#ff7b72" onclick="playerAnnexPuppet('${pid}')">🔗 吞并领土</button>`;
@@ -10607,8 +10671,11 @@ setSpeed = function(s){
 // ---- 版本与更新日志 ----
 // 每次发布新版本：改 GAME_VERSION，并在 UPDATE_HISTORY 顶部加一条。
 // 玩家打开线上版时若版本号与 localStorage 记录不同，就弹「本次版本更新了以下内容」弹窗。
-const GAME_VERSION = 'v1.5.0';
+const GAME_VERSION = 'v1.6.0';
 const UPDATE_HISTORY = [
+  { ver:'v1.6.0', date:'2026-10-22', items:[
+    '🔖 **傀儡国叛变独立**：傀儡国控制省数达到法理省数+4 时，会宣布脱离宗主、加冕成立王国（去掉「X属」前缀，如日属满洲国 → 满洲王国），恢复原始阵营并退出所有战争，与宗主关系暴跌；傀儡管理面板新增叛变风险预警',
+  ]},
   { ver:'v1.5.0', date:'2026-10-22', items:[
     '🎫 **陆军通行证**：可向中立国/盟友申请部队驻停与借道（100💰），AI 也会反过来请求你开放国境；悬停省份可见「驻停X方陆军N个」',
     '🏳️ **全吞并制**：打下敌国首都 → 该国与全部附属国直接并入你的领土；外交面板最下方「已吞并地区」可随时选择「成为傀儡国」或「释放独立」',
