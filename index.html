@@ -1597,7 +1597,7 @@ let game = {
   callToArmsQueue:[], // 待玩家答复的同盟参战邀请 [{id, inviter, enemy, divisions, provinceId, day}]
   callToArmsOut:{}    // 已发出邀请的去重记录 {"inviter|enemy": 发出日}
   ,
-  // 陆军通行证：{受邀国cid: {授予国cid: 到期tick}} —— 到期 0 = 永久
+  // 军队通行证：{受邀国cid: {授予国cid: 到期tick}} —— 到期 0 = 永久
   militaryAccess:{},
   // AI 每隔一段时间评估玩家的通行请求（避免每 tick 弹窗）
   accessAskCd:0,
@@ -3923,14 +3923,16 @@ canvas.addEventListener('click',(e)=>{
       myUnits.forEach(u=>{ if(moveUnit(u, clickedProvince)) moved++; });
       if(moved>0) addLog('🚚','部队从 '+fromP.name+' 向 '+p.name+' 移动');
     } else if(hasMilitaryAccess(game.player, p.controller) && !areAtWar(game.player, p.controller)){
-      // 🎫 陆军通行证：进入对方领土驻停 / 借道，不触发战斗
+      // 🎫 军队通行证：进入对方领土驻停 / 借道，不触发战斗
       let moved = 0;
       myUnits.forEach(u=>{ if(moveUnit(u, clickedProvince)) moved++; });
-      if(moved>0) addLog('🎫','部队借陆军通行证进驻 '+COUNTRY_DEFS[p.controller].short+' 的 '+p.name+'（驻停，不交战）');
+      if(moved>0) addLog('🎫','部队借军队通行证进驻 '+COUNTRY_DEFS[p.controller].short+' 的 '+p.name+'（驻停，不交战）');
     } else {
       if(!areAtWar(game.player, p.controller)){
         if(areAllies(game.player, p.controller)){
           addLog('🤝',COUNTRY_DEFS[p.controller].short+' 是你的盟友，不能进攻！');
+        } else if(p.controller && COUNTRY_DEFS[p.controller] && !COUNTRY_DEFS[p.controller].hidden && !COUNTRY_DEFS[p.controller].puppetOf){
+          addLog('⚠️','进入 '+COUNTRY_DEFS[p.controller].short+' 的 '+p.name+' 需要「军队通行证」或宣战。可在下方关系面板点「🎫 军队通行(100💰)」申请驻停/借道（海陆空三军通用），或对其宣战后强攻。');
         } else {
           addLog('⚠️','需要先对 '+COUNTRY_DEFS[p.controller].short+' 宣战才能进攻 '+p.name);
         }
@@ -4049,7 +4051,7 @@ function updateTooltip(mx, my){
     html += `</div>`;
   }
 
-  // 🎫 外国驻军（陆军通行证）：本省有非控制国的部队时，单独列一行
+  // 🎫 外国驻军（军队通行证）：本省有非控制国的部队时，单独列一行
   let garrisons = foreignGarrisonsIn(p.id);
   let garKeys = Object.keys(garrisons);
   if(garKeys.length > 0){
@@ -4057,7 +4059,7 @@ function updateTooltip(mx, my){
     html += garKeys.map(k=>{
       let kd = COUNTRY_DEFS[k];
       let tag = hasMilitaryAccess(k, p.controller) ? '（持通行证）' : '（临时进驻）';
-      return (kd?kd.short:k)+'陆军'+garrisons[k]+'个'+tag;
+      return (kd?kd.short:k)+'军队'+garrisons[k]+'个'+tag;
     }).join('、');
     html += `</div>`;
   }
@@ -4065,7 +4067,7 @@ function updateTooltip(mx, my){
   if(game.player && p.controller !== game.player && hasMilitaryAccess(game.player, p.controller) && !areAtWar(game.player, p.controller)){
     let left = accessExpiry(p.controller, game.player);
     let leftTxt = (left === 0) ? '永久' : ('剩 ' + Math.max(0, left - game.tick) + ' 天');
-    html += `<div class="t-info" style="color:#7ee787">🎫 你有 '+COUNTRY_DEFS[p.controller].short+' 的陆军通行证（'+leftTxt+'）——可驻停/借道</div>`;
+    html += `<div class="t-info" style="color:#7ee787">🎫 你有 '+COUNTRY_DEFS[p.controller].short+' 的军队通行证（'+leftTxt+'）——可驻停/借道</div>`;
   }
   
   if(p.buildQueue.length>0){
@@ -4124,7 +4126,7 @@ function gameTick(){
     checkAIFactionRecruit();
     // 傀儡国叛变检查：扩张过度（法理地盘+4）的傀儡会加冕独立
     checkPuppetRevolt();
-    // AI 偶尔向你申请陆军通行权（国境开放）
+    // AI 偶尔向你申请军队通行权（国境开放）
     aiAskAccessFromPlayer();
   }
   
@@ -6217,8 +6219,8 @@ function inviteToFaction(cid){
   updateUI();
 }
 
-// ==================== 陆军通行证（Military Access） ====================
-// 用户需求：可以向中立国家或自己的盟友发起「陆军通行」邀请 ——
+// ==================== 军队通行证（Military Access） ====================
+// 用户需求：可以向中立国家或自己的盟友发起「军队通行」邀请 ——
 //   "我的陆军能不能在你这暂时停靠/经停一下"。
 // 同意后：我方部队可以进入并驻停对方领土（不触发战斗），
 //   并且可以借道对方领土继续向第三国行军（经停/借道）。
@@ -6261,7 +6263,7 @@ function grantAccess(holder, grantedBy, days){
   if(!game.militaryAccess) game.militaryAccess = {};
   if(!game.militaryAccess[holder]) game.militaryAccess[holder] = {};
   game.militaryAccess[holder][grantedBy] = days > 0 ? (game.tick + days) : 0;
-  addLog('🎫', COUNTRY_DEFS[grantedBy].short + ' 授予 ' + COUNTRY_DEFS[holder].short + ' 陆军通行权（' +
+  addLog('🎫', COUNTRY_DEFS[grantedBy].short + ' 授予 ' + COUNTRY_DEFS[holder].short + ' 军队通行权（' +
     (days > 0 ? days + ' 天' : '永久') + '）');
 }
 function revokeAccess(holder, grantedBy){
@@ -6279,7 +6281,7 @@ function listAccessOf(holder){
   return out;
 }
 
-// 玩家向某国申请陆军通行证（与"邀请入阵营"同款的按钮 + 结果日志）
+// 玩家向某国申请军队通行证（与"邀请入阵营"同款的按钮 + 结果日志）
 function requestMilitaryAccess(cid){
   if(!game.player) return;
   let cd = COUNTRY_DEFS[cid], ec = countries[cid], pc = countries[game.player];
@@ -6287,7 +6289,7 @@ function requestMilitaryAccess(cid){
   if(cd.hidden){ addLog('⚠️','叛军不参与外交'); return; }
   if(cid === game.player) return;
   if(areAtWar(game.player, cid)){ addLog('⚠️','交战国之间不可能开放国境'); return; }
-  if(hasMilitaryAccess(game.player, cid)){ addLog('⚠️','你已持有 '+cd.short+' 的陆军通行证'); return; }
+  if(hasMilitaryAccess(game.player, cid)){ addLog('⚠️','你已持有 '+cd.short+' 的军队通行证'); return; }
   if(pc.cash < ACCESS_ASK_COST){ addLog('⚠️','需要 '+ACCESS_ASK_COST+'💰 游说费用'); return; }
   pc.cash -= ACCESS_ASK_COST;
 
@@ -6305,10 +6307,10 @@ function requestMilitaryAccess(cid){
   if(Math.random() < chance){
     grantAccess(game.player, cid, ACCESS_DURATION_DAYS);
     game.relations[game.player][cid] = Math.min(100, rel + 10);
-    addLog('✅', cd.short + ' 同意开放国境：你的陆军可在其领土驻停/借道（'+ACCESS_DURATION_DAYS+' 天）');
+    addLog('✅', cd.short + ' 同意开放国境：你的军队可在其领土驻停/借道（'+ACCESS_DURATION_DAYS+' 天）');
   } else {
     game.relations[game.player][cid] = Math.max(-80, rel - 5);
-    addLog('❌', cd.short + ' 拒绝了你的陆军通行请求（花费 '+ACCESS_ASK_COST+'💰）');
+    addLog('❌', cd.short + ' 拒绝了你的军队通行请求（花费 '+ACCESS_ASK_COST+'💰）');
   }
   updateUI();
 }
@@ -6317,7 +6319,7 @@ function requestMilitaryAccess(cid){
 function revokeMilitaryAccess(grantedBy){
   if(!game.player) return;
   revokeAccess(grantedBy, game.player);
-  addLog('🚫','你收回了 '+COUNTRY_DEFS[grantedBy].short+' 的陆军通行权');
+  addLog('🚫','你收回了 '+COUNTRY_DEFS[grantedBy].short+' 的军队通行权');
   updateUI();
 }
 
@@ -6351,8 +6353,8 @@ function showAccessRequestDialog(cid){
   let cd = COUNTRY_DEFS[cid];
   if(!cd) return;
   let ok = window.confirm(
-    '🎫 陆军通行请求\n\n'
-    + cd.short + ' 请求你的陆军通行权（军事通行证）。\n\n'
+    '🎫 军队通行请求\n\n'
+    + cd.short + ' 请求你的军队通行权（军事通行证）。\n\n'
     + '同意后：' + cd.short + ' 的部队可以进入并驻停你的领土，也可借道你的领土向第三国行军——不会与你的部队交战。\n'
     + '注意：这也意味着你的国境对其敞开。\n\n'
     + '确定 = 同意 / 取消 = 拒绝'
@@ -6361,11 +6363,11 @@ function showAccessRequestDialog(cid){
     grantAccess(cid, game.player, ACCESS_DURATION_DAYS);
     let rel = (game.relations[cid] && game.relations[cid][game.player]) || 0;
     if(game.relations[cid]) game.relations[cid][game.player] = Math.min(100, rel + 10);
-    addLog('✅','你同意了 '+cd.short+' 的陆军通行请求');
+    addLog('✅','你同意了 '+cd.short+' 的军队通行请求');
   } else {
     let rel = (game.relations[cid] && game.relations[cid][game.player]) || 0;
     if(game.relations[cid]) game.relations[cid][game.player] = Math.max(-80, rel - 8);
-    addLog('❌','你拒绝了 '+cd.short+' 的陆军通行请求');
+    addLog('❌','你拒绝了 '+cd.short+' 的军队通行请求');
   }
   updateUI();
 }
@@ -7994,25 +7996,25 @@ function renderActiveTab(){
           if(!getFaction(r.cid) && !cd.puppetOf && getFaction(game.player)){
             content.innerHTML += `<button class="btn-sm" style="font-size:10px;background:#1a3a5c;color:#58a6ff;margin-right:2px" onclick="inviteToFaction('${r.cid}')">🤝 邀请入阵营(300💰)</button>`;
           }
-          // 🎫 陆军通行证：可向中立国 / 盟友申请驻停与借道
+          // 🎫 军队通行证：可向中立国 / 盟友申请驻停与借道
           if(hasMilitaryAccess(game.player, r.cid)){
             let exp = accessExpiry(r.cid, game.player);
             let leftTxt = (exp === 0) ? '永久' : ('剩'+Math.max(0,exp-game.tick)+'天');
             content.innerHTML += `<span style="font-size:9px;color:#7ee787">🎫 通行证 ${leftTxt}</span> `;
             content.innerHTML += `<button class="btn-sm" style="font-size:9px;background:#3a1a1a;color:#ff7b72;margin-right:2px" onclick="revokeMilitaryAccess('${r.cid}')">🚫 收回</button>`;
           } else {
-            content.innerHTML += `<button class="btn-sm" style="font-size:10px;background:#1a4a3a;color:#7ee787;margin-right:2px" onclick="requestMilitaryAccess('${r.cid}')">🎫 陆军通行(100💰)</button>`;
+            content.innerHTML += `<button class="btn-sm" style="font-size:10px;background:#1a4a3a;color:#7ee787;margin-right:2px" onclick="requestMilitaryAccess('${r.cid}')">🎫 军队通行(100💰)</button>`;
           }
           content.innerHTML += `<button class="btn-sm" style="font-size:10px;background:#3a2a5c;color:#a78bfa;margin-right:2px" onclick="diploAid('${r.cid}')">💵 外交援助(100💰)</button>`;
         } else if(!r.atWar && !r.dead && isAlly){
           content.innerHTML += `<span style="font-size:10px;color:#7ee787">🔒盟友不可宣战</span>`;
-          // 🎫 陆军通行证（盟友同样需要正式通行权）
+          // 🎫 军队通行证（盟友同样需要正式通行权）
           if(hasMilitaryAccess(game.player, r.cid)){
             let exp = accessExpiry(r.cid, game.player);
             let leftTxt = (exp === 0) ? '永久' : ('剩'+Math.max(0,exp-game.tick)+'天');
             content.innerHTML += ` <span style="font-size:9px;color:#7ee787">🎫${leftTxt}</span>`;
           } else {
-            content.innerHTML += `<button class="btn-sm" style="font-size:10px;background:#1a4a3a;color:#7ee787;margin-left:2px" onclick="requestMilitaryAccess('${r.cid}')">🎫 陆军通行(100💰)</button>`;
+            content.innerHTML += `<button class="btn-sm" style="font-size:10px;background:#1a4a3a;color:#7ee787;margin-left:2px" onclick="requestMilitaryAccess('${r.cid}')">🎫 军队通行(100💰)</button>`;
           }
           // 租借法案：向盟友输送装备
           content.innerHTML += `<div style="font-size:10px;color:#8b949e;margin-top:2px">📦 租借法案:`;
@@ -10671,13 +10673,17 @@ setSpeed = function(s){
 // ---- 版本与更新日志 ----
 // 每次发布新版本：改 GAME_VERSION，并在 UPDATE_HISTORY 顶部加一条。
 // 玩家打开线上版时若版本号与 localStorage 记录不同，就弹「本次版本更新了以下内容」弹窗。
-const GAME_VERSION = 'v1.6.0';
+const GAME_VERSION = 'v1.6.1';
 const UPDATE_HISTORY = [
+  { ver:'v1.6.1', date:'2026-10-22', items:[
+    '🎫 **军队通行证改名**：「陆军通行证」升级为「军队通行证」——海军、陆军、空军通用，舰队同样可以借道他国海域/港口驻停',
+    '💡 **引导修正**：未持通行证点进中立国领土时，不再只提示「宣战」，会告诉你可先在关系面板申请「军队通行证」',
+  ]},
   { ver:'v1.6.0', date:'2026-10-22', items:[
     '🔖 **傀儡国叛变独立**：傀儡国控制省数达到法理省数+4 时，会宣布脱离宗主、加冕成立王国（去掉「X属」前缀，如日属满洲国 → 满洲王国），恢复原始阵营并退出所有战争，与宗主关系暴跌；傀儡管理面板新增叛变风险预警',
   ]},
   { ver:'v1.5.0', date:'2026-10-22', items:[
-    '🎫 **陆军通行证**：可向中立国/盟友申请部队驻停与借道（100💰），AI 也会反过来请求你开放国境；悬停省份可见「驻停X方陆军N个」',
+    '🎫 **军队通行证**：可向中立国/盟友申请部队驻停与借道（100💰），AI 也会反过来请求你开放国境；悬停省份可见「驻停X方军队N个」',
     '🏳️ **全吞并制**：打下敌国首都 → 该国与全部附属国直接并入你的领土；外交面板最下方「已吞并地区」可随时选择「成为傀儡国」或「释放独立」',
     '🎌 **史实修正**：日本 1936 年开局为中立阵营（三国同盟 1940.9 才签订），1940 年自动加入轴心；玩家自选日本时只提示不强制',
     '🌐 **AI 拉拢中立国**：世界大战爆发后，AI 阵营会主动邀请中立国加入自己的阵营',
