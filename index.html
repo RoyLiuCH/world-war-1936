@@ -4051,17 +4051,34 @@ function updateTooltip(mx, my){
     html += `</div>`;
   }
 
-  // 🎫 外国驻军（军队通行证）：本省有非控制国的部队时，单独列一行
+  // 🎫 外国驻军 / 敌军：本省有非控制国的部队时，单独列一行
+  // 判定：与我方交战 → 显示「⚔️ 敌军」（进攻模式）；未交战（持证/临时进驻）→ 显示「🎫 驻停」，二者互斥
   let garrisons = foreignGarrisonsIn(p.id);
   let garKeys = Object.keys(garrisons);
-  if(garKeys.length > 0){
-    html += `<div class="t-info" style="color:#58a6ff">🎫 驻停：`;
-    html += garKeys.map(k=>{
-      let kd = COUNTRY_DEFS[k];
-      let tag = hasMilitaryAccess(k, p.controller) ? '（持通行证）' : '（临时进驻）';
-      return (kd?kd.short:k)+'军队'+garrisons[k]+'个'+tag;
-    }).join('、');
-    html += `</div>`;
+  if(garKeys.length > 0 && game.player){
+    let atWarWithCtrl = areAtWar(game.player, p.controller);
+    // 敌军：与玩家交战的第三方部队
+    let foeKeys  = garKeys.filter(k=>k!==game.player && areAtWar(game.player, k));
+    // 驻停：未交战的外国部队；以及驻停在非交战国的我方部队（持证/借道进驻）
+    let stopKeys = garKeys.filter(k=> k!==game.player ? !areAtWar(game.player, k) : !atWarWithCtrl);
+    if(stopKeys.length > 0){
+      html += `<div class="t-info" style="color:#58a6ff">🎫 驻停：`;
+      html += stopKeys.map(k=>{
+        let kd = COUNTRY_DEFS[k];
+        let tag = (k===game.player) ? '（我方持证驻停）'
+                : (hasMilitaryAccess(k, p.controller) ? '（持通行证）' : '（临时进驻）');
+        return (kd?kd.short:k)+'军队'+garrisons[k]+'个'+tag;
+      }).join('、');
+      html += `</div>`;
+    }
+    if(foeKeys.length > 0){
+      html += `<div class="t-info" style="color:#f85149">⚔️ 敌军：`;
+      html += foeKeys.map(k=>{
+        let kd = COUNTRY_DEFS[k];
+        return (kd?kd.short:k)+'军队'+garrisons[k]+'个（交战中）';
+      }).join('、');
+      html += `</div>`;
+    }
   }
   // 我方持有本省控制国的通行证 → 提示可以驻停
   if(game.player && p.controller !== game.player && hasMilitaryAccess(game.player, p.controller) && !areAtWar(game.player, p.controller)){
@@ -10673,8 +10690,11 @@ setSpeed = function(s){
 // ---- 版本与更新日志 ----
 // 每次发布新版本：改 GAME_VERSION，并在 UPDATE_HISTORY 顶部加一条。
 // 玩家打开线上版时若版本号与 localStorage 记录不同，就弹「本次版本更新了以下内容」弹窗。
-const GAME_VERSION = 'v1.6.1';
+const GAME_VERSION = 'v1.6.2';
 const UPDATE_HISTORY = [
+  { ver:'v1.6.2', date:'2026-10-22', items:[
+    '🧭 **驻停/敌军标识互斥**：鼠标悬停省份时，「🎫 驻停」与「⚔️ 敌军」不再混在一起——交战中显示红色「敌军（交战中）」，驻停/借道才显示蓝色「驻停」；我方持证部队标注「我方持证驻停」',
+  ]},
   { ver:'v1.6.1', date:'2026-10-22', items:[
     '🎫 **军队通行证改名**：「陆军通行证」升级为「军队通行证」——海军、陆军、空军通用，舰队同样可以借道他国海域/港口驻停',
     '💡 **引导修正**：未持通行证点进中立国领土时，不再只提示「宣战」，会告诉你可先在关系面板申请「军队通行证」',
