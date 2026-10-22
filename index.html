@@ -10604,15 +10604,66 @@ setSpeed = function(s){
 };
 
 // ==================== 启动 ====================
+// ---- 版本与更新日志 ----
+// 每次发布新版本：改 GAME_VERSION，并在 UPDATE_HISTORY 顶部加一条。
+// 玩家打开线上版时若版本号与 localStorage 记录不同，就弹「本次版本更新了以下内容」弹窗。
+const GAME_VERSION = 'v1.5.0';
+const UPDATE_HISTORY = [
+  { ver:'v1.5.0', date:'2026-10-22', items:[
+    '🎫 **陆军通行证**：可向中立国/盟友申请部队驻停与借道（100💰），AI 也会反过来请求你开放国境；悬停省份可见「驻停X方陆军N个」',
+    '🏳️ **全吞并制**：打下敌国首都 → 该国与全部附属国直接并入你的领土；外交面板最下方「已吞并地区」可随时选择「成为傀儡国」或「释放独立」',
+    '🎌 **史实修正**：日本 1936 年开局为中立阵营（三国同盟 1940.9 才签订），1940 年自动加入轴心；玩家自选日本时只提示不强制',
+    '🌐 **AI 拉拢中立国**：世界大战爆发后，AI 阵营会主动邀请中立国加入自己的阵营',
+    '🇲🇾 **新增英属马来亚**：吉隆坡 + 新加坡（日军南进第一目标，对英宣战后自动卷入）',
+    '🧠 **AI 增强**：边境/重镇建要塞、边境驻重兵、多路进攻、同盟号召门槛 6→8 师',
+    '⚖️ **AI 开战门槛**：同时与 3 国以上交战（+++）、石油/现金不足时 AI 拒绝开辟新战线',
+  ]},
+  { ver:'v1.4.0', date:'2026-10-21', items:[
+    '🎭 傀儡国「宗主属」命名体系（德属法兰西共和国式）+ 手动扶植政权',
+    '🛡️ 历史安全保证（打波兰 = 英法参战）+ 静坐战动员时钟',
+    '🗺️ 新增 16 个参战国与国策树（德奥合并/慕尼黑/冬季战争等）',
+  ]},
+];
+function showUpdateModal(){
+  let last = null;
+  try { last = localStorage.getItem('ww1936_lastVersion'); } catch(e){}
+  if(last === GAME_VERSION) return;   // 没更新就不用弹
+  let entry = UPDATE_HISTORY.find(h=>h.ver===GAME_VERSION) || {ver:GAME_VERSION, date:'', items:['游戏已更新到最新版本']};
+  // 构建 modal（一次性插入，点「知道了」移除并记录版本）
+  let ov = document.createElement('div');
+  ov.id = 'update-modal';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center';
+  let rows = entry.items.map(t=>{
+    let emoji = t.slice(0, t.indexOf(' '));
+    let rest = t.slice(t.indexOf(' ')+1).replace(/\*\*/g,'');
+    return `<div style="margin:7px 0;font-size:13px;line-height:1.5;color:#c9d1d9"><span style="font-size:15px">${emoji}</span> ${rest}</div>`;
+  }).join('');
+  ov.innerHTML =
+    '<div style="background:#161b22;border:1px solid #58a6ff;border-radius:10px;max-width:520px;width:92%;padding:20px 24px;box-shadow:0 8px 40px rgba(0,0,0,0.6)">'
+    + '<div style="font-size:18px;font-weight:bold;color:#f0c040;margin-bottom:2px">🎉 本次版本更新了以下内容</div>'
+    + '<div style="font-size:11px;color:#8b949e;margin-bottom:10px">'+entry.ver+' · '+entry.date+'</div>'
+    + '<div style="border-top:1px solid #30363d;padding-top:8px">'+rows+'</div>'
+    + '<div style="text-align:center;margin-top:14px"><button id="update-ok" style="background:#238636;color:#fff;border:none;border-radius:6px;padding:8px 40px;font-size:14px;cursor:pointer">知道了，开战！</button></div>'
+    + '</div>';
+  document.body.appendChild(ov);
+  document.getElementById('update-ok').addEventListener('click', ()=>{
+    try { localStorage.setItem('ww1936_lastVersion', GAME_VERSION); } catch(e){}
+    ov.remove();
+  });
+}
+
 function init(){
   initGame();
   buildTerritories();
   drawMap();
   gameLoop();
-  
+
   // Show country selection
   document.getElementById('country-overlay').style.display = 'flex';
-  
+
+  // 版本更新弹窗（localStorage 记录的上次版本 ≠ 当前版本时弹出）
+  showUpdateModal();
+
   // Handle window resize
   window.addEventListener('resize',()=>{
     resizeCanvas();
