@@ -108,10 +108,14 @@ canvas{display:block}
 #guide-panel{background:rgba(13,17,23,0.95);border:2px solid #ffd700;border-radius:10px;padding:12px 20px;min-width:380px;box-shadow:0 0 30px rgba(240,192,64,0.3)}
 #guide-panel .g-title{color:#ffd700;font-size:14px;font-weight:bold;margin-bottom:4px}
 #guide-panel .g-desc{color:#c9d1d9;font-size:13px;margin-bottom:6px;line-height:1.5}
-#guide-panel .g-steps{display:flex;gap:4px;margin-top:4px}
-#guide-panel .g-step{width:28px;height:4px;background:#30363d;border-radius:2px;transition:all .3s}
+#guide-panel .g-steps{display:flex;gap:3px;margin-top:6px;align-items:center}
+#guide-panel .g-step{flex:1;min-width:4px;height:4px;background:#30363d;border-radius:2px;transition:all .3s;cursor:default}
 #guide-panel .g-step.done{background:#238636}
 #guide-panel .g-step.active{background:#ffd700;animation:pulse 1s infinite}
+#guide-panel .g-sep{width:1px;height:8px;background:#484f58;flex:0 0 1px;margin:0 3px}
+#guide-panel .g-tip{display:block;margin-top:8px;padding:8px 10px;background:#161b22;
+  border-left:2px solid #1f6feb;border-radius:0 4px 4px 0;font-size:11.5px;line-height:1.65;color:#9da7b3}
+#guide-panel .g-tip b{color:#e6edf3}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 
 /* Highlight overlay for guided clicks */
@@ -245,7 +249,9 @@ const COUNTRY_DEFS = {
     doctrine:{fortDef:10,infDef:4},startTechs:[4]},
   ussr:{id:'ussr',name:'苏维埃社会主义共和国联盟',short:'苏联',color:'#cc3333',comintern:true,leader:'约瑟夫·斯大林',flag:'☭',aggression:65,
     doctrine:{infDef:6,infAtk:4,manpowerRecovery:0.15},startTechs:[2]},
-  japan:{id:'japan',name:'大日本帝国',short:'日本',color:'#8b4513',axis:true,leader:'昭和天皇',flag:'🇯🇵',aggression:85,
+  // 日本：1936 年尚未加入轴心（三国同盟 1940.9 才签订），开局中立阵营；
+  // 由 `_joinAxisYear:1940` 在日历走到 1940 年时自动转入轴心（见 checkTimedFactionEntries）
+  japan:{id:'japan',name:'大日本帝国',short:'日本',color:'#8b4513',neutral:true,_joinAxisYear:1940,leader:'昭和天皇',flag:'🇯🇵',aggression:85,
     doctrine:{navalAtk:6,infJungleAtk:5},startTechs:[4]},
   china:{id:'china',name:'中华民国',short:'中国',color:'#3388cc',allies:true,leader:'蒋介石',flag:'🇨🇳',aggression:35},
   usa:{id:'usa',name:'美利坚合众国',short:'美国',color:'#3377bb',allies:true,leader:'富兰克林·罗斯福',flag:'🇺🇸',aggression:25,
@@ -271,14 +277,15 @@ const COUNTRY_DEFS = {
   thailand:{id:'thailand',name:'泰王国',short:'泰国',color:'#cccc44',axis:true,leader:'銮披汶·颂堪',flag:'🇹🇭',aggression:35},
   // 傀儡国命名规范："宗主国属 + 原国名"（如 英属埃及、日属满洲国、德属法兰西）
   // _origName/_origShort 记录原名，释放/恢复独立时还原
-  egypt:{id:'egypt',name:'英属埃及王国',short:'英属埃及',_origName:'埃及王国',_origShort:'埃及',color:'#d4a444',allies:true,puppetOf:'uk',leader:'法鲁克一世',flag:'🇪🇬',aggression:20},
-  india:{id:'india',name:'英属印度帝国',short:'英属印度',_origName:'印度帝国',_origShort:'印度',color:'#cc8844',allies:true,puppetOf:'uk',leader:'林利斯戈侯爵',flag:'🇮🇳',aggression:30},
+  // _regime 标记政权类型：colony 自治领 / protector 保护国 / domestic 傀儡国
+  egypt:{id:'egypt',name:'英属埃及王国',short:'英属埃及',_origName:'埃及王国',_origShort:'埃及',_regime:'protector',color:'#d4a444',allies:true,puppetOf:'uk',leader:'法鲁克一世',flag:'🇪🇬',aggression:20},
+  india:{id:'india',name:'英属印度帝国',short:'英属印度',_origName:'印度帝国',_origShort:'印度',_regime:'colony',color:'#cc8844',allies:true,puppetOf:'uk',leader:'林利斯戈侯爵',flag:'🇮🇳',aggression:30},
   australia:{id:'australia',name:'澳大利亚联邦',short:'澳大利亚',color:'#4c8c4c',allies:true,leader:'约瑟夫·莱昂斯',flag:'🇦🇺',aggression:35},
   southafrica:{id:'southafrica',name:'南非联邦',short:'南非',color:'#8c7c4a',allies:true,leader:'巴里·赫佐格',flag:'🇿🇦',aggression:25},
   brazil:{id:'brazil',name:'巴西合众国',short:'巴西',color:'#4ca050',neutral:true,leader:'热图利奥·瓦加斯',flag:'🇧🇷',aggression:65},
   mexico:{id:'mexico',name:'墨西哥合众国',short:'墨西哥',color:'#8c4c4c',neutral:true,leader:'拉萨罗·卡德纳斯',flag:'🇲🇽',aggression:15},
-  manchukuo:{id:'manchukuo',name:'日属满洲国',short:'日属满洲国',_origName:'满洲国',_origShort:'满洲国',color:'#9c7c5a',axis:true,puppetOf:'japan',leader:'溥仪',flag:'🏴',aggression:30},
-  mongolia:{id:'mongolia',name:'苏属蒙古',short:'苏属蒙古',_origName:'蒙古人民共和国',_origShort:'蒙古',color:'#7c5a9c',comintern:true,puppetOf:'ussr',leader:'霍尔洛·乔巴山',flag:'🇲🇳',aggression:20},
+  manchukuo:{id:'manchukuo',name:'日属满洲国',short:'日属满洲国',_origName:'满洲国',_origShort:'满洲国',_regime:'protector',color:'#9c7c5a',neutral:true,puppetOf:'japan',leader:'溥仪',flag:'🏴',aggression:30},
+  mongolia:{id:'mongolia',name:'苏属蒙古',short:'苏属蒙古',_origName:'蒙古人民共和国',_origShort:'蒙古',_regime:'protector',color:'#7c5a9c',comintern:true,puppetOf:'ussr',leader:'霍尔洛·乔巴山',flag:'🇲🇳',aggression:20},
   // ---- 二战参战国扩充（第二轮）：欧洲被吞并国/中立国/英联邦/美国自治领/中东/波罗的海/东南亚殖民地 ----
   // 奥地利：1938年德奥合并的目标
   austria:{id:'austria',name:'奥地利联邦国',short:'奥地利',color:'#c96a6a',neutral:true,leader:'库尔特·许士尼格',flag:'🇦🇹',aggression:10},
@@ -293,7 +300,7 @@ const COUNTRY_DEFS = {
   ethiopia:{id:'ethiopia',name:'埃塞俄比亚帝国',short:'埃塞俄比亚',color:'#8f9a3a',neutral:true,leader:'海尔·塞拉西一世',flag:'🇪🇹',aggression:20},
   newzealand:{id:'newzealand',name:'新西兰',short:'新西兰',color:'#3c7c9c',allies:true,leader:'迈克尔·萨维奇',flag:'🇳🇿',aggression:25},
   // 菲律宾：美国自治领，1941年日本南侵目标
-  philippines:{id:'philippines',name:'美属菲律宾',short:'美属菲律宾',_origName:'菲律宾自治领',_origShort:'菲律宾',color:'#56b0c4',allies:true,puppetOf:'usa',leader:'曼努埃尔·奎松',flag:'🇵🇭',aggression:15},
+  philippines:{id:'philippines',name:'美属菲律宾',short:'美属菲律宾',_origName:'菲律宾自治领',_origShort:'菲律宾',_regime:'colony',color:'#56b0c4',allies:true,puppetOf:'usa',leader:'曼努埃尔·奎松',flag:'🇵🇭',aggression:15},
   iraq:{id:'iraq',name:'伊拉克王国',short:'伊拉克',color:'#8c9c4a',neutral:true,leader:'加齐·伊本·费萨尔',flag:'🇮🇶',aggression:30},
   // 伊朗：1941年英苏联合入侵目标
   iran:{id:'iran',name:'伊朗王国',short:'伊朗',color:'#c07850',neutral:true,leader:'礼萨·巴列维',flag:'🇮🇷',aggression:25},
@@ -302,9 +309,11 @@ const COUNTRY_DEFS = {
   latvia:{id:'latvia',name:'拉脱维亚共和国',short:'拉脱维亚',color:'#a04a6a',neutral:true,leader:'卡尔利斯·乌尔马尼斯',flag:'🇱🇻',aggression:10},
   estonia:{id:'estonia',name:'爱沙尼亚共和国',short:'爱沙尼亚',color:'#88b5c9',neutral:true,leader:'康斯坦丁·帕茨',flag:'🇪🇪',aggression:10},
   // 法属印度支那：1940年日本进驻
-  indochina:{id:'indochina',name:'法属印度支那',short:'法属印支',_origName:'印度支那联邦',_origShort:'印支',color:'#b89a5a',allies:true,puppetOf:'france',leader:'朱尔斯·布勒维耶',flag:'🇻🇳',aggression:15},
+  indochina:{id:'indochina',name:'法属印度支那',short:'法属印支',_origName:'印度支那联邦',_origShort:'印支',_regime:'colony',color:'#b89a5a',allies:true,puppetOf:'france',leader:'朱尔斯·布勒维耶',flag:'🇻🇳',aggression:15},
   // 荷属东印度：1942年日本夺取（婆罗洲石油）
-  dutchindies:{id:'dutchindies',name:'荷属东印度',short:'荷属东印度',_origName:'东印度群岛',_origShort:'东印度',color:'#d4903c',neutral:true,puppetOf:'netherlands',leader:'博尼法西乌斯·科尼利斯',flag:'🇮🇩',aggression:10},
+  dutchindies:{id:'dutchindies',name:'荷属东印度',short:'荷属东印度',_origName:'东印度群岛',_origShort:'东印度',_regime:'colony',color:'#d4903c',neutral:true,puppetOf:'netherlands',leader:'博尼法西乌斯·科尼利斯',flag:'🇮🇩',aggression:10},
+  // 英属马来亚：1941-42年日军南进首要目标（橡胶/锡矿 + 新加坡海军基地）
+  malaya:{id:'malaya',name:'英属马来亚',short:'英属马来亚',_origName:'马来亚联合邦',_origShort:'马来亚',_regime:'colony',color:'#9cc45c',allies:true,puppetOf:'uk',leader:'珊顿·托马斯',flag:'🇲🇾',aggression:10},
   // 地方叛军：战争支持率跌破40%时由内乱生成的隐藏势力（不可被选择，平时不存在）
   rebels:{id:'rebels',name:'地方叛军',short:'叛军',color:'#6b3f2a',neutral:true,leader:'叛乱首领',flag:'🏴',aggression:0,hidden:true}
 };
@@ -314,30 +323,114 @@ const COUNTRY_DEFS_ORIG = JSON.parse(JSON.stringify(COUNTRY_DEFS));
 
 // ==================== 傀儡国命名系统 ====================
 // 宗主国单字简称（德属/英属/苏属…），其余国家取国名首字
-const MASTER_ABBR = {germany:'德', uk:'英', france:'法', ussr:'苏', japan:'日', usa:'美', italy:'意'};
-function masterAbbr(cid){
+// ★ 覆盖所有可能成为宗主的主要国家：一旦成为宗主而表里没登记，
+//   就会退化为"取 short 首字"，遇到"比利时"→"比属"这类还算顺口，
+//   但"中华民国"首字是"中"没问题，"法属印支"的宗主"法"也必须显式登记。
+const MASTER_ABBR = {
+  germany:'德', uk:'英', france:'法', ussr:'苏', japan:'日', usa:'美', italy:'意',
+  china:'中', netherlands:'荷', belgium:'比', poland:'波', spain:'西', portugal:'葡',
+  turkey:'土', sweden:'瑞', norway:'挪', denmark:'丹', finland:'芬', romania:'罗',
+  hungary:'匈', bulgaria:'保', yugoslavia:'南', greece:'希', thailand:'泰',
+  iran:'伊', iraq:'伊', austria:'奥', czechoslovakia:'捷', switzerland:'瑞',
+  ireland:'爱', albania:'阿', ethiopia:'埃', brazil:'巴', mexico:'墨',
+  australia:'澳', southafrica:'南', newzealand:'新', canada:'加',
+  manchukuo:'满', mongolia:'蒙', india:'印', egypt:'埃', indochina:'印',
+  dutchindies:'荷', philippines:'菲', lithuania:'立', latvia:'拉', estonia:'爱'
+};
+// 单字简称冲突时（如 伊朗/伊拉克 都以"伊"开头），改用双字以免歧义
+const MASTER_ABBR2 = {
+  iran:'伊朗', iraq:'伊拉克', switzerland:'瑞士', sweden:'瑞典',
+  ethiopia:'埃塞', egypt:'埃及', estonia:'爱沙', india:'印度', indochina:'印支'
+};
+function masterAbbr(cid, useLong){
+  if(useLong && MASTER_ABBR2[cid]) return MASTER_ABBR2[cid];
   if(MASTER_ABBR[cid]) return MASTER_ABBR[cid];
   let d = COUNTRY_DEFS[cid];
   return d ? d.short.charAt(0) : '?';
 }
+
+// 政权类型：不同类型用不同后缀命名，避免所有傀儡都叫"XX属YY"。
+//   domestic  = 本土投降后扶植的傀儡政权（德属法兰西）
+//   colony    = 海外殖民地/自治领（英属印度）
+//   protector = 保护国（日属满洲国）
+//   military  = 占领区军政府（中属华北军政府）——未完全征服前的地方政权
+const REGIME_SUFFIX = {
+  domestic:  '傀儡国',
+  colony:    '自治领',
+  protector: '保护国',
+  military:  '军政府',
+  gov:       '自治政府'
+};
+// 判定政权类型：有 _regime 用手动标记，否则按宗主是否跨海/原属地推断
+function puppetRegime(cid){
+  let def = COUNTRY_DEFS[cid];
+  if(!def || !def.puppetOf) return 'domestic';
+  if(def._regime && REGIME_SUFFIX[def._regime]) return def._regime;
+  return 'domestic';
+}
 // 成为傀儡 → 改名"宗主属 + 原国名"（德属法兰西、意属南斯拉夫…）
+// ★ 关键修复：改名必须以「原始国名」为基准反复计算，而不是在现有名上叠加。
+//   否则傀儡转手（德属法国 → 苏属德国）会叠成"苏属德属法兰西"。
 function setPuppetName(cid){
   let def = COUNTRY_DEFS[cid];
-  if(!def || !def.puppetOf || !COUNTRY_DEFS[def.puppetOf]) return;
+  if(!def) return;
+  // 先固化原始名：只在尚未记录时抓取，之后永远用这份基准
   if(!def._origName){ def._origName = def.name; def._origShort = def.short; }
+  if(!def.puppetOf || !COUNTRY_DEFS[def.puppetOf]){
+    // 没有宗主 → 保持原名（不叠加、不残留）
+    def.name = def._origName;
+    def.short = def._origShort;
+    return;
+  }
+  let md = COUNTRY_DEFS[def.puppetOf];
+  let regime = puppetRegime(cid);
+  // 政权类型决定用全名还是简名：
+  //   傀儡国/保护国 → 正式全名（德属法兰西共和国、日属满洲国），史书体例
+  //   自治领/军政府/自治政府 → 简名（英属印度自治领，全名"印度帝国自治领"太啰嗦）
+  let baseName  = def._origName;
+  let baseShort = def._origShort;
+  if(regime === 'colony' || regime === 'military' || regime === 'gov'){
+    baseName = def._origShort;
+  } else if(regime === 'protector'){
+    // 保护国保留本国国号，不附加"共和国"等政体后缀（日属满洲国而非日属满洲国共和国）
+    baseName = def._origShort;
+    let full = def._origName;
+    if(/王国|帝国|国$/.test(full)) baseName = full;
+  }
+  // 宗主简称为单字时读起来最顺（德属法兰西）；双字则用"德属"-式全称避免歧义
   let ab = masterAbbr(def.puppetOf);
-  def.name = ab + '属' + def._origName;
-  def.short = ab + '属' + def._origShort;
+  def.name  = ab + '属' + baseName;
+  def.short = ab + '属' + baseShort;
+  // 附加政权类型标记，供 UI 与战报使用（不进入 name 字符串，避免过长）
+  def._regimeLabel = REGIME_SUFFIX[regime] || '';
 }
 // 恢复独立 → 还原国名
 function restorePuppetName(cid){
   let def = COUNTRY_DEFS[cid];
-  if(!def || !def._origName) return;
-  def.name = def._origName;
-  def.short = def._origShort;
+  if(!def) return;
+  if(def._origName){
+    def.name = def._origName;
+    def.short = def._origShort;
+  }
+  delete def._regimeLabel;
+}
+// 手动设定政权类型（扶植地方政权时用），并立即重算国名
+function setPuppetRegime(cid, regime){
+  let def = COUNTRY_DEFS[cid];
+  if(!def) return;
+  def._regime = regime;
+  setPuppetName(cid);
 }
 // 重开局：把 COUNTRY_DEFS 还原为初始定义（清除上一局的傀儡化/改名/阵营漂移）
 function resetCountryDefs(){
+  // 先移除上一局动态创建的地方政权（它们不在 COUNTRY_DEFS_ORIG 里，不会被覆盖）
+  for(let cid in COUNTRY_DEFS){
+    let d = COUNTRY_DEFS[cid];
+    if(d && d._localRegime){
+      delete COUNTRY_DEFS[cid];
+      if(countries && countries[cid]) delete countries[cid];
+    }
+  }
   for(let cid in COUNTRY_DEFS){
     let def = COUNTRY_DEFS[cid];
     let orig = COUNTRY_DEFS_ORIG[cid];
@@ -352,12 +445,59 @@ function collectPuppetMap(){
   for(let cid in COUNTRY_DEFS){ if(COUNTRY_DEFS[cid].puppetOf) m[cid] = COUNTRY_DEFS[cid].puppetOf; }
   return m;
 }
+// 收集「地方政权」的完整定义（它们不在 COUNTRY_DEFS_ORIG 里，读档必须重建）
+function collectLocalRegimes(){
+  let out = {};
+  for(let cid in COUNTRY_DEFS){
+    let d = COUNTRY_DEFS[cid];
+    if(!d || !d._localRegime) continue;
+    out[cid] = {
+      name: d.name, short: d.short, color: d.color, flag: d.flag, leader: d.leader,
+      puppetOf: d.puppetOf, regime: d._regime || 'military',
+      legalOwner: d._localLegalOwner || null, seedProv: d._localSeedProv || null,
+      bonus: d._regimeBonus || null
+    };
+  }
+  return out;
+}
+// 读档时重建地方政权（必须早于 applyPuppetState，否则快照里的 cid 找不到宗主）
+function rebuildLocalRegimes(map){
+  if(!map) return;
+  for(let rid in map){
+    let s = map[rid];
+    if(!s || COUNTRY_DEFS[rid]) continue;
+    let masterDef = COUNTRY_DEFS[s.puppetOf];
+    COUNTRY_DEFS[rid] = {
+      id: rid, name: s.name, short: s.short, color: s.color || (masterDef?masterDef.color:'#888'),
+      flag: s.flag || (masterDef?masterDef.flag:'🏳️'), leader: s.leader || '扶植政权',
+      aggression: 20, neutral: false, puppetOf: s.puppetOf,
+      _regime: s.regime || 'military', _localRegime: true,
+      _localLegalOwner: s.legalOwner || null, _localSeedProv: s.seedProv || null,
+      _regimeBonus: s.bonus || null
+    };
+    if(!countries[rid]){
+      countries[rid] = initCountry(rid);
+      countries[rid].eliminated = false;
+    }
+    countries[rid].puppetOf = s.puppetOf;
+  }
+}
 // 从快照恢复傀儡关系 + 阵营 + 国名（存档读取 / 联机快照应用）
 function applyPuppetState(pmap){
   if(!pmap) return;
+  // 地方政权（_localRegime）不在 COUNTRY_DEFS_ORIG 里，必须单独处理：
+  // 快照里没有它 → 说明这局没有这个政权，先整个删掉，避免上一局的残留。
+  for(let cid in COUNTRY_DEFS){
+    let def = COUNTRY_DEFS[cid];
+    if(def && def._localRegime && !pmap[cid]){
+      delete COUNTRY_DEFS[cid];
+      if(countries[cid]) delete countries[cid];
+    }
+  }
   for(let cid in COUNTRY_DEFS){
     let def = COUNTRY_DEFS[cid];
     let m = pmap[cid];
+    let orig = COUNTRY_DEFS_ORIG[cid] || {};
     if(m && COUNTRY_DEFS[m]){
       def.puppetOf = m;
       let md = COUNTRY_DEFS[m];
@@ -366,9 +506,20 @@ function applyPuppetState(pmap){
       def.comintern = md.comintern || false;
       def.neutral = false;
       setPuppetName(cid);
-    } else if(def.puppetOf && !COUNTRY_DEFS_ORIG[cid].puppetOf){
-      // 原为动态傀儡，快照中已恢复独立
+    } else if(orig.puppetOf){
+      // 初始傀儡（英属印度等）：快照里没有说明被释放了，回到原始宗主
+      def.puppetOf = orig.puppetOf;
+      if(orig._regime) def._regime = orig._regime;
+      setPuppetName(cid);
+    } else if(def.puppetOf){
+      // 原为动态傀儡（战时扶植/投降产生），快照中已恢复独立 → 抹掉痕迹
       def.puppetOf = null;
+      delete def._regime;
+      delete def._localRegime;
+      delete def._localLegalOwner;
+      restorePuppetName(cid);
+    } else if(def._origName){
+      // 已独立但名字还是"X属Y"（旧存档残留）→ 还原
       restorePuppetName(cid);
     }
     if(countries[cid]) countries[cid].puppetOf = def.puppetOf || null;
@@ -384,12 +535,12 @@ const FOCUS_TREES = {
       {id:'ger_rhine',name:'进军莱茵兰',icon:'🚩',days:10,req:[],desc:'撕毁《凡尔赛条约》，重新军事化莱茵兰。西方列强只会抗议。',effects:{buff:{ws:10,stab:5}}},
       {id:'ger_anschluss',name:'德奥合并',icon:'🇦🇹',days:14,req:['ger_rhine'],desc:'兵不血刃吞并奥地利，实现大德意志的第一步。',effects:{annex:'austria',buff:{ws:5}},need:{year:1938}},
       {id:'ger_munich',name:'慕尼黑阴谋',icon:'📋',days:14,req:['ger_anschluss'],desc:'绥靖政策的顶点：接管捷克军工。',effects:{annex:'czechoslovakia',res:{steel:80,equipment:60},buff:{ws:5}},need:{year:1938}},
-      {id:'ger_danzig',name:'但泽或战争',icon:'⚔️',days:10,req:['ger_munich'],desc:'向波兰发出最后通牒：交出但泽走廊，否则战争！',effects:{war:'poland',buff:{atk:10}},need:{year:1939}},
-      {id:'ger_west',name:'施里芬计划2.0',icon:'🗺️',days:21,req:['ger_danzig'],desc:'绕过马奇诺防线，取道低地国家直捣巴黎。',effects:{war:'france',war2:'netherlands',buff:{atk:10}},need:{year:1940}},
+      {id:'ger_danzig',go:true,name:'但泽或战争',icon:'⚔️',days:10,req:['ger_munich'],desc:'向波兰发出最后通牒：交出但泽走廊，否则战争！',effects:{war:'poland',buff:{atk:10}},need:{year:1939}},
+      {id:'ger_west',go:true,name:'施里芬计划2.0',icon:'🗺️',days:21,req:['ger_danzig'],desc:'绕过马奇诺防线，取道低地国家直捣巴黎。',effects:{war:'france',war2:'netherlands',buff:{atk:10}},need:{year:1940}},
     ]},
     {name:'东方路线',nodes:[
       {id:'ger_pact',name:'苏德互不侵犯条约',icon:'📜',days:10,req:[],desc:'与斯大林秘密瓜分东欧，确保东方安全（12个月内互不开战）。',effects:{pact:'ussr',rel:{t:'ussr',d:30}}},
-      {id:'ger_barbarossa',name:'巴巴罗萨计划',icon:'🦅',days:21,req:['ger_pact'],desc:'撕毁条约，三路大军闪击苏联！攻苏+25%。',effects:{war:'ussr',buff:{atk:25,ws:10}},need:{year:1941,warFirst:'poland'}},
+      {id:'ger_barbarossa',go:true,name:'巴巴罗萨计划',icon:'🦅',days:21,req:['ger_pact'],desc:'撕毁条约，三路大军闪击苏联！攻苏+25%。',effects:{war:'ussr',buff:{atk:25,ws:10}},need:{year:1941,warFirst:'poland'}},
       {id:'ger_ostland',name:'东方总督辖区',icon:'🏚️',days:14,req:['ger_barbarossa'],desc:'在占领区实施总督统治，压榨战争资源。',effects:{buff:{prod:20,res:{steel:100}}}},
     ]},
     {name:'战时经济',nodes:[
@@ -421,7 +572,7 @@ const FOCUS_TREES = {
       {id:'sov_pact',name:'苏德互不侵犯条约',icon:'📜',days:10,req:[],desc:'与德国秘密瓜分东欧，争取备战时间（12个月内互不开战）。',effects:{pact:'germany',rel:{t:'germany',d:30}}},
       {id:'sov_neutral',name:'对日中立条约',icon:'🕊️',days:10,req:['sov_pact'],desc:'与日本签订中立条约，稳住远东（12个月）。',effects:{pact:'japan',rel:{t:'japan',d:20}}},
       {id:'sov_baltic',name:'吞并波罗的海',icon:'🧩',days:14,req:['sov_neutral'],desc:'依据苏德秘密议定书势力范围，强行合并立陶宛、拉脱维亚、爱沙尼亚。',effects:{annex:['lithuania','latvia','estonia'],buff:{ws:5}},need:{year:1940}},
-      {id:'sov_winter',name:'冬季战争',icon:'❄️',days:14,req:['sov_baltic'],desc:'卡累利阿地峡的炮声：对芬兰宣战索取边境领土。',effects:{war:'finland',buff:{atk:5}},need:{year:1939}},
+      {id:'sov_winter',go:true,name:'冬季战争',icon:'❄️',days:14,req:['sov_baltic'],desc:'卡累利阿地峡的炮声：对芬兰宣战索取边境领土。',effects:{war:'finland',buff:{atk:5}},need:{year:1939}},
     ]},
     {name:'解放欧洲',nodes:[
       {id:'sov_greatp',name:'伟大卫国战争',icon:'⭐',days:14,req:['sov_deep'],desc:'祖国母亲在召唤！遭到德国入侵后全民动员，防御+10%、攻+10%。',effects:{buff:{def:10,atk:10,ws:15}},need:{year:1940,warFirst:'germany'}},
@@ -438,7 +589,7 @@ const FOCUS_TREES = {
   ]},
   japan:{name:'八纮一宇',branches:[
     {name:'中国事变',nodes:[
-      {id:'jap_marco',name:'卢沟桥事变',icon:'🌉',days:10,req:[],desc:'宛平城外的枪声，全面侵华战争爆发。',effects:{war:'china',buff:{atk:10}},need:{year:1937}},
+      {id:'jap_marco',go:true,name:'卢沟桥事变',icon:'🌉',days:10,req:[],desc:'宛平城外的枪声，全面侵华战争爆发。',effects:{war:'china',buff:{atk:10}},need:{year:1937}},
       {id:'jap_three',name:'以战养战',icon:'💸',days:14,req:['jap_marco'],desc:'在占领区疯狂掠夺资源。',effects:{buff:{prod:15},res:{steel:100,oil:50}}},
       {id:'jap_spear',name:'刺刀突击',icon:'🗡️',days:14,req:['jap_three'],desc:'白刃战精神注入部队。',effects:{buff:{atk:15,ws:10}}},
     ]},
@@ -461,10 +612,10 @@ const FOCUS_TREES = {
   ]},
   italy:{name:'新罗马帝国',branches:[
     {name:'复兴罗马',nodes:[
-      {id:'ita_ethiopia',name:'侵略埃塞俄比亚',icon:'🛡️',days:10,req:[],desc:'为洗刷阿杜瓦之耻，出兵东非。战争支持率+10。',effects:{war:'ethiopia',buff:{atk:10,ws:10}}},
+      {id:'ita_ethiopia',go:true,name:'侵略埃塞俄比亚',icon:'🛡️',days:10,req:[],desc:'为洗刷阿杜瓦之耻，出兵东非。战争支持率+10。',effects:{war:'ethiopia',buff:{atk:10,ws:10}}},
       {id:'ita_spain',name:'武装干涉西班牙',icon:'🇪🇸',days:14,req:['ita_ethiopia'],desc:'派遣志愿军援助佛朗哥。',effects:{buff:{atk:5,ws:5}}},
-      {id:'ita_albania',name:'吞并阿尔巴尼亚',icon:'🗺️',days:10,req:['ita_spain'],desc:'控制亚得里亚海东岸，和平吞并阿尔巴尼亚。',effects:{annex:'albania',res:{steel:40}},need:{year:1939}},
-      {id:'ita_greece',name:'进攻希腊',icon:'⚔️',days:14,req:['ita_albania'],desc:'墨索里尼的"平行战争"：向希腊宣战。',effects:{war:'greece',buff:{atk:10}},need:{year:1940}},
+      {id:'ita_albania',go:true,name:'吞并阿尔巴尼亚',icon:'🗺️',days:10,req:['ita_spain'],desc:'控制亚得里亚海东岸，和平吞并阿尔巴尼亚。',effects:{annex:'albania',res:{steel:40}},need:{year:1939}},
+      {id:'ita_greece',go:true,name:'进攻希腊',icon:'⚔️',days:14,req:['ita_albania'],desc:'墨索里尼的"平行战争"：向希腊宣战。',effects:{war:'greece',buff:{atk:10}},need:{year:1940}},
     ]},
     {name:'殖民帝国',nodes:[
       {id:'ita_littorio',name:'利托里奥级战列舰',icon:'⚓',days:14,req:[],desc:'地中海是我们的海！',effects:{res:{steel:80},buff:{prod:10}}},
@@ -496,7 +647,7 @@ const FOCUS_TREES = {
       {id:'uk_appease',name:'绥靖政策',icon:'☂️',days:10,req:[],desc:'一代人的和平？与德国周旋。',effects:{rel:{t:'germany',d:20},buff:{stab:5}}},
       {id:'uk_churchill',name:'丘吉尔上台',icon:'🎩',days:10,req:[],desc:'我们将战斗到底！战争支持率+20。',effects:{buff:{ws:20,stab:5}}},
       {id:'uk_dunkirk',name:'敦刻尔克精神',icon:'🚢',days:14,req:['uk_churchill'],desc:'撤退不是失败：防御+15%。',effects:{buff:{def:15}}},
-      {id:'uk_overlord',name:'霸王行动',icon:'🌊',days:21,req:['uk_dunkirk'],desc:'反攻欧陆！对德宣战，攻击+20%。',effects:{war:'germany',buff:{atk:20}},need:{year:1944}},
+      {id:'uk_overlord',go:true,name:'霸王行动',icon:'🌊',days:21,req:['uk_dunkirk'],desc:'反攻欧陆！对德宣战，攻击+20%。',effects:{war:'germany',buff:{atk:20}},need:{year:1944}},
     ]},
     {name:'帝国空军',nodes:[
       {id:'uk_radar',name:'本土链雷达',icon:'📡',days:10,req:[],desc:'道丁系统预警网络。',effects:{buff:{def:10}}},
@@ -515,8 +666,8 @@ const FOCUS_TREES = {
     {name:'孤立与参战',nodes:[
       {id:'us_isolation',name:'孤立主义',icon:'🛋️',days:10,req:[],desc:'远离欧洲的战争：稳定+10，战支-10。',effects:{buff:{stab:10,ws:-10}}},
       {id:'us_lendlease',name:'租借法案',icon:'📦',days:14,req:['us_isolation'],desc:'民主兵工厂开动：产能+25%。',effects:{buff:{prod:25}}},
-      {id:'us_day',name:'国耻日',icon:'🔥',days:14,req:['us_lendlease'],desc:'珍珠港的浓烟唤醒巨人：对日宣战！战支+30。',effects:{war:'japan',buff:{ws:30,atk:15}},need:{year:1941}},
-      {id:'us_normandy',name:'诺曼底登陆',icon:'🚢',days:21,req:['us_day'],desc:'霸王行动：对德宣战，攻击+20%。',effects:{war:'germany',buff:{atk:20}},need:{year:1944}},
+      {id:'us_day',go:true,name:'国耻日',icon:'🔥',days:14,req:['us_lendlease'],desc:'珍珠港的浓烟唤醒巨人：对日宣战！战支+30。',effects:{war:'japan',buff:{ws:30,atk:15}},need:{year:1941}},
+      {id:'us_normandy',go:true,name:'诺曼底登陆',icon:'🚢',days:21,req:['us_day'],desc:'霸王行动：对德宣战，攻击+20%。',effects:{war:'germany',buff:{atk:20}},need:{year:1944}},
     ]},
     {name:'工业巨人',nodes:[
       {id:'us_industry',name:'工业巨人觉醒',icon:'🏭',days:14,req:[],desc:'自由企业的战争动员。',effects:{fac:{civ:3,mil:2}}},
@@ -568,6 +719,7 @@ const DIFFICULTY = {
   france:3, spain:3, turkey:3, brazil:3, sweden:3, finland:3,
   canada:3, australia:3, southafrica:3, mexico:3, romania:3, hungary:3, bulgaria:3, newzealand:3,
   italy:4, china:4, greece:4, belgium:4, netherlands:4, norway:4, denmark:4, yugoslavia:4, thailand:4,
+  malaya:4,
   austria:4, czechoslovakia:4, albania:4, iraq:4, iran:4, lithuania:4, latvia:4, estonia:4,
   switzerland:4, ireland:4, portugal:4,
   poland:5, egypt:5, india:5, manchukuo:5, mongolia:5,
@@ -603,6 +755,7 @@ const DIFF_TIPS = {
   denmark:'闪电战首波目标，危在旦夕',
   yugoslavia:'轴心入侵目标，四面楚歌',
   thailand:'弱国，夹在英日之间',
+  malaya:'英国殖民地，日军南进第一目标（新加坡要塞）',
   poland:'开局即被德国宣战，生死一线',
   egypt:'英国傀儡，北非绞肉机',
   india:'英国傀儡，人力多但无自主权',
@@ -793,7 +946,9 @@ const PROVINCE_DEFS = [
 [111,'indochina','河内',1048,298,'urban',1,1,0,0,0,2],
 [112,'indochina','西贡',1042,330,'plains',0,1,0,0,0,2],
 // 荷属东印度 (1942日本夺取)
-[113,'dutchindies','雅加达',1092,342,'urban',1,2,0,0,4,3]
+[113,'dutchindies','雅加达',1092,342,'urban',1,2,0,0,4,3],
+[114,'malaya','吉隆坡',1058,362,'plains',1,1,1,1,0,2],
+[115,'malaya','新加坡',1072,392,'urban',0,1,2,0,0,3]
 ];
 
 // Province adjacency: province pairs that border each other
@@ -898,12 +1053,178 @@ const ADJACENCY = [
 [108,4],[108,25],[108,46],[108,109],[109,110],[110,22],
 // 法属印度支那
 [111,112],[111,37],[111,83],[111,38],[112,82],
+// 英属马来亚：曼谷-吉隆坡（克拉地峡，陆路）、吉隆坡-新加坡（半岛内部）
+[82,114],[114,115],
+// ---- 岛屿国家攻击路线修复 ----
+// 问题：markSea() 只是给"已有边"打上海路标记，它本身不创建边。
+//   下面这些航线长期只在 SEA_ROUTES 里挂了名，ADJACENCY 里却没有对应的边，
+//   导致爱尔兰、新西兰、菲律宾、荷属东印度四个国家的省份邻接数恒为 0 ——
+//   它们打不出去，别人也打不进来，AI 每回合都"没有合法目标"。
+// 现在把这些悬空航线补成真实的邻接边（海路标记仍由下方 markSea 保留）。
+// 爱尔兰：爱尔兰海两条航线
+[100,9],[100,8],
+// 新西兰：塔斯曼海 → 澳大利亚
+[104,84],
+// 菲律宾：南海/东海航线 → 中国广州、日本长崎
+[105,38],[105,33],
+// 菲律宾 ↔ 法属印支（西贡）
+[112,105],
+// 荷属东印度：马六甲/南海/帝汶海/西太平洋四条出海口
+[113,82],[113,105],[113,84],[113,33],
+// 法属印支 ↔ 日本长崎（1940 日本进驻航线）
+[111,33],
+// 芬兰湾：赫尔辛基 ↔ 塔林（已在 SEA_ROUTES 中缺失对应边）
+[67,110],
+// 意大利东非远征：西西里 ↔ 亚的斯亚贝巴
+[20,103],
+// ==================== 航线扩容（2026-10 第二轮） ====================
+// 问题：地图虽然整体单连通，但航线太稀 —— 葡萄牙只能打西班牙、
+//   爱尔兰/新西兰/南非/墨西哥/瑞士/阿尔巴尼亚/保加利亚都只有 1~2 个目标。
+//   玩家点开这些小国，外交面板上几乎没有人可以宣战，观感就是"没有攻击路线"。
+// 做法：按地理 + 史实补一批海运线（下面统一用 markSea 标记为需要海军），
+//   让每个国家都有 3 个以上潜在目标，同时保留"内陆国不需要海军"的区分。
+
+// ---- 不列颠诸岛 ----
+[100,6],    // 都柏林 - 伦敦（爱尔兰海）
+[100,7],    // 都柏林 - 伯明翰
+[100,59],   // 都柏林 - 渥太华（北大西洋，爱尔兰移民航线）
+[100,101],  // 都柏林 - 里斯本（伊比利亚西岸）
+[9,62],     // 格拉斯哥 - 斯德哥尔摩（北海）
+[9,64],     // 格拉斯哥 - 奥斯陆（北海）
+[9,66],     // 格拉斯哥 - 哥本哈根
+[8,63],     // 利物浦 - 哥德堡（北海）
+// ---- 伊比利亚 / 西地中海 ----
+[101,11],   // 里斯本 - 马赛（西地中海）
+[101,79],   // 里斯本 - 开罗（直布罗陀→苏伊士）
+[101,88],   // 里斯本 - 里约热内卢（大西洋航线）
+[101,86],   // 里斯本 - 比勒陀利亚（南大西洋）
+[101,52],   // 里斯本 - 阿姆斯特丹
+[51,16],    // 瓦伦西亚 - 罗马（西地中海）
+[51,18],    // 瓦伦西亚 - 那不勒斯
+[50,16],    // 巴塞罗那 - 罗马
+[49,88],    // 马德里 - 里约热内卢（伊比利亚-南美）
+[49,90],    // 马德里 - 墨西哥城（西属美洲旧航线）
+// ---- 地中海 ----
+[11,18],    // 马赛 - 那不勒斯
+[11,71],    // 马赛 - 雅典
+[18,71],    // 那不勒斯 - 雅典
+[18,72],    // 那不勒斯 - 塞萨洛尼基
+[18,102],   // 那不勒斯 - 地拉那
+[20,79],    // 西西里 - 开罗
+[20,102],   // 西西里 - 地拉那（奥特朗托海峡）
+[16,102],   // 罗马 - 地拉那
+[71,79],    // 雅典 - 开罗
+[71,57],    // 雅典 - 伊斯坦布尔
+[20,56],    // 西西里 - 安卡拉
+// ---- 大西洋 ----
+[88,86],    // 里约热内卢 - 比勒陀利亚（南大西洋）
+[88,79],    // 里约热内卢 - 开罗
+[88,59],    // 里约热内卢 - 渥太华（泛美航线）
+[89,87],    // 圣保罗 - 开普敦
+[89,90],    // 圣保罗 - 墨西哥城
+[90,41],    // 墨西哥城 - 华盛顿（已存在，保留）
+[91,44],    // 瓜达拉哈拉 - 洛杉矶（太平洋沿岸）
+[90,45],    // 墨西哥城 - 旧金山
+[44,29],    // 洛杉矶 - 东京（太平洋航线）
+[45,105],   // 旧金山 - 马尼拉（跨太平洋）
+[45,84],    // 旧金山 - 堪培拉
+[61,32],    // 温哥华 - 札幌（北太平洋）
+[59,6],     // 渥太华 - 伦敦
+[61,29],    // 温哥华 - 东京
+// ---- 印度洋 ----
+[86,81],    // 比勒陀利亚 - 孟买（印度洋）
+[86,84],    // 比勒陀利亚 - 堪培拉
+[86,113],   // 比勒陀利亚 - 雅加达
+[86,87],    // 内部
+[79,81],    // 开罗 - 孟买（已存在）
+[79,113],   // 开罗 - 雅加达（经红海/印度洋）
+[79,103],   // 开罗 - 亚的斯亚贝巴（尼罗河 / 红海）
+// ★ 埃塞俄比亚只有 1 个省，上面这条是海路 → 全国 4 条通道全是海路，
+//   而它史实上是内陆国（被意属厄立特里亚、英属索马里、法属索马里包围），
+//   没有理由给它配舰队。改成陆路：1941 年东非战役英军正是从苏丹/肯尼亚
+//   沿陆路一路推进到亚的斯亚贝巴。这条边在下面单独处理（不标记海路）。
+[80,82],    // 德里 - 曼谷
+[81,82],    // 孟买 - 曼谷
+[81,113],   // 孟买 - 雅加达
+[81,105],   // 孟买 - 马尼拉
+[80,107],   // 德里 - 德黑兰
+// ---- 东亚 / 东南亚 ----
+[113,84],   // 雅加达 - 堪培拉（已存在）
+[113,85],   // 雅加达 - 悉尼
+[105,84],   // 马尼拉 - 堪培拉
+[105,85],   // 马尼拉 - 悉尼
+[105,113],  // 马尼拉 - 雅加达（已存在）
+[105,29],   // 马尼拉 - 东京
+[105,30],   // 马尼拉 - 大阪
+[113,30],   // 雅加达 - 大阪
+[112,113],  // 西贡 - 雅加达
+[112,84],   // 西贡 - 堪培拉
+[82,113],   // 曼谷 - 雅加达（马六甲）
+[82,105],   // 曼谷 - 马尼拉
+[115,113],  // 新加坡 - 雅加达（马六甲南口）
+[115,105],  // 新加坡 - 马尼拉（南海航线）
+[115,30],   // 新加坡 - 大阪（日军南进补给线）
+[83,111],   // 清迈 - 河内
+[104,85],   // 惠灵顿 - 悉尼
+[104,105],  // 惠灵顿 - 马尼拉
+[104,113],  // 惠灵顿 - 雅加达
+[104,45],   // 惠灵顿 - 旧金山
+[104,84],   // 已存在
+[84,33],    // 堪培拉 - 长崎
+[84,30],    // 堪培拉 - 大阪
+[85,31],    // 悉尼 - 广岛
+// ---- 北欧 / 波罗的海 ----
+[62,110],   // 斯德哥尔摩 - 塔林（波罗的海）
+[62,109],   // 斯德哥尔摩 - 里加
+[62,4],     // 斯德哥尔摩 - 柯尼斯堡
+[63,66],    // 哥德堡 - 哥本哈根
+[64,9],     // 奥斯陆 - 格拉斯哥
+[64,52],    // 奥斯陆 - 阿姆斯特丹（已存在）
+[64,1],     // 奥斯陆 - 汉堡
+[65,59],    // 卑尔根 - 渥太华（北大西洋）
+[65,9],     // 卑尔根 - 格拉斯哥
+[67,62],    // 赫尔辛基 - 斯德哥尔摩（已存在）
+[67,109],   // 赫尔辛基 - 里加
+[110,62],   // 塔林 - 斯德哥尔摩
+[109,4],    // 里加 - 柯尼斯堡
+[66,63],    // 哥本哈根 - 哥德堡
+// ---- 黑海 ----
+[57,73],    // 伊斯坦布尔 - 布加勒斯特（黑海）
+[57,27],    // 伊斯坦布尔 - 塞瓦斯托波尔（黑海）
+[57,77],    // 伊斯坦布尔 - 索菲亚（已存在陆路，此处保留海路标记）
+[58,71],    // 伊兹密尔 - 雅典
+[58,72],    // 伊兹密尔 - 塞萨洛尼基
+[56,27],    // 安卡拉 - 塞瓦斯托波尔（黑海）
+[73,27],    // 已存在
+[77,72],    // 已存在
+// ---- 波斯湾 / 中东 ----
+[107,81],   // 德黑兰 - 孟买
+[107,113],  // 德黑兰 - 雅加达
+[106,81],   // 巴格达 - 孟买
+[106,103],  // 巴格达 - 亚的斯亚贝巴
+[106,71],   // 巴格达 - 雅典
+[79,102],   // 开罗 - 地拉那
+// 瑞士：只有法/意两个陆路邻国，补上德语区的两条史实通道
+//   （巴塞尔-斯图加特铁路、瑞士-奥地利阿尔卑斯山口），
+//   让这个"武装中立"国家也有 3 个以上潜在对手，不至于外交面板一片空白。
+[99,5],     // 伯尔尼 - 法兰克福（巴塞尔-莱茵走廊）
+[99,95],    // 伯尔尼 - 维也纳（阿尔卑斯山口）
 ];
 
 // Sea routes — cross-ocean adjacency requiring naval capability
 const SEA_ROUTES = new Set();
 // Define sea routes as "min:max" sorted keys
-function markSea(a,b){ SEA_ROUTES.add(Math.min(a,b)+':'+Math.max(a,b)); }
+//
+// ★ 历史坑：markSea 原来只往 SEA_ROUTES 里加标记，不创建 ADJACENCY 边。
+//   于是"声明了航线却没连边"的情况不会报错，只会让该岛国永远没有攻击目标
+//   （爱尔兰/新西兰/菲律宾/荷属东印度全部中招，省份邻接数 = 0）。
+//   现在改为：如果 ADJACENCY 里还没有这条边，就顺手补上。
+//   这样后面任何 markSea 调用都自带连通性，不可能再漏。
+function markSea(a,b){
+  SEA_ROUTES.add(Math.min(a,b)+':'+Math.max(a,b));
+  let exists = ADJACENCY.some(([x,y])=>(x===a&&y===b)||(x===b&&y===a));
+  if(!exists) ADJACENCY.push([a,b]);
+}
 // China-Japan sea crossings
 markSea(35,31); markSea(36,33); markSea(34,31); markSea(38,33);
 // UK to mainland
@@ -913,7 +1234,9 @@ markSea(41,6); markSea(29,41); markSea(44,29);
 // Scandinavia sea
 markSea(64,52);
 // North Sea / Baltic
-markSea(1,52);   // Hamburg <-> Amsterdam
+// ★ 汉堡↔阿姆斯特丹是陆上边界（荷兰与德国本土直接接壤），不是海路。
+//   原来误标成 markSea 后，荷兰的全部对外通道都被判成"需要海军"，
+//   于是荷兰 AI 一支船都没有 → 一个进攻目标都找不到，全程不动。
 markSea(4,22);   // Königsberg <-> Leningrad
 // Mediterranean sea
 markSea(79,71);
@@ -942,6 +1265,42 @@ markSea(113,84);  // 雅加达-堪培拉（帝汶海）
 markSea(113,33);  // 雅加达-长崎（西太平洋）
 markSea(111,33);  // 河内-长崎（日本进驻印支航线）
 markSea(20,103);  // 西西里-亚的斯亚贝巴（意大利东非远征）
+
+// ---- 航线扩容（第二轮）：把上面新增的边全部标记为需要海军 ----
+// 说明：这批边里混有少数本就相邻的陆路边（如 [57,73] 伊斯坦布尔-布加勒斯特
+//   在黑海南北岸，历史上也只能坐船），按海路处理更符合玩法。
+const SEA_ROUTE_PAIRS_V2 = [
+  // 不列颠诸岛
+  [100,6],[100,7],[100,59],[100,101],[9,62],[9,64],[9,66],[8,63],
+  // 伊比利亚 / 西地中海
+  [101,11],[101,79],[101,88],[101,86],[101,52],
+  [51,16],[51,18],[50,16],[49,88],[49,90],
+  // 地中海
+  [11,18],[11,71],[18,71],[18,72],[18,102],[20,79],[20,102],[16,102],
+  [71,79],[71,57],[20,56],
+  // 大西洋
+  [88,86],[88,79],[88,59],[89,87],[89,90],[91,44],[90,45],
+  [44,29],[45,105],[45,84],[61,32],[59,6],[61,29],
+  // 印度洋
+  // 注意：[79,103] 开罗-亚的斯亚贝巴 不在此列 —— 它是陆路（见上方说明），
+  //   若标成海路，埃塞俄比亚会变成"纯岛国"却拿不到舰队，直接锁死。
+  [86,81],[86,84],[86,113],[79,113],
+  [80,82],[81,82],[81,113],[81,105],[80,107],
+  // 东亚 / 东南亚
+  [113,85],[105,84],[105,85],[105,29],[105,30],[113,30],
+  [112,113],[112,84],[82,113],[82,105],[83,111],
+  [115,113],[115,105],[115,30],
+  [104,85],[104,105],[104,113],[104,45],
+  [84,33],[84,30],[85,31],
+  // 北欧 / 波罗的海
+  [62,110],[62,109],[62,4],[63,66],[64,9],[64,1],[65,59],[65,9],
+  [67,109],[110,62],[109,4],[66,63],
+  // 黑海
+  [57,73],[57,27],[57,77],[58,71],[58,72],[56,27],
+  // 波斯湾 / 中东
+  [107,81],[107,113],[106,81],[106,103],[106,71],[79,102],
+];
+SEA_ROUTE_PAIRS_V2.forEach(([a,b])=>markSea(a,b));
 
 // Unit types
 const UNIT_TYPES = {
@@ -1114,6 +1473,11 @@ const INITIAL_RELATIONS = [
   {a:'thailand',b:'china',val:-20,reason:'华人移民问题'},
   {a:'thailand',b:'uk',val:-15,reason:'马来亚殖民地竞争'},
   {a:'thailand',b:'france',val:-20,reason:'印支领土争端'},
+  // British Malaya
+  {a:'malaya',b:'uk',val:80,reason:'英国直辖殖民地'},
+  {a:'malaya',b:'japan',val:-45,reason:'日军南进的首要目标'},
+  {a:'malaya',b:'thailand',val:-25,reason:'泰国对北马来四邦的领土主张'},
+  {a:'malaya',b:'dutchindies',val:20,reason:'海峡殖民地邻居'},
   // British colonies/dominions
   {a:'egypt',b:'uk',val:70,reason:'英国保护国'},
   {a:'egypt',b:'italy',val:-35,reason:'意大利北非野心'},
@@ -1230,6 +1594,13 @@ let game = {
   victoryShown:false,  // 胜利结算画面已展示过（防重复触发）
   animations:[], // Battle animations: {type, x, y, frame, maxFrames, data}
   factionOverride:{}, // 外交改变阵营: {cid: 'axis'|'allies'|'comintern'}
+  callToArmsQueue:[], // 待玩家答复的同盟参战邀请 [{id, inviter, enemy, divisions, provinceId, day}]
+  callToArmsOut:{}    // 已发出邀请的去重记录 {"inviter|enemy": 发出日}
+  ,
+  // 陆军通行证：{受邀国cid: {授予国cid: 到期tick}} —— 到期 0 = 永久
+  militaryAccess:{},
+  // AI 每隔一段时间评估玩家的通行请求（避免每 tick 弹窗）
+  accessAskCd:0,
   stats:{byCountry:{}} // 战报统计
 };
 
@@ -1323,6 +1694,9 @@ function initGame(){
   game.alliances = [];
   game.log = [];
   game.factionOverride = {};
+  game.militaryAccess = {};
+  game.accessAskCd = 0;
+  game.recruitCd = 0;
   game.stats = {byCountry:{}};
   for(let cid in COUNTRY_DEFS){
     game.stats.byCountry[cid] = {kills:0, losses:0, provTaken:0, unitsLost:0, nukesDropped:0};
@@ -1337,6 +1711,10 @@ function initGame(){
   game.paused = false;
   game.nukeTargeting = false;
   firedEvents = new Set();
+  game.warEffort = {};        // 战线动员时钟（静坐战机制）
+  game.pushNotes = {};
+  game.peaceNotes = {};
+  initWarStance();
   
   units = [];
   
@@ -1345,7 +1723,181 @@ function initGame(){
   addLog('⚔️','中日关系极为紧张，满洲已被日本控制');
   addLog('🌍','欧洲局势紧张，德国正在重整军备');
   
+  grantStartingNavies();
+  grantStartingArmies();
   renderCountrySelect();
+}
+
+// ==================== 开局初始舰队 ====================
+// 问题：开局 units = [] 全社会零部队，全凭 AI 自己慢慢产兵。
+//   陆军还能在本土周边打，但英国/澳大利亚/新西兰/爱尔兰/菲律宾/荷属东印度
+//   这些"只靠海路出入"的国家，没有船就等于连一个目标都够不着，
+//   玩家点开它们会看到全程一动不动 —— 表现就是"没有攻击路线"。
+// 方案：按史实给主要海军国发一支小舰队。数量克制，只保证"能出海一次"，
+//   不改变后期产能竞争的平衡。
+const STARTING_NAVY = {
+  uk:          {destroyer:6, carrier:1},
+  japan:       {destroyer:5, carrier:1},
+  usa:         {destroyer:5, carrier:1},
+  italy:       {destroyer:3},
+  france:      {destroyer:3},
+  germany:     {destroyer:2, submarine:1},
+  ussr:        {destroyer:2, submarine:1},
+  netherlands: {destroyer:2},
+  australia:   {destroyer:2},
+  newzealand:  {destroyer:2},
+  canada:      {destroyer:2},
+  india:       {destroyer:1},
+  brazil:      {destroyer:1},
+  turkey:      {destroyer:1},
+  greece:      {destroyer:1},
+  sweden:      {destroyer:1},
+  norway:      {destroyer:1},
+  denmark:     {destroyer:1},
+  finland:     {destroyer:1},
+  ireland:     {destroyer:1},
+  philippines: {destroyer:1},
+  dutchindies: {destroyer:1},
+  malaya:      {destroyer:1},
+  thailand:    {destroyer:1},
+  argentina:   {destroyer:1},
+};
+function grantStartingNavies(){
+  for(let cid in STARTING_NAVY){
+    if(!countries[cid] || countries[cid].eliminated) continue;
+    if(COUNTRY_DEFS[cid] && COUNTRY_DEFS[cid].hidden) continue;
+    let myProvs = provinces.filter(p=>p.controller === cid);
+    if(myProvs.length === 0) continue;
+    // 优先放在有海路出口的省份，没有海路的退而放在首都
+    let seaProvs = myProvs.filter(p=>getNeighbors(p.id).some(n=>{
+      return SEA_ROUTES.has(Math.min(p.id,n)+':'+Math.max(p.id,n));
+    }));
+    let host = seaProvs.length > 0 ? seaProvs[0] : (myProvs.find(p=>p.capital) || myProvs[0]);
+    let spec = STARTING_NAVY[cid];
+    for(let type in spec){
+      for(let i=0;i<spec[type];i++) createUnit(host.id, type);
+    }
+  }
+}
+
+// ==================== 开局初始陆军 ====================
+// 问题（比舰队更严重）：units = [] 开局，全场只有 STARTING_NAVY 发的船，
+//   一支陆军都没有。诊断结果：中国 7 个省 0 支部队、奥地利 2 个省 0 支部队、
+//   波兰 3 个省 0 支部队 —— 点开任何国家都是"光杆司令"。
+//   这才是"没有任何攻击路线"的真正原因：不是没路，是没有兵可以走。
+//   陆路国没兵 = 一步都迈不出去；岛国有船没兵 = 船能出海但运不了人。
+// 方案：按 1936 年前后的史实常备军规模发一支开局陆军。
+//   这是"战前就有的部队"，所以直接入列，不扣人力/装备。
+const STARTING_ARMY = {
+  // ---- 陆军强国 ----
+  germany:        {infantry:8, armor:1, motorized:1},
+  ussr:           {infantry:10, armor:2},
+  france:         {infantry:7, armor:1, motorized:1},
+  japan:          {infantry:7, armor:1},
+  italy:          {infantry:6, motorized:1},
+  uk:             {infantry:4, motorized:1},
+  usa:            {infantry:4, motorized:1},
+  china:          {infantry:14, garrison:2},   // 人多装备差，用数量体现人海
+  poland:         {infantry:6, garrison:1},
+  // ---- 中等国家 ----
+  turkey:         {infantry:4, garrison:1},
+  spain:          {infantry:4, garrison:1},
+  romania:        {infantry:3, garrison:1},
+  yugoslavia:     {infantry:3, garrison:1},
+  czechoslovakia: {infantry:3, garrison:1},    // 军工强，装备好
+  hungary:        {infantry:3, garrison:1},
+  finland:        {infantry:3, garrison:1},    // 冬季战争打得极顽强
+  bulgaria:       {infantry:2, garrison:1},
+  sweden:         {infantry:2, garrison:1},
+  greece:         {infantry:2, garrison:1},
+  netherlands:    {infantry:2, garrison:1},
+  belgium:        {infantry:2, garrison:1},
+  austria:        {infantry:2, garrison:1},
+  switzerland:    {infantry:2, garrison:2},    // 全民皆兵的山地要塞
+  brazil:         {infantry:3, garrison:1},
+  india:          {infantry:4, garrison:1},    // 英属印度陆军规模庞大
+  // ---- 小国 / 自治领 ----
+  portugal:       {infantry:1, garrison:1},
+  denmark:        {infantry:1, garrison:1},
+  norway:         {infantry:1, garrison:1},
+  ireland:        {infantry:1, garrison:1},
+  canada:         {infantry:2, garrison:1},
+  australia:      {infantry:2, garrison:1},
+  newzealand:     {infantry:2, garrison:1},
+  southafrica:    {infantry:2, garrison:1},
+  mexico:         {infantry:2, garrison:1},
+  thailand:       {infantry:2, garrison:1},
+  malaya:         {infantry:2, garrison:1},
+  iran:           {infantry:2, garrison:1},
+  iraq:           {infantry:2, garrison:1},
+  egypt:          {infantry:2, garrison:1},
+  ethiopia:       {infantry:3},                // 正被意大利入侵，撑场面
+  albania:        {infantry:1, garrison:1},
+  lithuania:      {infantry:1, garrison:1},
+  latvia:         {infantry:1, garrison:1},
+  estonia:        {infantry:1, garrison:1},
+  indochina:      {infantry:2, garrison:1},
+  manchukuo:      {infantry:3, garrison:1},
+  mongolia:       {infantry:2, garrison:1},
+  philippines:    {infantry:1, garrison:1},
+  dutchindies:    {infantry:2, garrison:1},
+};
+// 直接入列：不检查也不扣除人力/装备（发放的是开局既有的常备军，
+// 不是新征召的部队，走 createUnit 会因开局资源不足而静默失败）
+function spawnUnitRaw(provinceId, typeKey){
+  let type = UNIT_TYPES[typeKey];
+  let province = provinces[provinceId];
+  if(!type || !province) return null;
+  let cid = province.controller;
+  if(!countries[cid]) return null;
+  let u = {
+    id: unitNextId++,
+    type: typeKey,
+    provinceId,
+    country: cid,
+    hp: type.hp, maxHp: type.hp,
+    org: 100, maxOrg: 100,
+    exp: 0, lvl: 0,
+    moving: false, moveTo: null, moveProgress: 0, moveTotal: 0,
+    fighting: false, fightTarget: null
+  };
+  units.push(u);
+  if(province.unitIds) province.unitIds.push(u.id);
+  return u;
+}
+function grantStartingArmies(){
+  for(let cid in countries){
+    let c = countries[cid];
+    if(!c || c.eliminated) continue;
+    let cd = COUNTRY_DEFS[cid];
+    if(cd && cd.hidden) continue;               // 叛军不发常备军
+    let myProvs = provinces.filter(p=>p.controller === cid);
+    if(myProvs.length === 0) continue;
+
+    let spec = STARTING_ARMY[cid];
+    if(!spec){
+      // 表里没列的国家：每个省至少 1 支守备队，保证不是空壳
+      spec = {garrison: myProvs.length};
+    }
+    let queue = [];
+    for(let type in spec){ for(let i=0;i<spec[type];i++) queue.push(type); }
+    if(queue.length === 0) continue;
+
+    // 首都优先，其余省份轮转铺开
+    let order = myProvs.slice().sort((a,b)=>(b.capital?1:0)-(a.capital?1:0));
+    let idx = 0;
+    // 先保证每个省都有部队（不会出现"空省被一击即溃"）
+    for(let p of order){
+      if(idx >= queue.length) break;
+      spawnUnitRaw(p.id, queue[idx++]);
+    }
+    // 剩下的从首都开始轮转分配
+    let i = 0;
+    while(idx < queue.length){
+      spawnUnitRaw(order[i % order.length].id, queue[idx++]);
+      i++;
+    }
+  }
 }
 
 function addLog(emoji, text){
@@ -1585,6 +2137,13 @@ function isOwnOrPuppet(cid){
   return cid === game.player || isPuppetOf(cid, game.player);
 }
 
+// 取政权类型的中文标签（供 UI 显示）
+function puppetRegimeLabel(cid){
+  let def = COUNTRY_DEFS[cid];
+  if(!def || !def.puppetOf) return '';
+  return REGIME_SUFFIX[puppetRegime(cid)] || '傀儡国';
+}
+
 // 获取宗主国
 function getMaster(cid){
   let def = COUNTRY_DEFS[cid];
@@ -1597,7 +2156,9 @@ function factionName(cid){
     let masterName = COUNTRY_DEFS[def.puppetOf] ? COUNTRY_DEFS[def.puppetOf].short : '?';
     let f = getFaction(cid);
     let fName = f==='axis'?'⚫轴心':f==='allies'?'🔵同盟':f==='comintern'?'🔴共产国际':'⚪中立';
-    return fName + ' 🎭'+masterName+'傀儡';
+    // 用政权类型替代千篇一律的"傀儡"二字：自治领/保护国/军政府/傀儡国
+    let label = def._regimeLabel || puppetRegimeLabel(cid) || '傀儡';
+    return fName + ' 🎭' + masterName + label;
   }
   let f = getFaction(cid);
   if(f==='axis') return '⚫轴心';
@@ -1702,12 +2263,16 @@ function applyFocusEffects(cid, node){
   let c = countries[cid];
   let e = node.effects||{};
   // 宣战（自动撕毁与目标的条约）
+  // node.go === true 或 effects.go === true 表示"国策明确要求立即发动攻势"，
+  // 会把这条战线的静坐期清零（例如巴巴罗萨、霸王行动、施里芬2.0）。
+  let immediateGo = !!(node.go || (node.effects && node.effects.go));
   for(let wk of ['war','war2']){
     if(e[wk]){
       let t = e[wk];
       if(countries[t] && !countries[t].eliminated && !areAtWar(cid,t)){
         delete c.pacts[t]; if(countries[t]) delete countries[t].pacts[cid];
         declareWar(cid, t);
+        if(immediateGo) launchOffensive(cid, t);
       }
     }
   }
@@ -1945,6 +2510,11 @@ function fightTick(){
   provinces.forEach(p=>{ _ctrlCount[p.controller] = (_ctrlCount[p.controller]||0)+1; });
   
   battles.forEach(b=>{
+    // 静坐战：这条战线还没真正打响 → 双方对峙但不开火（不产生任何伤害）
+    // 判定用 canEngage：各自时钟独立，法国可以比英国晚出拳
+    let _quiet = (b.aCid !== 'rebels' && b.dCid !== 'rebels' && !canEngage(b.aCid, b.dCid));
+    if(_quiet) return;
+
     let aPower = 0, dPower = 0;
     
     // Air superiority: side with more air power gets combat bonus
@@ -2268,8 +2838,15 @@ function moveUnit(unit, toProvinceId){
     } else {
       dist *= 2.0; // Sea crossing takes longer for land units
       // Land units need naval transport: destroyer in source or destination province
-      let hasEscort = units.some(u=>u.country===unit.country && (u.type==='destroyer'||u.type==='carrier'||u.type==='submarine') && 
-        (u.provinceId===unit.provinceId || u.provinceId===toProvinceId) && !u.moving);
+      // ★ 原判定带 `&& !u.moving`，本意是"别用一艘已经出海的船运兵"。
+      //   但 AI 一次登陆是「同省全军一起上船」，驱逐舰会先被置为 moving=true，
+      //   于是同省的步兵在随后的循环里找不到"静止"的护航舰 → 静默失败。
+      //   结果是船出海了、兵留在港口，登陆永远打不上岸
+      //   （新西兰/爱尔兰/菲律宾/荷属东印度全是这个症状）。
+      //   改为：只要求同省（或目标省）有己方护航舰，不看它是否已在移动 ——
+      //   护航舰本来就是跟这批部队一起走的。
+      let hasEscort = units.some(u=>u.country===unit.country && (u.type==='destroyer'||u.type==='carrier'||u.type==='submarine') &&
+        (u.provinceId===unit.provinceId || u.provinceId===toProvinceId));
       // Motorized/armor can cross without escort (existing behavior, represents landing craft)
       if(!hasEscort && unit.type !== 'motorized' && unit.type !== 'armor'){
         if(unit.country===game.player) addLog('⚠️','🚢 '+UNIT_TYPES[unit.type].name+' 跨海需要驱逐舰/潜艇护航！请先在出发地部署海军再渡海');
@@ -3335,7 +3912,7 @@ canvas.addEventListener('click',(e)=>{
     }
   } else if(game.selectedProvince===clickedProvince){
     game.selectedProvince = null;
-  } else if(neighbors.includes(game.selectedProvince)){
+  } else if(neighbors.includes(game.selectedProvince) || canMarchThrough(game.player, game.selectedProvince, clickedProvince)){
     let fromP = provinces[game.selectedProvince];
     let myUnits = units.filter(u=>u.provinceId===game.selectedProvince && u.country===game.player && !u.moving);
     
@@ -3345,6 +3922,11 @@ canvas.addEventListener('click',(e)=>{
       let moved = 0;
       myUnits.forEach(u=>{ if(moveUnit(u, clickedProvince)) moved++; });
       if(moved>0) addLog('🚚','部队从 '+fromP.name+' 向 '+p.name+' 移动');
+    } else if(hasMilitaryAccess(game.player, p.controller) && !areAtWar(game.player, p.controller)){
+      // 🎫 陆军通行证：进入对方领土驻停 / 借道，不触发战斗
+      let moved = 0;
+      myUnits.forEach(u=>{ if(moveUnit(u, clickedProvince)) moved++; });
+      if(moved>0) addLog('🎫','部队借陆军通行证进驻 '+COUNTRY_DEFS[p.controller].short+' 的 '+p.name+'（驻停，不交战）');
     } else {
       if(!areAtWar(game.player, p.controller)){
         if(areAllies(game.player, p.controller)){
@@ -3353,6 +3935,17 @@ canvas.addEventListener('click',(e)=>{
           addLog('⚠️','需要先对 '+COUNTRY_DEFS[p.controller].short+' 宣战才能进攻 '+p.name);
         }
       } else {
+        // 静坐战：宣战了但还没到发动攻势的时候
+        if(!canEngage(game.player, p.controller)){
+          let d = daysOfPhoney(game.player, p.controller);
+          if(d > 0){
+            addLog('🕊️','西线静悄悄……对 '+COUNTRY_DEFS[p.controller].short+' 的攻势尚未发动（还需 '+d+' 天）。双方都在调兵筑垒，此刻越境进攻是不可想象的。');
+          } else {
+            addLog('🕊️','对方尚未发动攻势，这条战线还在对峙。');
+          }
+          game.selectedProvince = null;
+          return;
+        }
         let moved = 0;
         myUnits.forEach(u=>{ if(moveUnit(u, clickedProvince)) moved++; });
         if(moved>0) addLog('⚔️','部队从 '+fromP.name+' 向 '+p.name+' 发起进攻！');
@@ -3378,9 +3971,41 @@ canvas.addEventListener('click',(e)=>{
   checkGuideProgress();
 });
 
+// 借道判定：目标省虽不相邻，但可以从出发省先进入一个"有通行权的友方省"，
+// 再继续向目标省行军（经停/借道）。返回 true 表示这条路走得通。
+function canMarchThrough(cid, fromPid, toPid){
+  if(fromPid === null || toPid === null) return false;
+  if(!game.player || cid !== game.player) return false;
+  let to = provinces[toPid];
+  if(!to) return false;
+  let targetOk = to.controller === cid ||
+                 (COUNTRY_DEFS[to.controller] && COUNTRY_DEFS[to.controller].puppetOf === cid) ||
+                 hasMilitaryAccess(cid, to.controller) ||
+                 areAtWar(cid, to.controller);
+  if(!targetOk) return false;
+  for(let mid of getNeighbors(fromPid)){
+    if(mid === toPid) continue;
+    if(!canEnterProvince(cid, mid)) continue;
+    if(getNeighbors(mid).includes(toPid)) return true;
+  }
+  return false;
+}
+
+// 某省里"非控制国"的驻军统计（tooltip 用）：{国家cid: 部队数}
+function foreignGarrisonsIn(provinceId){
+  let ctrl = provinces[provinceId] && provinces[provinceId].controller;
+  let out = {};
+  units.forEach(u=>{
+    if(u.provinceId !== provinceId) return;
+    if(u.country === ctrl) return;
+    if(COUNTRY_DEFS[u.country] && COUNTRY_DEFS[u.country].hidden) return;
+    out[u.country] = (out[u.country]||0) + 1;
+  });
+  return out;
+}
+
 function updateTooltip(mx, my){
-  let tip = document.getElementById('tooltip');
-  if(hoverProvince===null){
+  let tip = document.getElementById('tooltip');  if(hoverProvince===null){
     tip.style.display = 'none';
     return;
   }
@@ -3422,6 +4047,25 @@ function updateTooltip(mx, my){
     });
     for(let k in counts) html += `${k}×${counts[k]} `;
     html += `</div>`;
+  }
+
+  // 🎫 外国驻军（陆军通行证）：本省有非控制国的部队时，单独列一行
+  let garrisons = foreignGarrisonsIn(p.id);
+  let garKeys = Object.keys(garrisons);
+  if(garKeys.length > 0){
+    html += `<div class="t-info" style="color:#58a6ff">🎫 驻停：`;
+    html += garKeys.map(k=>{
+      let kd = COUNTRY_DEFS[k];
+      let tag = hasMilitaryAccess(k, p.controller) ? '（持通行证）' : '（临时进驻）';
+      return (kd?kd.short:k)+'陆军'+garrisons[k]+'个'+tag;
+    }).join('、');
+    html += `</div>`;
+  }
+  // 我方持有本省控制国的通行证 → 提示可以驻停
+  if(game.player && p.controller !== game.player && hasMilitaryAccess(game.player, p.controller) && !areAtWar(game.player, p.controller)){
+    let left = accessExpiry(p.controller, game.player);
+    let leftTxt = (left === 0) ? '永久' : ('剩 ' + Math.max(0, left - game.tick) + ' 天');
+    html += `<div class="t-info" style="color:#7ee787">🎫 你有 '+COUNTRY_DEFS[p.controller].short+' 的陆军通行证（'+leftTxt+'）——可驻停/借道</div>`;
   }
   
   if(p.buildQueue.length>0){
@@ -3474,9 +4118,21 @@ function gameTick(){
     }
     // 阵营逐步卷入评估：战争持续时同阵营国家按关系+好战度小概率参战
     checkAllianceEntries();
+    // 史实定时入盟：日本 1940 年转入轴心（1936 开局是中立）
+    checkTimedFactionEntries();
+    // 世界大战期间：AI 阵营主动拉拢中立国入阵营
+    checkAIFactionRecruit();
+    // AI 偶尔向你申请陆军通行权（国境开放）
+    aiAskAccessFromPlayer();
   }
   
   // 历史事件系统已移除：历史进程改由国策树（FOCUS_TREES）驱动，AI 按历史线推行国策
+  
+  // 静坐战：动员时钟走完的国家自动发动攻势（宣战≠立刻开打）
+  checkWarEffortNews();
+
+  // 同盟参战邀请：队列里有待答复的邀请就弹窗（弹窗会暂停游戏）
+  maybeShowCallToArms();
   
   // 国策树：每日推进（AI 与玩家统一走这里）
   advanceFocus();
@@ -3971,96 +4627,28 @@ function checkSurrender(){
       
       if(!topAttacker) continue;
       
-      // Surrender! — 国家变为傀儡国而非完全灭亡
-      c.eliminated = true;
-      c.surrenderedTo = topAttacker;
-      addLog('🏳️', COUNTRY_DEFS[cid].short + ' 已向 ' + COUNTRY_DEFS[topAttacker].short + ' 投降！(投降值:' + Math.floor(c.surrender) + '%)');
+      // Surrender! — ★ 全吞并制：本国与所有附属国直接并入征服者（不再自动变傀儡）。
+      // 吞并后的前国家在外交面板最下方「已吞并地区」出现，可随时选择
+      //   「成为傀儡国」（德属法兰西式改名）或「释放独立」（恢复原国名/阵营）
+      addLog('🏳️', COUNTRY_DEFS[cid].short + ' 已向 ' + COUNTRY_DEFS[topAttacker].short + ' 投降！全部领土被吞并。(投降值:' + Math.floor(c.surrender) + '%)');
       if(cid === game.player) SFX.defeat();
-      
-      // 将投降国变为宗主国的傀儡
-      COUNTRY_DEFS[cid].puppetOf = topAttacker;
-      setPuppetName(cid); // 改名"宗主属 + 原国名"（如 德属法兰西）
-      // 继承宗主国阵营
-      let masterDef = COUNTRY_DEFS[topAttacker];
-      if(masterDef){
-        COUNTRY_DEFS[cid].axis = masterDef.axis || false;
-        COUNTRY_DEFS[cid].allies = masterDef.allies || false;
-        COUNTRY_DEFS[cid].comintern = masterDef.comintern || false;
-        COUNTRY_DEFS[cid].neutral = false;
-      }
-      addLog('🎭', COUNTRY_DEFS[cid].short + ' 成为 ' + COUNTRY_DEFS[topAttacker].short + ' 的傀儡国！');
-      
-      // 投降国退出所有战争——否则傀儡与宗主仍留在交战名单上，
-      // 之后被 joinPuppetsToWar 拖入战争时会出现"傀儡莫名对宗主开战"的假象
-      let endedWars = game.wars.filter(w=>w.attacker===cid||w.defender===cid).length;
-      if(endedWars > 0){
-        game.wars = game.wars.filter(w=>w.attacker!==cid && w.defender!==cid);
-        addLog('🕊️', COUNTRY_DEFS[cid].short + ' 投降，退出全部战争（'+endedWars+' 条战线结束）');
-      }
-      
-      // Transfer ALL provinces controlled by the surrendering nation to victor —
-      // 含其占领的外国领土（否则投降后地图残留其颜色 = 假死）
-      let transferred = 0;
-      provinces.filter(p=>p.controller===cid).forEach(p=>{
-        p.controller = topAttacker;
-        transferred++;
-        // Surrender flash animation
-        game.animations.push({type:'capture',x:p.x,y:p.y,frame:0,maxFrames:20,radius:25,color:COUNTRY_DEFS[topAttacker].color});
-      });
-      
+
+      let annexedN = annexSurrendered(cid, topAttacker);
+      addLog('🪢', COUNTRY_DEFS[cid].short + ' 作为占领区并入 ' + COUNTRY_DEFS[topAttacker].short + '（' + annexedN + ' 省）');
       if(topAttacker === game.player){
-        game.skillPoints += transferred;
-        addLog('⭐','接收 ' + transferred + ' 个省份！获得 ' + transferred + ' 点国策点数');
+        game.skillPoints += annexedN;
+        addLog('⭐','吞并 ' + COUNTRY_DEFS[cid].short + '！获得 ' + annexedN + ' 点国策点数');
       }
-      
-      // Transfer resources from surrendered to master
-      let surrenderedCountry = countries[cid];
-      if(surrenderedCountry && countries[topAttacker]){
-        countries[topAttacker].cash += surrenderedCountry.cash;
-        countries[topAttacker].steel += surrenderedCountry.steel;
-        countries[topAttacker].oil += surrenderedCountry.oil;
-        countries[topAttacker].manpower += surrenderedCountry.manpower;
-        countries[topAttacker].manpowerPool += Math.floor(surrenderedCountry.manpowerPool * 0.5);
-        countries[topAttacker].equipment['步兵装备'] += surrenderedCountry.equipment['步兵装备']||0;
-        countries[topAttacker].equipment['摩托化装备'] += surrenderedCountry.equipment['摩托化装备']||0;
-        countries[topAttacker].equipment['坦克'] += surrenderedCountry.equipment['坦克']||0;
-        surrenderedCountry.cash = 0; surrenderedCountry.steel = 0;
-        surrenderedCountry.oil = 0; surrenderedCountry.manpower = 0;
-        surrenderedCountry.manpowerPool = 0;
-        surrenderedCountry.equipment = {'步兵装备':0,'摩托化装备':0,'坦克':0};
-      }
-      
-      // Transfer B's puppets to become direct puppets of C (flatten nested puppets)
+
+      // 附属国（傀儡）一并吞并 —— 不再转移给新宗主，直接全部吃下
       for(let pid in COUNTRY_DEFS){
-        if(pid===cid) continue;
-        if(pid===topAttacker) continue;
-        let pd = COUNTRY_DEFS[pid];
-        if(pd.puppetOf === cid){
-          pd.puppetOf = topAttacker;
-          setPuppetName(pid); // 傀儡随领土转移改属新宗主
-          // Also align faction
-          let masterDef2 = COUNTRY_DEFS[topAttacker];
-          if(masterDef2){
-            pd.axis = masterDef2.axis||false;
-            pd.allies = masterDef2.allies||false;
-            pd.comintern = masterDef2.comintern||false;
-            pd.neutral = false;
-          }
-          addLog('🔄', pd.short + ' 的傀儡关系转移至 ' + COUNTRY_DEFS[topAttacker].short);
+        if(pid===cid || pid===topAttacker) continue;
+        if(COUNTRY_DEFS[pid].puppetOf === cid){
+          let n2 = annexSurrendered(pid, topAttacker);
+          addLog('🪢', COUNTRY_DEFS[pid].short + '（原 ' + COUNTRY_DEFS[cid].short + ' 傀儡国）作为占领区一并并入 ' + COUNTRY_DEFS[topAttacker].short + '（' + n2 + ' 省）');
         }
       }
-      
-      // Free puppets of surrendered country (legacy: any remaining unreferenced)
-      freePuppets(cid);
-      
-      // Disband all units and clean province unitIds
-      let deadIds = new Set(units.filter(u=>u.country===cid).map(u=>u.id));
-      units = units.filter(u=>u.country!==cid);
-      provinces.forEach(p=>{ p.unitIds = p.unitIds.filter(id=>!deadIds.has(id)); });
-      
-      // End wars
-      game.wars = game.wars.filter(w=>w.attacker!==cid && w.defender!==cid);
-      
+
       // Stability boost for victor
       if(countries[topAttacker]) countries[topAttacker].warSupport = Math.min(100, countries[topAttacker].warSupport + 20);
     }
@@ -4082,6 +4670,181 @@ const GUARANTEE_DEFS = {
   // 1941年4月：英国对希腊提供安全保证（意大利入侵希腊=英国参战）
   greece:['uk'],
 };
+
+// ==================== 静坐战 / 假战（Phoney War） ====================
+// 史实：1939.9.3 英法对德宣战，但西线整整八个月没有真正的军事行动。
+//      法国"萨尔攻势"只前进约 8 公里就撤回；英军先遣队 9.6 登陆、9.9 才首次接火；
+//      之后就是"静坐战"（Bore War）直到 1940.5.10 德国发动西线攻势。
+//
+// 机制：宣战 ≠ 立刻开打。每条战线上的每一方都有一个"动员时钟"：
+//   off      —— 我主动宣战/被卷入后，多久才真正发起进攻
+//   def      —— 我的本土被打进来之后，多久才进入作战状态
+//   garrison —— 后勤型大国（英法）：部队会登上大陆、会接火，
+//               但不会渡海登陆敌方本土（没有两栖投送能力/政治意愿）
+// 时钟没走完之前这条战线上没有地面交火（不进攻、不产生伤害），
+// 但双方都会调兵、筑垒、扩军。玩家不豁免——只是玩家可以随时
+// 手动"发动攻势"提前解禁（点击敌方省份时会给出明确提示）。
+const WAR_EFFORT = {
+  uk:     {off:14, def:2, garrison:true},  // 英国：远征军登陆先接火，不渡海登陆德国本土
+  france: {off:25, def:2, garrison:true},  // 法国：萨尔象征性攻势后缩回马奇诺
+  poland: {off:1,  def:1},
+  germany:{off:2,  def:3},
+  ussr:   {off:5,  def:3},
+  italy:  {off:6,  def:4},
+  japan:  {off:2,  def:3},
+  usa:    {off:20, def:3},
+  china:  {off:1,  def:1},
+};
+const WAR_EFFORT_DEFAULT = {off:7, def:2};
+
+// 傀儡国的侵略性上限：傀儡有兵、会打、会推进，但没有独立国策，
+// 推进意愿低于宗主（不抢戏），同时也不会低到 0（那样就变成"只驻防不进攻"）。
+const PUPPET_AGG_CAP = 55;
+
+function warKey(a, b){ return a < b ? a+'|'+b : b+'|'+a; }
+
+// 全国"动员准备"初始化（新开档时省份归属快照）
+function initWarStance(){
+  game.warEffort  = game.warEffort  || {};  // 'a|b' → {a,b,aTs,bTs,aIn,bIn}
+  game.pushNotes  = game.pushNotes  || {};  // 已推送过的战报提示 key → true
+  game.peaceNotes = game.peaceNotes || {};
+  provinces.forEach(p=>{ if(!p._origOwner) p._origOwner = p.cid; });
+}
+
+// 由 declareWar / joinWarSafely 创建战线时调用：登记双方动员时钟
+function registerWarEffort(attacker, defender){
+  if(!game.warEffort) game.warEffort = {};
+  let k = warKey(attacker, defender);
+  if(game.warEffort[k]) return;                 // 已有记录，保持原时钟
+  let a = attacker < defender ? attacker : defender;
+  let b = attacker < defender ? defender : attacker;
+  let aDays = warEffortDelay(a, b);
+  let bDays = warEffortDelay(b, a);
+  game.warEffort[k] = {
+    a, b,
+    aTs: game.tick + aDays,                     // 真正开始作战的时刻
+    bTs: game.tick + bDays,
+    aIn: false, bIn: false                      // 是否已单方面发动攻势
+  };
+}
+
+// 某国对某敌的动员天数
+function warEffortDelay(cid, enemy){
+  if(cid === 'rebels' || enemy === 'rebels') return 0;
+  let cfg = WAR_EFFORT[cid] || WAR_EFFORT_DEFAULT;
+  // 本土已被敌人占领 → 被入侵状态，用 def 时钟（快）
+  let invaded = provinces.some(p=>p._origOwner === cid && p.controller === enemy);
+  if(invaded) return (cfg.def !== undefined ? cfg.def : WAR_EFFORT_DEFAULT.def);
+  let days = (cfg.off !== undefined ? cfg.off : WAR_EFFORT_DEFAULT.off);
+  // 弱国遭强国碾压：顾不上静坐，先保家卫国
+  if(!cfg.garrison){
+    let myP = provinces.filter(p=>p.cid === cid).length;
+    let enP = provinces.filter(p=>p.cid === enemy).length;
+    if(myP > 0 && enP >= myP * 2) days = Math.min(days, 3);
+  }
+  return days;
+}
+
+// 这条战线上，某国现在能不能动武
+function stanceOf(cid, enemy){
+  let k = warKey(cid, enemy);
+  let st = game.warEffort && game.warEffort[k];
+  if(!st) return true;                          // 无记录：默认视为已开打（兼容旧存档）
+  let meA   = (cid === st.a);
+  let myTs  = meA ? st.aTs : st.bTs;
+  let myIn  = meA ? st.aIn : st.bIn;
+  if(myIn) return true;                         // 我已发动攻势
+  if(game.tick >= myTs) return true;            // 动员时钟走完
+  return false;
+}
+
+// 这条战线是否已经真正打响（任一方时钟走完即算"有战事"，用于战报/UI 展示）
+function isFrontActive(cid, enemy){
+  let k = warKey(cid, enemy);
+  let st = game.warEffort && game.warEffort[k];
+  if(!st) return true;
+  if(st.aIn || st.bIn) return true;
+  return game.tick >= Math.min(st.aTs, st.bTs);
+}
+
+// 攻击方能否真正打进去（AI 进攻 / 玩家点击进攻都用这个）
+// 只要"我"这边的动员时钟走完就能打——不需要等对方也准备好（法国可以比英国晚 11 天出拳）
+function canEngage(cid, enemy){
+  if(!areAtWar(cid, enemy)) return false;
+  if(cid === 'rebels' || enemy === 'rebels') return true;   // 平叛不静坐
+  return stanceOf(cid, enemy);
+}
+
+// 全国是否正在"真正作战"（有任意一条战线已打响）
+function isActivelyFighting(cid){
+  for(let w of game.wars){
+    if(w.attacker !== cid && w.defender !== cid) continue;
+    let other = (w.attacker === cid) ? w.defender : w.attacker;
+    if(canEngage(cid, other)) return true;
+  }
+  return false;
+}
+
+// 后勤型大国：不渡海登陆敌方本土（史实上英法在 1940 年前都没有这个能力/意愿）
+function isGarrisonPower(cid){  let cfg = WAR_EFFORT[cid];
+  return !!(cfg && cfg.garrison);
+}
+
+// 发动攻势：把这条战线的时钟清零（国策"立即开打"或玩家长按选择）
+function launchOffensive(cid, enemy){
+  let k = warKey(cid, enemy);
+  if(!game.warEffort) game.warEffort = {};
+  let st = game.warEffort[k];
+  if(!st){
+    registerWarEffort(cid, enemy);
+    st = game.warEffort[k];
+  }
+  st.aTs = game.tick; st.bTs = game.tick;
+  st.aIn = true; st.bIn = true;
+  return true;
+}
+
+// 这条战线还要静坐几天（用于 UI 提示；0 表示已开打）
+function daysOfPhoney(cid, enemy){
+  let k = warKey(cid, enemy);
+  let st = game.warEffort && game.warEffort[k];
+  if(!st) return 0;
+  let meA = (cid === st.a);
+  let myIn = meA ? st.aIn : st.bIn;
+  if(myIn) return 0;                       // 我已发动攻势
+  if(!meA && st.aIn) return 0;             // 对方已动手，我也被拖入
+  if(meA && st.bIn) return 0;
+  let myTs = meA ? st.aTs : st.bTs;
+  return Math.max(0, myTs - game.tick);
+}
+
+// 每日检查：动员时钟走完的一方发动攻势（对方不受影响，各自时钟独立）
+function checkWarEffortNews(){
+  if(!game.warEffort) return;
+  if(!game.pushNotes) game.pushNotes = {};
+  for(let k in game.warEffort){
+    let st = game.warEffort[k];
+    if(!st) continue;
+    if(!st.a || !st.b) continue;
+    // 双方各自判定：谁到点了谁发动攻势
+    if(!st.aIn && game.tick >= st.aTs){
+      st.aIn = true;
+      let gag = countries[st.a] && (countries[st.a].eliminated || countries[st.a].surrenderedTo);
+      if(!gag && countries[st.a] && countries[st.b]){
+        addLog('🔥', COUNTRY_DEFS[st.a].short + ' 结束静坐，对 ' + COUNTRY_DEFS[st.b].short + ' 发动全面攻势！');
+        if(st.a === game.player || st.b === game.player) SFX.war();
+      }
+    }
+    if(!st.bIn && game.tick >= st.bTs){
+      st.bIn = true;
+      let gag = countries[st.b] && (countries[st.b].eliminated || countries[st.b].surrenderedTo);
+      if(!gag && countries[st.a] && countries[st.b]){
+        addLog('🔥', COUNTRY_DEFS[st.b].short + ' 结束静坐，对 ' + COUNTRY_DEFS[st.a].short + ' 发动全面攻势！');
+        if(st.a === game.player || st.b === game.player) SFX.war();
+      }
+    }
+  }
+}
 
 // 保证是否对该攻击者生效：攻击者是轴心国，或与保证国关系恶劣时才触发
 function guaranteeApplies(guarantor, attacker){
@@ -4132,6 +4895,108 @@ function checkAllianceEntries(){
   }
 }
 
+// ==================== 定时加入阵营（史实：日本 1940.9 三国同盟） ====================
+// 1936 年开局日本不属于法西斯阵营（三国同盟 1940.9.27 才签订），
+// 用 COUNTRY_DEFS.japan._joinAxisYear = 1940 表达：日历走到该年时自动转入轴心。
+// 玩家自己选日本时尊重玩家选择：只提示，不强行改阵营。
+function checkTimedFactionEntries(){
+  if(!game.date) return;
+  let yr = game.date.year;
+  for(let cid in COUNTRY_DEFS){
+    let def = COUNTRY_DEFS[cid];
+    if(!def || def.hidden || def.puppetOf) continue;
+    let joinYear = def._joinAxisYear;
+    if(!joinYear) continue;
+    if(yr < joinYear) continue;
+    if(def.axis) continue;                       // 已经加入（或玩家外交改过）就别再动
+    if(cid === game.player){
+      if(!def._axisYearTipShown){
+        def._axisYearTipShown = true;
+        addLog('🎌', '史实：' + def.short + ' 已于 ' + joinYear + ' 年加入轴心（三国同盟）。作为玩家你可以自行决定是否加入阵营。');
+      }
+      continue;
+    }
+    def.axis = true;
+    def.neutral = false;
+    def._joinedAxisYear = yr;
+    addLog('🎌', def.short + ' 签署三国同盟条约，正式加入轴心阵营！');
+    // 傀儡随宗主漂移（满洲国等）
+    for(let pid in COUNTRY_DEFS){
+      let pd = COUNTRY_DEFS[pid];
+      if(pd && pd.puppetOf === cid){ pd.axis = true; pd.neutral = false; }
+    }
+  }
+}
+
+// ==================== AI 主动拉拢中立国入阵营（世界大战期间） ====================
+// 用户需求：世界大战真实爆发之后，AI 扮演的国家会主动邀请中立国家加入自己的阵营。
+// 判定：存在跨阵营战争（=世界大战）；发起者 = 阵营内随机一个非傀儡 AI；
+//       目标 = 无阵营、无战争、非傀儡、非 hidden 的中立国（玩家永远不被自动拉入）。
+// 成功后走 factionOverride（与玩家 inviteToFaction 同一通道），之后
+// checkAllianceEntries 会按阵营关系把它们逐步卷入战争。
+const RECRUIT_CD_DAYS = 45;   // 全局节流：每 45~75 天最多尝试一轮
+
+function isWorldWarActive(){
+  for(let w of game.wars){
+    let fa = getFaction(w.attacker), fb = getFaction(w.defender);
+    if(fa && fb && fa !== fb) return true;
+  }
+  return false;
+}
+function checkAIFactionRecruit(){
+  if(game.recruitCd === undefined) game.recruitCd = 0;
+  if(!isWorldWarActive()) return;
+  if(game.recruitCd > 0){ game.recruitCd--; return; }
+  // 候选中立国
+  let neutrals = [];
+  for(let cid in countries){
+    let c = countries[cid], cd = COUNTRY_DEFS[cid];
+    if(!c || c.eliminated || cid === 'rebels') continue;
+    if(cid === game.player) continue;                          // 玩家自己决定，不自动拉
+    if(!cd || cd.hidden || cd.puppetOf) continue;
+    if(getFaction(cid)) continue;                              // 已有阵营
+    if(game.wars.some(w=>w.attacker===cid||w.defender===cid)) continue; // 正在打仗的不拉
+    neutrals.push(cid);
+  }
+  if(neutrals.length === 0){ game.recruitCd = RECRUIT_CD_DAYS; return; }
+  let invited = 0;
+  for(let f of ['axis','allies','comintern']){
+    if(invited >= 1) break;                                    // 每轮最多拉一国
+    let reps = Object.keys(countries).filter(k=>{
+      let c = countries[k], cd = COUNTRY_DEFS[k];
+      return c && !c.eliminated && cd && !cd.hidden && !cd.puppetOf &&
+             getFaction(k) === f && k !== game.player && k !== 'rebels';
+    });
+    if(reps.length === 0) continue;
+    let rep = reps[Math.floor(Math.random()*reps.length)];
+    // 选最有希望的中立国：关系好 + 与本阵营敌人有冲突 + 不好战（好战的自立门户）
+    let best = null, bestScore = -1e9;
+    for(let n of neutrals){
+      if(areAtWar(n, rep) || areAllies(n, rep)) continue;
+      if(hasPact(n, rep)) continue;
+      let rel = (game.relations[n] && game.relations[n][rep]) || 0;
+      let sharesEnemy = Object.keys(COUNTRY_DEFS).some(k=>areAtWar(n, k) && getFaction(k) && getFaction(k) !== f);
+      let score = rel + (sharesEnemy ? 40 : 0) - (countries[n].aggression||50)*0.2;
+      if(score > bestScore){ bestScore = score; best = n; }
+    }
+    if(!best) continue;
+    let rel = (game.relations[best] && game.relations[best][rep]) || 0;
+    let chance = Math.max(0.02, Math.min(0.6, (rel + 50)/150));
+    if(Math.random() < chance){
+      game.factionOverride[best] = f;
+      game.relations[best][rep] = Math.min(100, rel + 20);
+      addLog('🌐', COUNTRY_DEFS[rep].short + ' 邀请 ' + COUNTRY_DEFS[best].short + ' 加入 ' + factionName(rep) + '，对方同意了！');
+      // 对立阵营对新成员不满
+      for(let k in countries){
+        let f2 = getFaction(k);
+        if(f2 && f2 !== f && game.relations[k]) game.relations[k][best] = Math.max(-80, (game.relations[k][best]||0) - 10);
+      }
+      invited++;
+    }
+  }
+  game.recruitCd = RECRUIT_CD_DAYS + Math.floor(Math.random()*30);
+}
+
 function declareWar(attacker, defender){
   if(areAtWar(attacker,defender)) return;
   // 互不侵犯条约：条约期内禁止宣战（国策宣战会先撕毁条约再调这里）
@@ -4154,6 +5019,7 @@ function declareWar(attacker, defender){
     return;
   }
   game.wars.push({attacker,defender,startDate:fmtDate()});
+  registerWarEffort(attacker, defender);   // 登记动员时钟：宣战≠立刻开打
   countries[attacker].warSupport = Math.min(100, countries[attacker].warSupport+15);
   countries[defender].warSupport = Math.min(100, countries[defender].warSupport+20);
   countries[defender].stability = Math.max(0, countries[defender].stability-10);
@@ -4202,6 +5068,7 @@ function joinWarSafely(a, d){
   if(countries[a] && countries[a].eliminated) return false;
   if(countries[d] && countries[d].eliminated) return false;
   game.wars.push({attacker:a, defender:d, startDate:fmtDate()});
+  registerWarEffort(a, d);   // 登记动员时钟
   return true;
 }
 
@@ -4220,6 +5087,398 @@ function joinPuppetsToWar(masterCid, enemyCid){
     }
   }
 }
+
+// ==================== 同盟参战邀请（Call to Arms） ====================
+// 设计意图：让"同盟"不只是一张贴纸。
+//   当一个国家在一条战线上投入 ≥ CALL_TO_ARMS_MIN_DIVISIONS 个师发动大规模攻势时，
+//   它有权邀请自己的同盟国一起参战。
+//   - 邀请方是 AI、被邀请方是玩家 → 弹窗询问（同意 = 对敌方宣战，拒绝 = 无事发生）
+//   - 邀请方是玩家、被邀请方是 AI → 按 AI 对盟友的好感与自身实力判定接受与否
+//   - 双方都是 AI → 直接按概率入战（不需要弹窗，避免打断玩家）
+// 弹窗期间游戏暂停，答复后恢复原速度。
+
+const CALL_TO_ARMS_MIN_DIVISIONS = 8;   // 触发门槛：8 个师以上的攻势（2026-10 从 6 上调，战略级行为要更慎重）
+const CALL_TO_ARMS_MAX_PER_DAY = 2;     // 同一天最多处理 2 个邀请，避免弹窗刷屏
+
+// 判断某国是否"值得邀请"：同阵营、非傀儡、还活着、尚未与敌方交战、且真能打到
+function callToArmsEligible(inviterCid, allyCid, enemyCid){
+  if(!inviterCid || !allyCid || !enemyCid) return false;
+  if(inviterCid === allyCid) return false;
+  if(allyCid === enemyCid) return false;
+  let ac = countries[allyCid];
+  if(!ac || ac.eliminated) return false;
+  if(areAtWar(allyCid, enemyCid)) return false;       // 已经在打了，不用再请
+  if(!areAllies(inviterCid, allyCid)) return false;   // 只请同盟
+  let ad = COUNTRY_DEFS[allyCid];
+  if(ad && ad.hidden) return false;                   // 叛军不参与外交
+  // 傀儡的外交权在宗主手里：邀请傀儡让它自己决定没有意义
+  if(ad && ad.puppetOf) return false;
+  // ★ 地理可达性：被邀请方必须真的够得着敌人。
+  //   否则会出现"匈牙利邀请日本去打瑞士"这种荒谬邀请——
+  //   玩家点同意就是横跨半个地球去送人头，完全不合理。
+  if(!canReachCountry(allyCid, enemyCid)) return false;
+  return true;
+}
+
+// a 国能否打到 b 国：陆路接壤 / 海路航线 / 双方都有海军时的远洋投送
+// 用 BFS 在 ADJACENCY 图上做有限深度搜索，比逐省对比更贴近"能不能打过去"
+function canReachCountry(aCid, bCid){
+  if(aCid === bCid) return false;
+  let aProvs = provinces.filter(p=>p.controller===aCid).map(p=>p.id);
+  let bSet = new Set(provinces.filter(p=>p.controller===bCid).map(p=>p.id));
+  if(aProvs.length === 0 || bSet.size === 0) return false;
+
+  // 我方有没有海军 —— 没有海军的国家只能走陆路
+  let hasNavy = units.some(u=>u.country===aCid && UNIT_TYPES[u.type] && UNIT_TYPES[u.type].naval);
+  // 有没有两栖能力（摩托化/装甲可自行抢滩）
+  let hasAmph = units.some(u=>u.country===aCid && (u.type==='motorized'||u.type==='armor'));
+  let canCrossSea = hasNavy || hasAmph;
+
+  let maxDepth = canCrossSea ? 12 : 4;   // 有海权才谈得上远征
+  let seen = new Set(aProvs);
+  let frontier = aProvs.slice();
+  let depth = 0;
+  while(frontier.length && depth < maxDepth){
+    let next = [];
+    for(let pid of frontier){
+      for(let n of getNeighbors(pid)){
+        if(seen.has(n)) continue;
+        seen.add(n);
+        if(bSet.has(n)) return true;
+        let np = provinces[n];
+        if(!np) continue;
+        // 走海路需要跨海能力，否则跳过
+        let sk = Math.min(pid,n)+':'+Math.max(pid,n);
+        if(SEA_ROUTES.has(sk) && !canCrossSea) continue;
+        // 不穿越第三国领土（只能走自己的、盟友的、或直接打到敌人的）
+        if(np.controller !== aCid && !areAllies(aCid, np.controller) && !bSet.has(n)){
+          // 中立/敌国领土不当作通路，但敌国本身算终点（上面已判断）
+          continue;
+        }
+        next.push(n);
+      }
+    }
+    frontier = next;
+    depth++;
+  }
+  return false;
+}
+
+// 某国在某个日期内是否已经对该敌国发过邀请（按日去重）
+function callToArmsAlreadySent(inviterCid, enemyCid){
+  if(!game.callToArmsOut) game.callToArmsOut = {};
+  let k = inviterCid + '|' + enemyCid;
+  let last = game.callToArmsOut[k];
+  // 同一对组合 30 天内只邀请一次
+  if(last !== undefined && game.tick - last < 30) return true;
+  return false;
+}
+
+// AI 对"是否接受盟友的参战邀请"的态度
+// ==================== AI 战争意愿统一判定 ====================
+// 用户需求：AI 决定「是否和盟友一起打某国」以及「是否主动宣战」时，要同时看三件事：
+//   1. 当前的战争状况：已经在和 3 个及以上国家交战（"+++"）→ 一定不参与
+//      （多线作战是兵家大忌，再开一条战线只会崩盘）
+//   2. 自己的石油储备够不够 —— 不够一律拒绝
+//   3. 自己的现金储备够不够 —— 不够一律拒绝
+// 仅限 AI。玩家完全不受这些限制，可以凭心情掀桌。
+const AI_MAX_WAR_FRONTS = 3;   // 交战对手数达到 3 个（"+++"）就不再开战
+
+// ★ 关于石油/现金门槛的量化方式（踩过的坑，别改回绝对值）：
+//   全国石油存量 = 省份石油总量 * 200，中位数只有 200，19 个国家开局是 0。
+//   早先写成「oil < 120 就拒绝」，直接把 25/48 的国家永久锁死 ——
+//   连英国(600)、日本(800) 都在打击范围内，等于把参战机制废掉一半。
+//
+//   正确做法是"相对自己"：门槛取该国自身石油产能的一个倍数。
+//   产能高的国家（苏联 15、美国 7）门槛自然高，产能为 0 的国家门槛也为 0 ——
+//   它们不是"没油所以不许打"，而是"本来就没油可烧"，不该被这条规则针对。
+//
+//   现金同理：国家开局统一 5000，但穷国会一直入不敷出，
+//   用"当前现金 / 日均维护费"的天数来衡量更合理。
+const AI_MIN_OIL_MULT  = 0.6;   // 至少要有「自身石油产能 * 0.6」的存量
+const AI_MIN_CASH_DAYS = 30;    // 至少要有「30 天维护费」的现金
+
+// 该国石油产能（按当前控制省份的 oil 产出，不乘 200）
+function aiOilCapacity(cid){
+  let cap = 0;
+  for(let p of provinces){
+    if(p.controller === cid) cap += (p.oil || 0);
+  }
+  return cap;
+}
+
+// 该国每天的现金净支出估算：部队维护费 + 建造成本。
+// 取一个保守的近似：每支部队每天 2 金，,每座在建工厂每天 5 金。
+// 目的是量级判断，不需要精确。
+function aiDailyBurn(cid){
+  let army = units.filter(u=>u.country===cid).length;
+  let building = provinces.filter(p=>p.controller===cid && p.buildQueue && p.buildQueue.length>0).length;
+  return army * 2 + building * 5 + 5;  // +5 是基础行政开销
+}
+
+// 统计某国当前正与多少个国家处于战争状态
+function aiWarFrontCount(cid){
+  let set = new Set();
+  for(let w of game.wars){
+    if(w.attacker === cid) set.add(w.defender);
+    else if(w.defender === cid) set.add(w.attacker);
+  }
+  return set.size;
+}
+
+// 判断某 AI 国家的战争资源是否充足。
+// 返回 {ok, reason}，reason 用于日志/调试，便于排查"为什么这个 AI 死活不参战"。
+function aiWarResourcesOk(cid){
+  let c = countries[cid];
+  if(!c) return {ok:false, reason:'国家不存在'};
+  let oil  = c.oil  || 0;
+  let cash = c.cash || 0;
+  let fronts = aiWarFrontCount(cid);
+
+  // ---- 石油：相对自身产能 ----
+  // 产能为 0 的国家（内陆小国）跳过这条检查 —— 它们本来就没有石油这个维度，
+  // 用它当否决条件等于给这类国家判死刑。
+  let cap = aiOilCapacity(cid);
+  if(cap > 0){
+    let oilNeed = cap * 200 * AI_MIN_OIL_MULT * (1 + fronts * 0.4);
+    if(oil < oilNeed){
+      return {ok:false, reason:'石油不足 ' + Math.round(oil) + '/' + Math.round(oilNeed)};
+    }
+  }
+
+  // ---- 现金：相对自身日均开销 ----
+  let burn = Math.max(5, aiDailyBurn(cid));
+  let cashNeed = burn * AI_MIN_CASH_DAYS * (1 + fronts * 0.4);
+  if(cash < cashNeed){
+    return {ok:false, reason:'现金不足 ' + Math.round(cash) + '/' + Math.round(cashNeed)};
+  }
+
+  return {ok:true};
+}
+
+// 综合判定：AI 愿不愿意「对 targetCid 动武」。
+// mode: 'join'（响应盟友号召）| 'declare'（主动宣战）
+// 返回 {ok, reason}
+function aiCanWageWar(cid, targetCid, mode){
+  let c = countries[cid];
+  if(!c || c.eliminated) return {ok:false, reason:'已灭亡'};
+  // targetCid 传 null 表示"通用开战资格检查"（主动宣战在选定目标前先过一遍总量门槛）
+  if(targetCid){
+    if(cid === targetCid) return {ok:false, reason:'目标是自己'};
+    if(isPuppetOf(cid, targetCid)) return {ok:false, reason:'目标是自己的宗主'};
+  }
+
+  // ① 已经在打 3 个或更多国家（"+++"）→ 一定不参与
+  let fronts = aiWarFrontCount(cid);
+  if(fronts >= AI_MAX_WAR_FRONTS){
+    return {ok:false, reason:'已陷入 ' + fronts + ' 线作战（+++），拒绝开新战线'};
+  }
+
+  // ②③ 石油 / 现金储备
+  let res = aiWarResourcesOk(cid);
+  if(!res.ok) return {ok:false, reason:res.reason + '，拒绝开战'};
+
+  return {ok:true};
+}
+
+// 综合判定：AI 愿不愿意「对 targetCid 动武」。
+// mode: 'join'（响应盟友号召）| 'declare'（主动宣战）
+// 返回 {ok, reason}
+function aiCanWageWar(cid, targetCid, mode){
+  let c = countries[cid];
+  if(!c || c.eliminated) return {ok:false, reason:'已灭亡'};
+  // targetCid 传 null 表示"通用开战资格检查"（主动宣战在选定目标前先过一遍总量门槛）
+  if(targetCid){
+    if(cid === targetCid) return {ok:false, reason:'目标是自己'};
+    if(isPuppetOf(cid, targetCid)) return {ok:false, reason:'目标是自己的宗主'};
+  }
+
+  // ① 已经在打 3 个或更多国家（"+++"）→ 一定不参与
+  let fronts = aiWarFrontCount(cid);
+  if(fronts >= AI_MAX_WAR_FRONTS){
+    return {ok:false, reason:'已陷入 ' + fronts + ' 线作战（+++），拒绝开新战线'};
+  }
+
+  // ②③ 石油 / 现金储备
+  let res = aiWarResourcesOk(cid);
+  if(!res.ok) return {ok:false, reason:res.reason + '，拒绝开战'};
+
+  return {ok:true};
+}
+
+function aiAcceptsCallToArms(allyCid, inviterCid, enemyCid){
+  let a = countries[allyCid], e = countries[enemyCid], inv = countries[inviterCid];
+  if(!a || !e) return false;
+
+  // ★ 统一硬门槛（仅 AI）：+++ 敌对 / 石油不足 / 现金不足 → 一律拒绝。
+  //   这三条是"绝对否决"，不参与后面的概率计算。
+  let gate = aiCanWageWar(allyCid, enemyCid, 'join');
+  if(!gate.ok) return false;
+
+  // 自身实力 vs 敌人：差距过大就不去送死
+  let myPow = units.filter(u=>u.country===allyCid).reduce((s,u)=>s+(u.hp/u.maxHp)*UNIT_TYPES[u.type].atk,0);
+  let enemyPow = units.filter(u=>u.country===enemyCid).reduce((s,u)=>s+(u.hp/u.maxHp)*UNIT_TYPES[u.type].atk,0);
+  let ratio = myPow / Math.max(1, enemyPow);
+  // 对邀请方的好感（同盟内默认偏正）
+  let rel = (game.relations[allyCid] && game.relations[allyCid][inviterCid]) || 0;
+  let p = 0.45;
+  if(ratio > 1.2) p += 0.30;         // 打得过，愿意分一杯羹
+  else if(ratio < 0.5) p -= 0.35;    // 明显打不过，躲
+  if(rel > 30) p += 0.15;
+  if(rel < -20) p -= 0.20;
+  // 侵略性高的国家更愿意参战
+  p += ((a.aggression||50) - 50) / 250;
+  // 已经被别的战线拖住的国家不愿意再开一条
+  let myWars = game.wars.filter(w=>w.attacker===allyCid || w.defender===allyCid).length;
+  p -= myWars * 0.10;
+  return Math.random() < Math.max(0.05, Math.min(0.9, p));
+}
+
+// 发出参战邀请（统一入口）
+//   inviterCid 发起攻势方，enemyCid 攻势目标，divisions 投入师数
+function sendCallToArms(inviterCid, enemyCid, divisions, provinceId){
+  if(divisions < CALL_TO_ARMS_MIN_DIVISIONS) return 0;
+  // 防御：调用方可能传进 undefined / 空串（比如拿不到目标省份的控制者），
+  //   这种邀请没有意义，直接丢弃，免得脏数据进队列后弹出一个"对 undefined 的作战"
+  if(!inviterCid || !enemyCid) return 0;
+  if(inviterCid === enemyCid) return 0;
+  if(!countries[inviterCid] || countries[inviterCid].eliminated) return 0;
+  if(!countries[enemyCid] || countries[enemyCid].eliminated) return 0;
+  if(callToArmsAlreadySent(inviterCid, enemyCid)) return 0;
+
+  let allies = [];
+  for(let cid in countries){
+    if(callToArmsEligible(inviterCid, cid, enemyCid)) allies.push(cid);
+  }
+  if(allies.length === 0) return 0;
+
+  if(!game.callToArmsOut) game.callToArmsOut = {};
+  game.callToArmsOut[inviterCid + '|' + enemyCid] = game.tick;
+
+  let invitedToPlayer = false;
+  for(let allyCid of allies){
+    if(allyCid === game.player){
+      // 玩家：进队列等弹窗，不立刻判定
+      if(!game.callToArmsQueue) game.callToArmsQueue = [];
+      game.callToArmsQueue.push({
+        id: 'cta' + game.tick + '_' + inviterCid + '_' + enemyCid,
+        inviter: inviterCid, enemy: enemyCid,
+        divisions, provinceId, day: game.tick
+      });
+      invitedToPlayer = true;
+    } else if(countries[allyCid] && countries[allyCid].isAI){
+      // AI 盟友：按态度自动判定
+      if(aiAcceptsCallToArms(allyCid, inviterCid, enemyCid)){
+        if(joinWarSafely(allyCid, enemyCid)){
+          addLog('🤝', COUNTRY_DEFS[allyCid].short+' 响应 '+COUNTRY_DEFS[inviterCid].short
+            +' 的同盟号召，对 '+COUNTRY_DEFS[enemyCid].short+' 宣战！');
+        }
+      }
+    }
+  }
+  if(invitedToPlayer) maybeShowCallToArms();
+  return allies.length;
+}
+
+// ---- 弹窗：同盟邀请参战 ----
+function maybeShowCallToArms(){
+  if(!game.player) return;
+  if(game.callToArmsShowing) return;         // 已经有一个在显示了
+  if(!game.callToArmsQueue || game.callToArmsQueue.length === 0) return;
+  let req = game.callToArmsQueue[0];
+  // 过期作废（比如这段时间里玩家已经自己和敌人开战了）
+  if(areAtWar(game.player, req.enemy) || countries[req.enemy] && countries[req.enemy].eliminated){
+    game.callToArmsQueue.shift();
+    maybeShowCallToArms();
+    return;
+  }
+  if(!countries[req.inviter] || countries[req.inviter].eliminated){
+    game.callToArmsQueue.shift();
+    maybeShowCallToArms();
+    return;
+  }
+
+  game.callToArmsShowing = true;
+  game._ctaPrePaused = game.paused;          // 记住原暂停状态
+  game.paused = true;
+  updateBottomBar();
+
+  let inv = COUNTRY_DEFS[req.inviter];
+  let en = COUNTRY_DEFS[req.enemy];
+
+  let ov = document.getElementById('calltoarms-overlay');
+  if(!ov){
+    ov = document.createElement('div');
+    ov.className = 'modal-overlay';
+    ov.id = 'calltoarms-overlay';
+    ov.style.zIndex = '260';
+    document.body.appendChild(ov);
+  }
+  ov.style.display = 'flex';
+  ov.innerHTML =
+    '<div class="modal" style="max-width:440px;text-align:center">'
+    + '<h2 style="font-size:17px">📣 同盟号召</h2>'
+    + '<div style="background:#0d1117;border:1px solid #30363d;border-radius:8px;padding:18px 16px;margin:14px 0">'
+    +   '<div style="font-size:26px;margin-bottom:10px">'+(inv.flag||'🏳️')+' → '+(en.flag||'🏳️')+'</div>'
+    +   '<div style="color:#c9d1d9;font-size:14px;line-height:1.7">'
+    +     '<b style="color:#f0c040">'+inv.short+'</b> 邀请你加入<br>'
+    +     '对 <b style="color:#ff7b72">'+en.short+'</b> 的作战'
+    +   '</div>'
+    +   '<div style="color:#8b949e;font-size:11px;margin-top:10px">'
+    +     inv.short+' 已投入 '+req.divisions+' 个师发动大规模攻势'
+    +   '</div>'
+    + '</div>'
+    + '<div style="color:#8b949e;font-size:11px;margin-bottom:12px">'
+    +   '同意将立即对 '+en.short+' 宣战；拒绝则不会发生任何事。'
+    + '</div>'
+    + '<div style="display:flex;gap:10px;justify-content:center">'
+    +   '<button class="btn btn-go" style="flex:1;margin-top:0" onclick="answerCallToArms(true)">✅ 同意</button>'
+    +   '<button class="btn btn-skip" style="flex:1;margin-left:0;margin-top:0;color:#ff7b72;border-color:#5c2a2a" onclick="answerCallToArms(false)">❌ 拒绝</button>'
+    + '</div>'
+    + '</div>';
+  SFX.click && SFX.click();
+}
+
+function answerCallToArms(accept){
+  let ov = document.getElementById('calltoarms-overlay');
+  if(ov) ov.style.display = 'none';
+  game.callToArmsShowing = false;
+
+  let req = (game.callToArmsQueue || []).shift();
+  if(req && accept){
+    let ok = joinWarSafely(game.player, req.enemy);
+    if(ok){
+      addLog('🤝','你响应了 '+COUNTRY_DEFS[req.inviter].short+' 的号召，对 '
+        + COUNTRY_DEFS[req.enemy].short+' 宣战！');
+      // 玩家主动参战，同阵营其他盟友也更愿意跟进
+      for(let cid in countries){
+        if(cid===game.player || cid===req.enemy) continue;
+        if(!countries[cid] || !countries[cid].isAI || countries[cid].eliminated) continue;
+        if(!callToArmsEligible(game.player, cid, req.enemy)) continue;
+        if(aiAcceptsCallToArms(cid, game.player, req.enemy)){
+          joinWarSafely(cid, req.enemy);
+        }
+      }
+    } else {
+      addLog('⚠️','无法对 '+COUNTRY_DEFS[req.enemy].short+' 宣战（可能已停战或已结盟）');
+    }
+  } else if(req){
+    addLog('🚫','你拒绝了 '+COUNTRY_DEFS[req.inviter].short+' 的参战邀请');
+    // 拒绝会伤害与邀请方的关系
+    if(game.relations[game.player] && game.relations[game.player][req.inviter] !== undefined){
+      game.relations[game.player][req.inviter] = Math.max(-100, game.relations[game.player][req.inviter] - 8);
+    }
+  }
+
+  // 恢复暂停状态（原来不是暂停就继续跑）
+  if(!game._ctaPrePaused) game.paused = false;
+  updateBottomBar();
+  updateUI && updateUI();
+
+  // 队列里还有就继续弹下一个
+  setTimeout(()=>{ if(game.callToArmsQueue && game.callToArmsQueue.length) maybeShowCallToArms(); }, 120);
+}
+
 
 // 结束 a 与 b 之间的战争，并连带结束双方傀儡的参战记录
 // （否则：宗主国停战了，它的傀儡却还在打对方——"孤军作战"bug）
@@ -4267,6 +5526,83 @@ function freePuppets(deadMasterCid){
       addLog('🔓', '💔 '+def.short+' 的宗主国灭亡，恢复独立！');
     }
   }
+}
+
+// ==================== 全吞并制：投降国直接并入征服者 ====================
+// 旧版：投降 → 变征服者的傀儡（"德属法兰西"）；附属国转投新宗主。
+// 新版（用户需求）：打下首都 → 投降 → 本国与全部附属国**直接吞并**为占领区，
+//   事后在外交面板最下方「已吞并地区」里由玩家决定 成为傀儡国 / 释放独立。
+function annexSurrendered(cid, victor){
+  let def = COUNTRY_DEFS[cid], c = countries[cid], v = countries[victor];
+  if(!def || !c || !v || c.eliminated) return 0;
+  let wasPuppetOf = def.puppetOf || null;   // 记录原宗主（UI 显示"原××傀儡国"）
+  // 1) 领土：全部控制省（含它占领的外国领土）划给征服者
+  let n = 0;
+  provinces.filter(p=>p.controller===cid).forEach(p=>{
+    p.controller = victor; n++;
+    game.animations.push({type:'capture',x:p.x,y:p.y,frame:0,maxFrames:20,radius:25,color:COUNTRY_DEFS[victor].color});
+  });
+  // 2) 资源/装备全部移交
+  v.cash += c.cash; v.steel += c.steel; v.oil += c.oil;
+  v.manpower += c.manpower; v.manpowerPool += Math.floor((c.manpowerPool||0) * 0.5);
+  ['步兵装备','摩托化装备','坦克'].forEach(k=>{ v.equipment[k] += c.equipment[k]||0; });
+  c.cash = 0; c.steel = 0; c.oil = 0; c.manpower = 0; c.manpowerPool = 0;
+  c.equipment = {'步兵装备':0,'摩托化装备':0,'坦克':0};
+  // 3) 国家本体退出世界舞台（不设傀儡 —— 留给"已吞并地区"面板处置）
+  c.eliminated = true;
+  c.surrenderedTo = victor;
+  def._annexedBy = victor;
+  def._annexedWasPuppetOf = wasPuppetOf;
+  def.puppetOf = null;
+  delete def._regimeLabel;
+  restorePuppetName(cid);   // 吞并区保留原国名（UI 显示「原国名+地区」；扶植傀儡时再改名）
+  // 4) 解散全部部队
+  let deadIds = new Set(units.filter(u=>u.country===cid).map(u=>u.id));
+  units = units.filter(u=>u.country!==cid);
+  provinces.forEach(p=>{ p.unitIds = p.unitIds.filter(id=>!deadIds.has(id)); });
+  // 5) 退出全部战争
+  let ended = game.wars.filter(w=>w.attacker===cid||w.defender===cid).length;
+  game.wars = game.wars.filter(w=>w.attacker!==cid && w.defender!==cid);
+  if(ended > 0) addLog('🕊️', COUNTRY_DEFS[cid].short + ' 被吞并，退出全部战争（' + ended + ' 条战线结束）');
+  return n;
+}
+
+// 吞并地区处置：mode 'puppet' 扶植为玩家傀儡国 | 'free' 释放独立
+function restoreAnnexed(cid, mode){
+  if(!game.player) return;
+  let def = COUNTRY_DEFS[cid], c = countries[cid];
+  if(!def || !c || !c.eliminated || def._annexedBy !== game.player) return;
+  c.eliminated = false;
+  c.surrender = 0;
+  delete c.surrenderedTo;
+  delete def._annexedBy;
+  let wasPuppetOf = def._annexedWasPuppetOf || null;
+  delete def._annexedWasPuppetOf;
+  // 归还法理领土（p.cid===cid 且仍在玩家手中；被第三方占住的不动）
+  let given = 0;
+  provinces.forEach(p=>{ if(p.cid===cid && p.controller===game.player){ p.controller = cid; given++; } });
+  if(given === 0){ addLog('⚠️','吞并区 '+(def._origShort||def.short)+' 已无可归还领土（全被第三方占领）'); updateUI(); return; }
+  // 资源兜底 + 每省 1 支驻军（复活不裸奔）
+  c.cash = Math.max(c.cash||0, 300); c.steel = Math.max(c.steel||0, 100); c.oil = Math.max(c.oil||0, 50);
+  c.equipment['步兵装备'] = Math.max(c.equipment['步兵装备']||0, given);
+  c.manpowerPool = Math.max(c.manpowerPool||0, 100);
+  provinces.filter(p=>p.controller===cid).forEach(p=>{ spawnUnitRaw(p.id, 'garrison'); });
+  if(mode === 'puppet'){
+    def.puppetOf = game.player;
+    setPuppetName(cid);
+    let md = COUNTRY_DEFS[game.player];
+    def.axis = !!(md&&md.axis); def.allies = !!(md&&md.allies); def.comintern = !!(md&&md.comintern); def.neutral = false;
+    addLog('🎭','你在吞并区「'+(def._origShort||def.short)+'」扶植傀儡国：'+def.short+'（归还 '+given+' 省）');
+  } else {
+    def.puppetOf = null;
+    restorePuppetName(cid);
+    let orig = COUNTRY_DEFS_ORIG[cid] || {};
+    def.axis = !!orig.axis; def.allies = !!orig.allies; def.comintern = !!orig.comintern; def.neutral = !!orig.neutral;
+    if(game.relations[game.player]) game.relations[game.player][cid] = Math.min(100,(game.relations[game.player][cid]||0)+50);
+    addLog('🔓','吞并区「'+(def._origShort||def.short)+'」'+(wasPuppetOf?'（原'+COUNTRY_DEFS[wasPuppetOf].short+'傀儡国）':'')+' 获释独立，归还 '+given+' 省');
+  }
+  buildTerritories();
+  updateUI();
 }
 
 // ====================（历史事件系统已移除：全屏弹窗事件与国策树重复，历史进程由国策树驱动） ====================
@@ -4521,6 +5857,16 @@ function playerReleasePuppet(pid){
   }
   if(game.relations[game.player]) game.relations[game.player][pid] = Math.min(100, (game.relations[game.player][pid]||0) + 25);
   addLog('🔓', '你释放了傀儡国 ' + pd.short + '，恢复其独立');
+  // 地方政权释放后不再有意义（它的法理母国可能已经不存在了），
+  // 直接标记成普通独立小国并存续，避免出现"独立了却仍是占领区政权"的怪状态
+  if(pd._localRegime){
+    pd._localRegime = false;
+    delete pd._regime;
+    delete pd._regimeBonus;
+    restorePuppetName(pid);
+    addLog('🏛️', pd.short + ' 已成为独立国家');
+  }
+  buildTerritories();
   updateUI();
 }
 
@@ -4552,6 +5898,227 @@ function playerAnnexPuppet(pid){
   addLog('🔗', '你吞并了傀儡国 ' + pd.short + '，获得 ' + annexed + ' 块领土');
   pd.puppetOf = null;
   restorePuppetName(pid);
+  updateUI();
+}
+
+// ==================== 占领区扶植地方政权（Local Regime） ====================
+// 问题：原来的傀儡系统只有"敌国整体投降 → 全国变傀儡"一条路径。
+//      中国打下华北几个省，这些省只是"被占领"，永远不会有"中属华北"。
+//      而德国打下列宁格勒就会有"德属苏联"（其实是全国投降才有）。
+//
+// 机制：把「占领区」就地转成一个听命于占领者的地方政权。
+//   1. 必须在占领区里扶植——该省由我方控制，但法理归属（cid）是别国；
+//   2. 必须与法理母国处于战争状态（不能凭空在友邦领土上搞政变）；
+//   3. 该省不能是法理母国的最后一块领土（剩下最后一块时应当直接吞并/等待投降）；
+//   4. 需要付出政治成本：资金 + 国策点数（扶植政权要养官僚、要给军费）；
+//   5. 扶植后：该省 cid 改为新政权，新政权 puppetOf = 我方，政权类型走 military（军政府）。
+//
+// 与"投降变傀儡"的区别：
+//   - 投降傀儡：整个国家、本土全部领土、类型 domestic
+//   - 地方政权：只针对已占领的具体省份、类型 military/gov、国名取"宗主属+省名"
+
+// 可用政权类型（按"占领区"性质给出选项）
+const LOCAL_REGIME_TYPES = [
+  {id:'military', name:'军政府', icon:'🎖️', desc:'占领军直接管制，产出高但民心差', cost:{cash:400, sp:2}, bonus:{prod:0.15, unrest:15}},
+  {id:'gov',      name:'自治政府', icon:'🏛️', desc:'扶植本地精英，稳定但产出一般', cost:{cash:600, sp:3}, bonus:{prod:0.05, unrest:0}},
+  {id:'protector',name:'保护国', icon:'🛡️', desc:'名义独立、实为附庸，外交上更体面', cost:{cash:800, sp:4}, bonus:{prod:0.0, unrest:-5}}
+];
+
+// 生成本地政权 id：master_provId（如 china_42），避免与既有国家冲突
+function localRegimeId(masterCid, pid){
+  return masterCid + '_r' + pid;
+}
+
+// 判定某个省能否被扶植为地方政权。返回 {ok, reason}
+function canEstablishRegime(pid){
+  if(!game.player) return {ok:false, reason:'未开始游戏'};
+  let p = provinces[pid];
+  if(!p) return {ok:false, reason:'省份不存在'};
+  if(p.controller !== game.player) return {ok:false, reason:'必须由我方控制该省'};
+  // 法理归属：优先 _origOwner（旧存档兼容），其次 cid
+  let legal = p._origOwner || p.cid;
+  if(legal === game.player) return {ok:false, reason:'这是我方本土，无需扶植政权'};
+  let legalDef = COUNTRY_DEFS[legal];
+  if(!legalDef) return {ok:false, reason:'该省法理归属不明'};
+  // 已经是某个傀儡政权的一部分 → 不重复扶植
+  if(legalDef.puppetOf === game.player) return {ok:false, reason:'该地区已是我方傀儡领土'};
+  if(!areAtWar(game.player, legal)) return {ok:false, reason:'我方与 ' + legalDef.short + ' 不处于战争状态'};
+  // 该省不能是母国最后一块领土（否则应该等它投降/直接吞并）
+  let legalRemain = provinces.filter(x=>x.controller === legal).length;
+  if(legalRemain <= 1) return {ok:false, reason:legalDef.short + ' 仅剩该省，直接军事占领即可'};
+  // 同母国已有政权 → 建议扩张而不是新建（减少国家数量爆炸）
+  let existing = findLocalRegimeFor(legal, game.player);
+  if(existing) return {ok:false, reason:'已存在 ' + COUNTRY_DEFS[existing].short + '，请直接向其转让该省', existing:existing};
+  // 所需省份数：至少要有 2 个连着占领的省份才有"地方"可言
+  let myOccupied = provinces.filter(x=>{
+    let lg = x._origOwner || x.cid;
+    return lg === legal && x.controller === game.player;
+  }).length;
+  if(myOccupied < 2) return {ok:false, reason:'至少需占领 ' + legalDef.short + ' 的 2 个省份（当前 ' + myOccupied + '）'};
+  return {ok:true};
+}
+
+// 找到某母国已被我方扶植的地方政权（一个母国只扶植一个，避免政权碎片化）
+function findLocalRegimeFor(legalCid, masterCid){
+  for(let cid in COUNTRY_DEFS){
+    let d = COUNTRY_DEFS[cid];
+    if(d._localRegime && d._localLegalOwner === legalCid && d.puppetOf === masterCid){
+      return cid;
+    }
+  }
+  return null;
+}
+
+// 创建一个地方政权（不接管任何省份，由 establishRegime 分配）
+function createLocalRegime(masterCid, legalCid, regimeType, seedPid){
+  let masterDef = COUNTRY_DEFS[masterCid];
+  let legalDef = COUNTRY_DEFS[legalCid];
+  if(!masterDef || !legalDef) return null;
+  let rid = localRegimeId(masterCid, seedPid);
+  // 若 id 已存在（局部省份被反复扶植），加后缀
+  let base = rid, n = 2;
+  while(COUNTRY_DEFS[rid]){ rid = base + '_' + n++; }
+  // 用省名 + 方位感拼出政权名（华北军政府 / 华东自治政府），
+  // 取不到合适名字时退回"母国简称 + 占领区"
+  let provName = provinces[seedPid] ? provinces[seedPid].name : '占领区';
+  let rtype = LOCAL_REGIME_TYPES.find(t=>t.id===regimeType) || LOCAL_REGIME_TYPES[0];
+  let shortName = provName.replace(/[省市]$/,'') + rtype.name;
+  let def = {
+    id: rid,
+    name: shortName,
+    short: shortName,
+    color: masterDef.color,
+    leader: '扶植政权',
+    flag: masterDef.flag,
+    aggression: 20,
+    neutral: false,
+    puppetOf: masterCid,
+    _regime: regimeType,
+    _localRegime: true,
+    _localLegalOwner: legalCid,
+    _localSeedProv: seedPid
+  };
+  // 政策加成（军政府产出高但不安定）
+  if(rtype.bonus) def._regimeBonus = {...rtype.bonus};
+  COUNTRY_DEFS[rid] = def;
+  // 立即建国家对象（否则 AI/战斗会报 undefined）
+  countries[rid] = initCountry(rid);
+  countries[rid].eliminated = false;
+  countries[rid].puppetOf = masterCid;
+  countries[rid].isAI = true;
+  countries[rid].cash = 400;
+  countries[rid].aggression = 20;
+  // 继承宗主阵营
+  def.axis = masterDef.axis || false;
+  def.allies = masterDef.allies || false;
+  def.comintern = masterDef.comintern || false;
+  // 关系表补齐（否则 UI getRelations 取不到）
+  for(let oid in countries){
+    if(!game.relations[oid]) game.relations[oid] = {};
+    if(game.relations[oid][rid] === undefined) game.relations[oid][rid] = 0;
+    if(!game.relations[rid]) game.relations[rid] = {};
+    if(game.relations[rid][oid] === undefined) game.relations[rid][oid] = 0;
+  }
+  game.relations[masterCid][rid] = 90;
+  game.relations[rid][masterCid] = 90;
+  setPuppetName(rid);
+  return rid;
+}
+
+// 执行扶植：把该母国被我方占领的所有省份划给新政权
+function establishRegime(pid, regimeType){
+  if(!game.player) return false;
+  let chk = canEstablishRegime(pid);
+  if(!chk.ok){
+    addLog('⚠️', chk.reason);
+    if(chk.existing){
+      // 已有政权 → 直接把该省转过去
+      transferProvinceToPuppet(pid, chk.existing);
+    }
+    return false;
+  }
+  let rtype = LOCAL_REGIME_TYPES.find(t=>t.id===regimeType) || LOCAL_REGIME_TYPES[0];
+  let c = countries[game.player];
+  if(c.cash < rtype.cost.cash){ addLog('⚠️','资金不足（需要 '+rtype.cost.cash+'💰）'); return false; }
+  if((game.skillPoints||0) < rtype.cost.sp){ addLog('⚠️','国策点数不足（需要 '+rtype.cost.sp+' 点）'); return false; }
+  let p = provinces[pid];
+  let legal = p._origOwner || p.cid;
+  let legalDef = COUNTRY_DEFS[legal];
+  // 扣成本
+  c.cash -= rtype.cost.cash;
+  game.skillPoints = (game.skillPoints||0) - rtype.cost.sp;
+  // 建国
+  let rid = createLocalRegime(game.player, legal, regimeType, pid);
+  if(!rid) return false;
+  // 划转该母国所有被我方控制的省份
+  let moved = 0;
+  provinces.forEach(x=>{
+    let lg = x._origOwner || x.cid;
+    if(lg === legal && x.controller === game.player){
+      x.cid = rid;
+      x.controller = rid;
+      moved++;
+      game.animations.push({type:'capture',x:x.x,y:x.y,frame:0,maxFrames:18,radius:22,color:COUNTRY_DEFS[rid].color});
+    }
+  });
+  // 新政权与该母国自动处于战争状态（母国不会承认傀儡）
+  if(areAtWar(game.player, legal) && !areAtWar(rid, legal)){
+    game.wars.push({attacker:legal, defender:rid, start:game.tick, turns:0});
+  }
+  // 军政人力/装备从宗主划一部分过去，否则新政权 0 兵 0 人力，AI 永远不出兵
+  let newC = countries[rid];
+  if(newC){
+    newC.manpowerPool = Math.max(20, Math.floor((c.manpowerPool||0) * 0.08));
+    newC.equipment['步兵装备'] = Math.max(20, Math.floor((c.equipment['步兵装备']||0) * 0.06));
+    c.manpowerPool = Math.max(0, (c.manpowerPool||0) - newC.manpowerPool);
+    c.equipment['步兵装备'] = Math.max(0, (c.equipment['步兵装备']||0) - newC.equipment['步兵装备']);
+  }
+  addLog('🏛️', '在 ' + legalDef.short + ' 占领区扶植了 ' + COUNTRY_DEFS[rid].short + '（' + rtype.name + '），接管 ' + moved + ' 个省份');
+  addLog('💰', '扶植成本: ' + rtype.cost.cash + '💰 / ' + rtype.cost.sp + ' 国策点数');
+  SFX.build();
+  buildTerritories();
+  updateUI();
+  return true;
+}
+
+// 把一个省从宗主转给自己的傀儡（已有政权时扩张领土用）
+function transferProvinceToPuppet(pid, puppetCid){
+  let p = provinces[pid];
+  if(!p) return;
+  let pd = COUNTRY_DEFS[puppetCid];
+  if(!pd || pd.puppetOf !== game.player) return;
+  p.cid = puppetCid;
+  p.controller = puppetCid;
+  addLog('🗺️','已将 ' + p.name + ' 划归 ' + pd.short);
+  buildTerritories();
+  updateUI();
+}
+
+// 解散地方政权：领土归还宗主（直接吞并），避免地图上遍地小政权
+function dissolveLocalRegime(rid){
+  if(!game.player) return;
+  let rd = COUNTRY_DEFS[rid];
+  if(!rd || !rd._localRegime || rd.puppetOf !== game.player) return;
+  let c = countries[game.player];
+  let absorbed = 0;
+  provinces.forEach(p=>{
+    if(p.cid === rid){ p.cid = game.player; p.controller = game.player; absorbed++; }
+    else if(p.controller === rid){ p.controller = game.player; }
+  });
+  if(countries[rid]){
+    c.cash += countries[rid].cash || 0;
+    let dead = new Set(units.filter(u=>u.country===rid).map(u=>u.id));
+    units = units.filter(u=>u.country!==rid);
+    provinces.forEach(p=>{ p.unitIds = p.unitIds.filter(id=>!dead.has(id)); });
+    countries[rid].eliminated = true;
+    countries[rid].cash = 0;
+  }
+  // 清理关系表与战争表
+  game.wars = game.wars.filter(w=>w.attacker!==rid && w.defender!==rid);
+  delete COUNTRY_DEFS[rid];
+  delete countries[rid];
+  addLog('🔗','解散 ' + rd.short + '，' + absorbed + ' 个省份并入本土');
+  buildTerritories();
   updateUI();
 }
 
@@ -4589,6 +6156,159 @@ function inviteToFaction(cid){
   } else {
     game.relations[game.player][cid] = Math.max(-40, rel - 10);
     addLog('❌', cd.short + ' 拒绝了你的阵营邀请（花费300💰）');
+  }
+  updateUI();
+}
+
+// ==================== 陆军通行证（Military Access） ====================
+// 用户需求：可以向中立国家或自己的盟友发起「陆军通行」邀请 ——
+//   "我的陆军能不能在你这暂时停靠/经停一下"。
+// 同意后：我方部队可以进入并驻停对方领土（不触发战斗），
+//   并且可以借道对方领土继续向第三国行军（经停/借道）。
+// 数据结构：game.militaryAccess[受邀国][授予国] = 到期 tick（0 = 永久）
+const ACCESS_DURATION_DAYS = 365;      // 通行证有效期 1 年
+const ACCESS_ASK_COST = 100;           // 外交游说费用
+const ACCESS_ASK_COOLDOWN = 120;       // AI 主动请求玩家的冷却（天）
+
+function accessExpiry(grantedBy, holder){
+  let m = game.militaryAccess && game.militaryAccess[holder];
+  if(!m) return -1;
+  let exp = m[grantedBy];
+  if(exp === undefined) return -1;
+  return exp;
+}
+// 是否有（未过期的）通行权
+function hasMilitaryAccess(holder, grantedBy){
+  if(!holder || !grantedBy || holder === grantedBy) return false;
+  let exp = accessExpiry(grantedBy, holder);
+  if(exp === undefined || exp < 0) return false;
+  if(exp === 0) return true;                       // 永久
+  if(game.tick > exp){                             // 过期自动清理
+    delete game.militaryAccess[holder][grantedBy];
+    return false;
+  }
+  return true;
+}
+// 能否把部队开进这块地（自己的 / 傀儡的 / 有通行证的）
+function canEnterProvince(cid, provinceId){
+  let p = provinces[provinceId];
+  if(!p) return false;
+  let ctrl = p.controller;
+  if(ctrl === cid) return true;
+  if(COUNTRY_DEFS[ctrl] && COUNTRY_DEFS[ctrl].puppetOf === cid) return true;
+  if(hasMilitaryAccess(cid, ctrl)) return true;
+  return false;
+}
+// 授予通行证（内部调用，不做外交判定）
+function grantAccess(holder, grantedBy, days){
+  if(!game.militaryAccess) game.militaryAccess = {};
+  if(!game.militaryAccess[holder]) game.militaryAccess[holder] = {};
+  game.militaryAccess[holder][grantedBy] = days > 0 ? (game.tick + days) : 0;
+  addLog('🎫', COUNTRY_DEFS[grantedBy].short + ' 授予 ' + COUNTRY_DEFS[holder].short + ' 陆军通行权（' +
+    (days > 0 ? days + ' 天' : '永久') + '）');
+}
+function revokeAccess(holder, grantedBy){
+  if(game.militaryAccess && game.militaryAccess[holder]) delete game.militaryAccess[holder][grantedBy];
+}
+// 列出某人持有的有效通行证：{授予国: 剩余天数/0}
+function listAccessOf(holder){
+  let out = {};
+  let m = game.militaryAccess && game.militaryAccess[holder];
+  if(!m) return out;
+  for(let g in m){
+    if(!hasMilitaryAccess(holder, g)) continue;
+    out[g] = m[g] === 0 ? 0 : Math.max(0, m[g] - game.tick);
+  }
+  return out;
+}
+
+// 玩家向某国申请陆军通行证（与"邀请入阵营"同款的按钮 + 结果日志）
+function requestMilitaryAccess(cid){
+  if(!game.player) return;
+  let cd = COUNTRY_DEFS[cid], ec = countries[cid], pc = countries[game.player];
+  if(!cd || !ec || ec.eliminated){ addLog('⚠️','对方已不存在'); return; }
+  if(cd.hidden){ addLog('⚠️','叛军不参与外交'); return; }
+  if(cid === game.player) return;
+  if(areAtWar(game.player, cid)){ addLog('⚠️','交战国之间不可能开放国境'); return; }
+  if(hasMilitaryAccess(game.player, cid)){ addLog('⚠️','你已持有 '+cd.short+' 的陆军通行证'); return; }
+  if(pc.cash < ACCESS_ASK_COST){ addLog('⚠️','需要 '+ACCESS_ASK_COST+'💰 游说费用'); return; }
+  pc.cash -= ACCESS_ASK_COST;
+
+  // 判定：盟友几乎必成；中立国看关系与好战度
+  let rel = (game.relations[game.player] && game.relations[game.player][cid]) || 0;
+  let ally = areAllies(game.player, cid);
+  let sameFaction = getFaction(game.player) && getFaction(game.player) === getFaction(cid);
+  let chance;
+  if(ally || sameFaction) chance = 0.9;
+  else chance = Math.max(0.03, Math.min(0.75, (rel + 60) / 160 - (ec.aggression || 50) / 400));
+  // 与我的敌人结盟的国家更谨慎
+  let enemyOfMine = Object.keys(COUNTRY_DEFS).some(k=>areAtWar(game.player, k) && areAllies(k, cid));
+  if(enemyOfMine) chance *= 0.5;
+
+  if(Math.random() < chance){
+    grantAccess(game.player, cid, ACCESS_DURATION_DAYS);
+    game.relations[game.player][cid] = Math.min(100, rel + 10);
+    addLog('✅', cd.short + ' 同意开放国境：你的陆军可在其领土驻停/借道（'+ACCESS_DURATION_DAYS+' 天）');
+  } else {
+    game.relations[game.player][cid] = Math.max(-80, rel - 5);
+    addLog('❌', cd.short + ' 拒绝了你的陆军通行请求（花费 '+ACCESS_ASK_COST+'💰）');
+  }
+  updateUI();
+}
+
+// 玩家收回某国对自己的通行权
+function revokeMilitaryAccess(grantedBy){
+  if(!game.player) return;
+  revokeAccess(grantedBy, game.player);
+  addLog('🚫','你收回了 '+COUNTRY_DEFS[grantedBy].short+' 的陆军通行权');
+  updateUI();
+}
+
+// AI 向玩家申请通行权（与"同盟号召"同款：队列 + 暂停式弹窗）
+function aiAskAccessFromPlayer(){
+  if(!game.player || game.paused) return;
+  if(game.accessAskCd > 0){ game.accessAskCd--; return; }
+  let pc = countries[game.player];
+  if(!pc || pc.eliminated) return;
+  let cands = [];
+  for(let cid in countries){
+    let c = countries[cid], cd = COUNTRY_DEFS[cid];
+    if(!c || c.eliminated || cid === game.player || cid === 'rebels') continue;
+    if(!cd || cd.hidden || cd.puppetOf) continue;
+    if(areAtWar(game.player, cid)) continue;
+    if(hasMilitaryAccess(cid, game.player)) continue;   // 已有
+    if(areAllies(game.player, cid)) continue;           // 盟友本就能通行
+    let sharesEnemy = Object.keys(COUNTRY_DEFS).some(k=>areAtWar(cid, k) && areAtWar(game.player, k));
+    let rel = (game.relations[cid] && game.relations[cid][game.player]) || 0;
+    if(!sharesEnemy && rel < 20) continue;
+    cands.push(cid);
+  }
+  if(cands.length === 0){ game.accessAskCd = 60; return; }
+  let pick = cands[Math.floor(Math.random()*cands.length)];
+  game.accessAskCd = ACCESS_ASK_COOLDOWN;
+  showAccessRequestDialog(pick);
+}
+
+// 弹窗：AI 请求玩家开放国境
+function showAccessRequestDialog(cid){
+  let cd = COUNTRY_DEFS[cid];
+  if(!cd) return;
+  let ok = window.confirm(
+    '🎫 陆军通行请求\n\n'
+    + cd.short + ' 请求你的陆军通行权（军事通行证）。\n\n'
+    + '同意后：' + cd.short + ' 的部队可以进入并驻停你的领土，也可借道你的领土向第三国行军——不会与你的部队交战。\n'
+    + '注意：这也意味着你的国境对其敞开。\n\n'
+    + '确定 = 同意 / 取消 = 拒绝'
+  );
+  if(ok){
+    grantAccess(cid, game.player, ACCESS_DURATION_DAYS);
+    let rel = (game.relations[cid] && game.relations[cid][game.player]) || 0;
+    if(game.relations[cid]) game.relations[cid][game.player] = Math.min(100, rel + 10);
+    addLog('✅','你同意了 '+cd.short+' 的陆军通行请求');
+  } else {
+    let rel = (game.relations[cid] && game.relations[cid][game.player]) || 0;
+    if(game.relations[cid]) game.relations[cid][game.player] = Math.max(-80, rel - 8);
+    addLog('❌','你拒绝了 '+cd.short+' 的陆军通行请求');
   }
   updateUI();
 }
@@ -4937,21 +6657,98 @@ function runAI(){
         c.cash -= 150;
       }
 
-      // AI builds forts on border provinces；受威胁时频率翻倍且优先修在威胁方向
-      if(c.cash > 300 && Math.random() < (threatened ? 0.55 : 0.25)){
+      // ---- 要塞建造：边境 + 重要省份优先 ----
+      // 旧版：25%/55% 概率随机挑 1 个边境省修 1 座 —— 位置全凭运气，
+      //   要塞经常出现在无关紧要的边境，首都和工业重镇反而裸奔。
+      // 新版：
+      //   ① 候选池 = 边境省 + 首都 + 工业重镇（"重要地方"才值得花钱）
+      //   ② 受威胁时优先修在威胁方向，且一次修多座（最多 3 座）
+      //   ③ 按重要性排序：首都 > 工业重镇 > 普通边境
+      if(c.cash > 300){
         let borderProvs = myProvs.filter(mp=>{
-          let ns = getNeighbors(mp.id);
-          return ns.some(n=>provinces[n] && provinces[n].controller !== cid);
+          return getNeighbors(mp.id).some(n=>{
+            let np = provinces[n];
+            return np && np.controller !== cid;
+          });
         });
-        if(threatened && borderProvs.length>0){
-          let danger = borderProvs.filter(mp=>getNeighbors(mp.id).some(n=>provinces[n] && threatIds.includes(provinces[n].controller)));
-          if(danger.length>0) borderProvs = danger;
-        }
-        if(borderProvs.length>0){
-          let target = borderProvs[Math.floor(Math.random()*borderProvs.length)];
-          if(target.fortLevel < 3 && !target.buildQueue.some(bq=>bq.type==='fort')){
+        // ★ atWarWith 在 6537 行才声明（TDZ），用 game.wars 直接判断
+        let anyWarNow = game.wars.some(w=>w.attacker===cid || w.defender===cid);
+        let fortChance = threatened ? 0.9 : (anyWarNow ? 0.5 : 0.35);
+        if(Math.random() < fortChance){
+          let candidates = myProvs.filter(p=>{
+            if(p.fortLevel >= 3) return false;
+            if(p.buildQueue.some(bq=>bq.type==='fort')) return false;
+            if(borderProvs.includes(p)) return true;
+            if(p.capital) return true;                          // 首都必须有城墙
+            if((p.civFactories + p.milFactories) >= 3) return true;  // 工业重镇
+            return false;
+          });
+          if(threatened && candidates.length>0){
+            let danger = candidates.filter(p=>getNeighbors(p.id).some(n=>{
+              return provinces[n] && threatIds.includes(provinces[n].controller);
+            }));
+            if(danger.length>0) candidates = danger;
+          }
+          // 重要性排序（分数高在前）
+          let imp = p => (p.capital?2:0) + ((p.civFactories+p.milFactories)>=3?1:0);
+          candidates.sort((a,b)=>imp(b)-imp(a));
+          let budget = threatened ? 3 : 1;   // 危急时刻一次修多座
+          for(let target of candidates){
+            if(budget<=0 || c.cash < 300) break;
             target.buildQueue.push({type:'fort',progress:0,total:300});
             c.cash -= 200;
+            budget--;
+          }
+        }
+      }
+
+      // ---- 边境设重兵（威慑 + 布防）----
+      // 用户需求："在一些边境地区设下重兵，防止发生战争"。
+      // 旧版完全没有这个概念：AI 的部队全靠进攻逻辑顺路带到边境，
+      //   和平时期边境常年空虚，敌人一看"无人设防"就动手了。
+      // 新版：受威胁 / 已开战 / 有失地时，把后方闲置部队调往
+      //   威胁方向的边境省份驻防（每个边境省最多堆 6 个师，避免全部挤成一坨）。
+      //   部队走 moveUnit 正常行军，一跳一跳往边境爬，到达后就地驻扎；
+      //   一旦开打，这些部队就在最前线，进攻逻辑下一 tick 直接可用。
+      if(!inExile && (threatened || homelandOccupied ||
+          game.wars.some(w=>w.attacker===cid || w.defender===cid))){
+        // ★ atWarWith 在后面 6537 行才声明（TDZ），这里用 game.wars 直接判断已开战
+        let dangerBorder = myProvs.filter(mp=>getNeighbors(mp.id).some(n=>{
+          let np = provinces[n];
+          return np && np.controller !== cid &&
+                 (areAtWar(cid, np.controller) || threatIds.includes(np.controller));
+        }));
+        if(dangerBorder.length > 0){
+          let dangerSet = new Set(dangerBorder.map(p=>p.id));
+          // ★ 注意：这里不能用 unitsByProv —— 它在后面才声明（TDZ）。
+          //   直接从 myUnits 统计每个危险边境省的现有驻军。
+          let garrison = {};
+          dangerBorder.forEach(p=>{
+            garrison[p.id] = myUnits.filter(u=>u.provinceId===p.id).length;
+          });
+          // 二跳可达索引：后方省 →（经 1 个己方省）→ 危险边境省
+          let rearIdle = myUnits.filter(u=>!u.moving && !u.fighting && !dangerSet.has(u.provinceId));
+          for(let u of rearIdle){
+            let from = u.provinceId;
+            // 一跳直达
+            let dest = getNeighbors(from).find(n=>dangerSet.has(n));
+            if(dest === undefined){
+              // 二跳：经由己方省份向边境推进
+              dest = getNeighbors(from).find(n=>{
+                let np = provinces[n];
+                return np && np.controller===cid &&
+                       getNeighbors(n).some(m=>dangerSet.has(m));
+              });
+            }
+            if(dest === undefined) continue;
+            let cap = 6;   // 每个边境省的驻军上限
+            if((garrison[dest]||0) >= cap){
+              // 满员了换下一个边境省
+              let alt = dangerBorder.find(p=>(garrison[p.id]||0) < cap && p.id !== dest);
+              if(!alt) continue;
+              dest = alt.id;
+            }
+            if(moveUnit(u, dest)){ garrison[dest] = (garrison[dest]||0)+1; }
           }
         }
       }
@@ -4989,12 +6786,37 @@ function runAI(){
           return SEA_ROUTES.has(seaKey);
         });
       });
+      // ★ 岛国判定：国土所有对外通道都是海路（英国/澳大利亚/新西兰/爱尔兰/菲律宾/荷属东印度）。
+      //   这类国家没有陆军可走的出口，没有船就等于一个目标都够不着，
+      //   旧逻辑下它们常年 0 艘船 → 整局原地不动，看起来像"没有攻击路线"。
+      let hasLandExit = myProvs.some(mp=>{
+        return getNeighbors(mp.id).some(n=>{
+          let np = provinces[n];
+          if(!np || np.cid === cid) return false;
+          let seaKey = Math.min(mp.id,n)+':'+Math.max(mp.id,n);
+          return !SEA_ROUTES.has(seaKey);
+        });
+      });
+      let isIslandNation = coastalProvs.length > 0 && !hasLandExit;
       let hasDestroyers = myUnits.filter(u=>u.type==='destroyer'||u.type==='carrier'||u.type==='submarine').length;
-      let needDestroyers = coastalProvs.length > 0 && hasDestroyers < Math.min(3, Math.ceil(coastalProvs.length/2));
+      // 岛国保底舰队：至少要有 2 艘才能组织一次登陆，否则永远出不了海
+      let minShips = isIslandNation ? Math.max(2, Math.min(4, coastalProvs.length)) : 1;
+      let needDestroyers = coastalProvs.length > 0 && hasDestroyers < Math.max(minShips, Math.min(3, Math.ceil(coastalProvs.length/2)));
+      // 岛国在开战时按"紧急军备"处理：造舰优先级拉满，不给陆军抢产能
+      // 注意：这里不能读 atWarWith —— 它在下方 5764 行才声明（TDZ）。
+      //       直接用 areAtWar 扫描一遍，语义等价且无顺序依赖。
+      let islandAtWar = false;
+      for(let oid in countries){
+        if(oid===cid || !countries[oid] || countries[oid].eliminated) continue;
+        if(areAtWar(cid, oid)){ islandAtWar = true; break; }
+      }
+      let navyUrgent = isIslandNation && (islandAtWar || threatened);
       
       if(needDestroyers && c.manpowerPool>=1 && c.equipment['摩托化装备']>=1){
         let provs = coastalProvs.filter(p=>getUnitsAt(p.id,cid).length<3);
-        if(provs.length>0 && Math.random()<0.4){
+        // 岛国造舰概率大幅提高（0.4 → 0.85），否则一次 tick 的 40% 概率遇上
+        // "必须先满足 targetUnits 才轮到造兵"的顺序，会一直挤不进去
+        if(provs.length>0 && Math.random() < (navyUrgent ? 0.85 : 0.4)){
           let p = provs[Math.floor(Math.random()*provs.length)];
           // Choose ship type: 30% carrier (if agg>60+tanks), 35% submarine (if agg>50), 35% destroyer
           let shipType = 'destroyer';
@@ -5012,7 +6834,10 @@ function runAI(){
       if(fuelSaving){
         types = ['infantry','infantry','infantry','garrison','garrison'];
       } else if(threatened || homelandOccupied){
-        types = ['infantry','infantry','infantry','garrison','motorized']; // 防御优先：便宜量大上得快
+        // 岛国本土被登陆时更需要反登陆部队，同时留一点摩托化（可跨海支援）
+        types = isIslandNation
+          ? ['infantry','infantry','garrison','garrison','motorized']
+          : ['infantry','infantry','infantry','garrison','motorized']; // 防御优先：便宜量大上得快
       } else if(agg>=70) types = ['armor','armor','motorized','motorized','infantry'];
       else if(agg>=40) types = ['motorized','motorized','infantry','infantry','garrison'];
       else types = ['infantry','infantry','garrison','garrison'];
@@ -5079,7 +6904,15 @@ function runAI(){
     // （意埃战争、中日战争、德奥合并/慕尼黑等史实节点），避免开局即世界大乱
     let aiWarAllowed = game.date.year >= 1939;
 
-    if(!inExile && !isPuppet && aiWarAllowed && !(c._warCd > 0) && (atWarWith.length===0 || agg>=70)){
+    // ★ 主动宣战也套用统一门槛（仅 AI）：
+    //   已经在打 3 个及以上国家（+++）、或石油/现金见底 → 一律不宣战。
+    //   aiCanWageWar 的第三参用 'declare'，便于将来给两条路径做差异化（如参战更保守）。
+    //   注意：这里不加 `cid === game.player` 判断 —— 整段 AI 逻辑本来就只跑 AI，
+    //   玩家手动宣战走的是 UI 里的 declareWar()，完全不受影响。
+    let aiWarGate = aiCanWageWar(cid, null, 'declare');
+
+    if(!inExile && !isPuppet && aiWarAllowed && !(c._warCd > 0) && aiWarGate.ok
+       && (atWarWith.length===0 || agg>=70)){
       // Find enemy targets
       let potentialTargets = [];
       for(let tid in countries){
@@ -5479,8 +7312,33 @@ function runAI(){
     // ---- 战时驰援：远离前线的闲散部队向最近战线推进（优先收复失地），不再坐视本土被蚕食 ----
     {
       let lostHome = provinces.filter(p=>p.cid===cid && p.controller!==cid && atWarWith.includes(p.controller)).map(p=>p.id);
-      let front = provinces.filter(p=>p.controller!==cid && atWarWith.includes(p.controller)).map(p=>p.id);
+      let front = provinces.filter(p=>p.controller!==cid && atWarWith.includes(p.controller) && canEngage(cid, p.controller)).map(p=>p.id);
+      // 尚在静坐的战线：只准往边境集结，不许越境进攻
+      let quietFront = provinces.filter(p=>p.controller!==cid && atWarWith.includes(p.controller) && !canEngage(cid, p.controller)).map(p=>p.id);
       let targets = lostHome.length>0 ? lostHome : front;
+      if(targets.length===0 && quietFront.length>0){
+        // 所有战线都在静坐：不动手，只把部队开赴对峙前线布防（史实：静坐战期的部队调动）
+        let borderHold = myProvs.filter(mp=>getNeighbors(mp.id).some(n=>provinces[n] && quietFront.includes(n)));
+        for(let uid in unitsByProv){
+          let force = unitsByProv[uid];
+          if(!force || force.length===0) continue;
+          let pid = parseInt(uid);
+          if(borderHold.some(bh=>bh.id===pid)) continue;
+          if(getUnitsAt(pid,cid).length<=1) continue;   // 内地至少留 1 支
+          let movers = force.slice(Math.floor(force.length/2));
+          let best=null, bestD=Infinity;
+          for(let n of getNeighbors(pid)){
+            let np = provinces[n];
+            if(!np || np.controller!==cid) continue;
+            let sk = Math.min(pid,n)+':'+Math.max(pid,n);
+            if(SEA_ROUTES.has(sk)) continue;             // 布防走陆路
+            if(borderHold.length===0) break;
+            let d = Math.min.apply(null, borderHold.map(bh=>Math.hypot(np.x-bh.x, np.y-bh.y)));
+            if(d<bestD){ bestD=d; best=n; }
+          }
+          if(best!==null) movers.forEach(u=>{ if(!u.moving&&!u.fighting) moveUnit(u,best); });
+        }
+      }
       if(targets.length>0){
         for(let uid in unitsByProv){
           let force = unitsByProv[uid];
@@ -5503,37 +7361,33 @@ function runAI(){
       }
     }
     
-    // Puppet AI: move to support master's wars
+    // ---- PUPPET WAR SUPPORT ----
+    // 傀儡没有独立外交权，但一旦宗主开战就必须出兵。它只是"少一点自主性"，
+    // 不是"不会打仗"。旧版这里用 if(isPuppet){…} else {全部进攻逻辑} 把傀儡
+    // 隔在进攻之外，导致满洲国、英属印度这类傀儡从头到尾只挪窝不放枪。
+    // 现在改为：傀儡与普通国共享完整作战流程，只在三处降权——
+    //   1. 不主动发动战略级两栖登陆（登陆是宗主的事，傀儡只做战术渡海）
+    //   2. 不自行选定战争目标，完全跟随宗主的战争列表
+    //   3. 攻势节奏更慢（puppetAggCap 压低 aggression）
+    let puppetMasterWar = false;
     if(isPuppet && cd.puppetOf){
       let masterAtWar = [];
       for(let tid in countries){
         if(countries[tid].eliminated) continue;
+        if(tid===cid || tid===cd.puppetOf) continue;
         if(areAtWar(cd.puppetOf, tid)) masterAtWar.push(tid);
       }
-      // If master is at war but puppet isn't, join
-      if(masterAtWar.length>0 && atWarWith.length===0){
-        atWarWith = masterAtWar;
-      }
-      // Move units toward master's wars
+      // 宗主在打，傀儡自然算交战方（即便 wars 表里还没有自己的记录）
       if(masterAtWar.length>0){
-        for(let pid in unitsByProv){
-          let force = unitsByProv[pid];
-          if(force.length===0) continue;
-          let hasNaval = force.some(u=>u.type==='destroyer'||u.type==='carrier'||u.type==='submarine'||u.type==='motorized'||u.type==='armor');
-          let ns = getNeighbors(parseInt(pid)).filter(n=>{
-            let seaKey = Math.min(parseInt(pid),n)+':'+Math.max(parseInt(pid),n);
-            if(SEA_ROUTES.has(seaKey) && !hasNaval) return false;
-            let np = provinces[n];
-            return np && atWarWith.includes(np.controller);
-          });
-          if(ns.length>0){
-            force.forEach(u=>{
-              if(!u.moving && !u.fighting) moveUnit(u, ns[0]);
-            });
-          }
-        }
+        puppetMasterWar = true;
+        for(let t of masterAtWar){ if(!atWarWith.includes(t)) atWarWith.push(t); }
       }
-    } else {
+      // 傀儡的"侵略性"受宗主约束：不至于像宗主国那样疯狂推进，但绝不等于零
+      agg = Math.min(agg, PUPPET_AGG_CAP);
+      // 傀儡不选战、不议和、不放傀儡——这些是宗主的外交权，下面各段会跳过
+    }
+    // ★ 以下进攻逻辑对「普通国家」和「傀儡国」同样生效。
+    //   傀儡只是不发动战略两栖登陆、不自行宣战，战术进攻完全保留。
     
     // ---- COORDINATED AMPHIBIOUS ASSAULT (multi-line landing) ----
     // AI with naval capability checks for sea-adjacent weak enemy provinces
@@ -5542,8 +7396,24 @@ function runAI(){
     let hasCarrier = myUnits.some(u=>u.type==='carrier');
     let hasNavy = hasCarrier || myUnits.some(u=>u.type==='destroyer' || u.type==='submarine');
     let allCoastalForces = [];
+    // 后勤型大国（英法 1939-40）：不渡海登陆敌方本土
+    let noAmphib = isGarrisonPower(cid);
     
-    if(hasNavy && atWarWith.length > 0 && agg >= 30){
+    // ★ 岛国（无任何陆路出口）的跨海进攻是唯一通行方式，不能按"两栖作战"的
+    //   高门槛来卡。英国/澳大利亚/新西兰/爱尔兰/菲律宾/荷属东印度原来因为
+    //   agg<30（爱尔兰和荷属东印度只有 10）被挡在整段登陆逻辑之外，
+    //   有船也永远不出海 —— 表现就是"没有任何攻击路线"。
+    let pureIsland = !myProvs.some(mp=>getNeighbors(mp.id).some(n=>{
+      let np = provinces[n];
+      if(!np || np.cid === cid) return false;
+      return !SEA_ROUTES.has(Math.min(mp.id,n)+':'+Math.max(mp.id,n));
+    })) && myProvs.length > 0;
+    let amphibAggGate = pureIsland ? 5 : 30;
+    let amphibMinForce = pureIsland ? 1 : 2;
+    
+    // 傀儡不发动战略级两栖登陆（那是宗主的海权战略）；它只在宗主已建立的
+    // 桥头堡附近做短程渡海支援，这里直接跳过整段登陆逻辑。
+    if(hasNavy && !noAmphib && !isPuppet && atWarWith.length > 0 && agg >= amphibAggGate){
       // Calculate total enemy naval power across all sea routes
       let enemyNavalTotal = 0;
       for(let eid of atWarWith){
@@ -5564,7 +7434,8 @@ function runAI(){
       // Collect all coastal provinces with idle units + naval escort
       for(let pid in unitsByProv){
         let force = unitsByProv[pid];
-        if(force.length < 2) continue; // Need at least 2 units for landing
+        // 岛国只有 1 个省、兵力本来就少，强行要求 2 支部队会永远凑不齐
+        if(force.length < amphibMinForce) continue;
         let hasEscort = force.some(u=>u.type==='destroyer'||u.type==='carrier'||u.type==='submarine');
         let hasAmph = force.some(u=>u.type==='motorized'||u.type==='armor');
         if(!hasEscort && !hasAmph) continue; // Need naval capability
@@ -5619,7 +7490,13 @@ function runAI(){
           });
           let target = usableTargets[0];
           usedTargets.add(target);
-          cf.force.forEach(u=>{ if(!u.moving&&!u.fighting) moveUnit(u, target); });
+          // 同样先派海军再派陆军：陆军渡海需要出发地/目的地有静止的护航舰
+          let ordered = cf.force.slice().sort((a,b)=>{
+            let na = (UNIT_TYPES[a.type]&&UNIT_TYPES[a.type].naval)?0:1;
+            let nb = (UNIT_TYPES[b.type]&&UNIT_TYPES[b.type].naval)?0:1;
+            return na - nb;
+          });
+          ordered.forEach(u=>{ if(!u.moving&&!u.fighting) moveUnit(u, target); });
           launched++;
         }
         if(launched >= 2){
@@ -5628,75 +7505,135 @@ function runAI(){
         }
       }
       // Single amphibious: if only one coastal force, try landing anyway
-      if(allCoastalForces.length === 1 && Math.random() < 0.4 && allCoastalForces[0].seaEnemies.length > 0){
+      // 岛国全国通常就只有 1 个海岸省份，概率必须抬高（0.4 → 0.8），
+      // 否则"每 tick 只有 40% 尝试一次"，实际节奏慢到看不出在打仗
+      if(allCoastalForces.length >= 1 && allCoastalForces[0].seaEnemies.length > 0
+         && Math.random() < (pureIsland ? 0.8 : 0.4)){
         let cf = allCoastalForces[0];
-        cf.force.forEach(u=>{ if(!u.moving&&!u.fighting) moveUnit(u, cf.seaEnemies[0]); });
+        // ★ 必须按「先海军、后陆军」的顺序发射。
+        //   陆军的跨海运输要求出发地或目的地有一个「未移动」的护航舰
+        //   （见 moveUnit 的 hasEscort 判定），如果驱逐舰先被派出去，
+        //   同省的步兵就会因为 find 不到静止护航舰而静默返回 false ——
+        //   表现就是"船出海了，兵留在港口"，登陆永远打不上去。
+        let navalFirst = cf.force.slice().sort((a,b)=>{
+          let na = (UNIT_TYPES[a.type]&&UNIT_TYPES[a.type].naval)?0:1;
+          let nb = (UNIT_TYPES[b.type]&&UNIT_TYPES[b.type].naval)?0:1;
+          return na - nb;
+        });
+        for(let u of navalFirst){
+          if(u.moving||u.fighting) continue;
+          moveUnit(u, cf.seaEnemies[0]);
+        }
+        // 大规模登陆同样触发同盟号召（8 个师以上渡海，这是战略级行动）
+        {
+          let amphibMoved = cf.force.filter(u=>u.moving && u.moveTo===cf.seaEnemies[0]).length;
+          if(amphibMoved >= CALL_TO_ARMS_MIN_DIVISIONS){
+            sendCallToArms(cid, provinces[cf.seaEnemies[0]].controller, amphibMoved, cf.pid);
+          }
+        }
+        // 两栖单位（摩托化/装甲）可以自行抢滩，不需要护航舰，单独再推一轮
+        for(let u of cf.force){
+          if(u.moving||u.fighting) continue;
+          if(u.type==='motorized'||u.type==='armor') moveUnit(u, cf.seaEnemies[0]);
+        }
         continue; // Skip normal attack logic
       }
     }
     
-    // For each province with idle units, decide action
+    // ---- 战略进攻：按「目标省」聚合出发兵力，支持多路同时进攻 ----
+    // 旧逻辑：每个省的驻军各自为战，一次决策只打 1 个目标 —— 表现为
+    //   "每次只从一个小方向零星出兵"，明明有 10 个师却分散在 4 个省互不支援。
+    // 新逻辑（用户需求：出的兵力多一点 + 从多个位置进攻）：
+    //   ① 先把所有能打到同一目标省的出发省聚合成一个「攻击集群」
+    //   ② 用集群【总战力】评估目标（打首都/要塞的判断比单省视角准得多）
+    //   ③ 决定进攻时，所有出发省同时进军 —— 多面包夹
+    //   ④ 一个集群打完后，剩余集群还能继续打其他目标（最多同时 3 个方向）
+    let attackGroups = new Map();  // 目标省id -> {ctrl, sources:[出发省id...]}
     for(let pid in unitsByProv){
       let force = unitsByProv[pid];
       if(force.length===0) continue;
-      
-      // Check if this force has naval capability (destroyer in same province)
       let hasNavalEscort = force.some(u=>u.type==='destroyer' || u.type==='carrier' || u.type==='submarine');
       let hasAmphibious = force.some(u=>u.type==='motorized' || u.type==='armor');
-      
       let neighbors = getNeighbors(parseInt(pid));
-      // Find enemy neighbors (allow sea routes if naval escort or amphibious units present)
-      let enemyNeighbors = neighbors.filter(n=>{
+      for(let n of neighbors){
         let seaKey = Math.min(parseInt(pid),n)+':'+Math.max(parseInt(pid),n);
         if(SEA_ROUTES.has(seaKey)){
-          // Allow sea crossing if we have destroyers or amphibious units
-          if(!hasNavalEscort && !hasAmphibious) return false;
+          // 海路：需要护航舰或两栖单位；后勤型大国不渡海登陆（英法 1939-40）
+          if(!hasNavalEscort && !hasAmphibious) continue;
+          if(noAmphib) continue;
         }
         let p = provinces[n];
-        return p && atWarWith.includes(p.controller);
+        // 静坐战：这条战线还没真正打响 → 不越境进攻，只对峙
+        if(!p || !atWarWith.includes(p.controller) || !canEngage(cid, p.controller)) continue;
+        if(!attackGroups.has(n)){
+          attackGroups.set(n, {ctrl:p.controller, sources:[]});
+        }
+        attackGroups.get(n).sources.push(parseInt(pid));
+      }
+    }
+
+    // 逐个攻击集群评估
+    let scoredGroups = [];
+    for(let [n, g] of attackGroups){
+      let p = provinces[n];
+      let defenders = getUnitsAt(n, p.controller);
+      let defPower = defenders.reduce((s,u)=>s+(u.hp/u.maxHp)*UNIT_TYPES[u.type].atk, 0);
+      // 收集所有出发省的闲置部队（多路兵力的实体）
+      let attackingUnits = [];
+      g.sources.forEach(pid=>{
+        (unitsByProv[pid]||[]).forEach(u=>{
+          if(!u.moving && !u.fighting) attackingUnits.push(u);
+        });
       });
-      
-      if(enemyNeighbors.length===0) continue;
-      
-      // Score each enemy neighbor
-      let scoredTargets = enemyNeighbors.map(n=>{
-        let p = provinces[n];
-        let defenders = getUnitsAt(n, p.controller);
-        let defPower = defenders.reduce((s,u)=>s+(u.hp/u.maxHp)*UNIT_TYPES[u.type].atk, 0);
-        let ourPower = force.reduce((s,u)=>s+(u.hp/u.maxHp)*UNIT_TYPES[u.type].atk, 0);
-        
-        let score = 0;
-        if(p.capital) score += 50; // Always prioritize capitals
-        if(defPower < ourPower*0.5) score += 30; // Easy win
-        if(defPower < ourPower) score += 15;
-        if(p.fortLevel>0) score -= p.fortLevel*10;
-        if(defenders.length===0) score += 25; // Undefended!
-        
-        return {n, score, defPower, defenders};
+      let ourPower = attackingUnits.reduce((s,u)=>s+(u.hp/u.maxHp)*UNIT_TYPES[u.type].atk, 0);
+
+      let score = 0;
+      if(p.capital) score += 50;              // Always prioritize capitals
+      if(defPower < ourPower*0.5) score += 30; // Easy win
+      if(defPower < ourPower) score += 15;
+      if(p.fortLevel>0) score -= p.fortLevel*10;
+      if(defenders.length===0) score += 25;   // Undefended!
+      // 多面包夹加分：能压上来的出发省越多，包围态势越好
+      score += Math.min(15, (g.sources.length-1)*5);
+
+      scoredGroups.push({n, ctrl:g.ctrl, sources:g.sources,
+        units:attackingUnits, ourPower, defPower, score, unitCount:attackingUnits.length});
+    }
+    scoredGroups.sort((a,b)=>b.score-a.score);
+
+    // Attack threshold depends on aggression and force ratio
+    let attackThreshold = agg>=70 ? -20 : agg>=50 ? 0 : 20;
+    // More aggressive = more likely to attack each tick
+    let attackChance = agg>=70 ? 0.9 : agg>=50 ? 0.6 : 0.35;
+
+    // 一次决策最多同时对 3 个目标发起进攻（多路进攻，但不是四面开花）
+    const MAX_PARALLEL_ATTACKS = 3;
+    let launchedAttacks = 0;
+    for(let t of scoredGroups){
+      if(launchedAttacks >= MAX_PARALLEL_ATTACKS) break;
+      if(t.score < attackThreshold) continue;
+      if(Math.random() >= attackChance) continue;
+
+      // ★ 全集群压上（先海军后陆军：渡海运输要求出发地/目的地有静止护航舰）
+      let moved = 0;
+      let ordered = t.units.slice().sort((a,b)=>{
+        let na = (UNIT_TYPES[a.type]&&UNIT_TYPES[a.type].naval)?0:1;
+        let nb = (UNIT_TYPES[b.type]&&UNIT_TYPES[b.type].naval)?0:1;
+        return na - nb;
       });
-      
-      // Sort by score descending
-      scoredTargets.sort((a,b)=>b.score-a.score);
-      
-      // Attack threshold depends on aggression and force ratio
-      let attackThreshold = agg>=70 ? -20 : agg>=50 ? 0 : 20;
-      
-      for(let t of scoredTargets){
-        if(t.score < attackThreshold) continue;
-        
-        // More aggressive = more likely to attack each tick
-        let attackChance = agg>=70 ? 0.9 : agg>=50 ? 0.6 : 0.35;
-        
-        if(Math.random() < attackChance){
-          // Attack with all units in this province
-          force.forEach(u=>{
-            if(!u.moving) moveUnit(u, t.n);
-          });
-          break; // Only attack one target per province group
-          }
+      ordered.forEach(u=>{
+        if(!u.moving && !u.fighting && moveUnit(u, t.n)) moved++;
+      });
+      if(moved > 0){
+        launchedAttacks++;
+        // ★ 大规模攻势（≥8 个师）→ 同盟国有权被邀请一起打
+        //   这是"同盟"真正有意义的地方：小国抱团才敢开战
+        if(moved >= CALL_TO_ARMS_MIN_DIVISIONS){
+          sendCallToArms(cid, t.ctrl, moved, t.n);
         }
       }
-    } // end else (normal AI strategic attacking)
+    }
+    // end of strategic attacking (puppets included)
   } // end for(cid in countries)
 } // end runAI}
 
@@ -5962,7 +7899,7 @@ function renderActiveTab(){
         let cls = r.rel>30?'good':'bad';
         let barColor = r.rel>0?'#238636':r.rel<-30?'#da3633':'#d29922';
         let barWidth = Math.abs(r.rel);
-        let deadTag = r.dead ? ' 💀已灭亡' : '';
+        let deadTag = r.dead ? (cd._annexedBy ? ' 🏳️已吞并' : ' 💀已灭亡') : '';
         let isAlly = areAllies(game.player, r.cid);
         let allyTag = isAlly ? ' 🤝盟友' : '';
         let fTag = factionName(r.cid);
@@ -5981,6 +7918,14 @@ function renderActiveTab(){
           let surrColor = surr>=90?'#f85149':surr>=50?'#d29922':'#3fb950';
           content.innerHTML += `<span style="color:#ff7b72;font-size:10px">⚔️ 交战中</span> `;
           content.innerHTML += `<span style="color:${surrColor};font-size:10px">🏳️投降:${Math.floor(surr)}%</span> `;
+          // 静坐战：宣战了但还没发动攻势 → 给出剩余天数 + 主动开打按钮
+          let phoney = daysOfPhoney(game.player, r.cid);
+          if(phoney > 0){
+            content.innerHTML += `<div style="font-size:9px;color:#d29922;margin-top:2px">🕊️ 静坐战：还需 ${phoney} 天才发动攻势</div>`;
+            content.innerHTML += `<button class="btn-sm" style="font-size:9px;background:#5c2a2a;color:#ff7b72;margin-top:2px" onclick="if(confirm('提前发动攻势？宣战不等于开战——现在就把部队推过边境，会立刻进入激战。'))launchOffensive('${game.player}','${r.cid}');updateUI()">⚔️ 提前发动攻势</button>`;
+          } else if(!canEngage(game.player, r.cid)){
+            content.innerHTML += `<span style="font-size:9px;color:#d29922"> 🕊️ 对方尚未进攻</span> `;
+          }
         }
         if(!r.atWar && !r.dead && !isAlly){
           // 安全保证提示：宣战该国会引来保证国参战（仅敌对/轴心攻击者触发）
@@ -5992,9 +7937,26 @@ function renderActiveTab(){
           if(!getFaction(r.cid) && !cd.puppetOf && getFaction(game.player)){
             content.innerHTML += `<button class="btn-sm" style="font-size:10px;background:#1a3a5c;color:#58a6ff;margin-right:2px" onclick="inviteToFaction('${r.cid}')">🤝 邀请入阵营(300💰)</button>`;
           }
+          // 🎫 陆军通行证：可向中立国 / 盟友申请驻停与借道
+          if(hasMilitaryAccess(game.player, r.cid)){
+            let exp = accessExpiry(r.cid, game.player);
+            let leftTxt = (exp === 0) ? '永久' : ('剩'+Math.max(0,exp-game.tick)+'天');
+            content.innerHTML += `<span style="font-size:9px;color:#7ee787">🎫 通行证 ${leftTxt}</span> `;
+            content.innerHTML += `<button class="btn-sm" style="font-size:9px;background:#3a1a1a;color:#ff7b72;margin-right:2px" onclick="revokeMilitaryAccess('${r.cid}')">🚫 收回</button>`;
+          } else {
+            content.innerHTML += `<button class="btn-sm" style="font-size:10px;background:#1a4a3a;color:#7ee787;margin-right:2px" onclick="requestMilitaryAccess('${r.cid}')">🎫 陆军通行(100💰)</button>`;
+          }
           content.innerHTML += `<button class="btn-sm" style="font-size:10px;background:#3a2a5c;color:#a78bfa;margin-right:2px" onclick="diploAid('${r.cid}')">💵 外交援助(100💰)</button>`;
         } else if(!r.atWar && !r.dead && isAlly){
           content.innerHTML += `<span style="font-size:10px;color:#7ee787">🔒盟友不可宣战</span>`;
+          // 🎫 陆军通行证（盟友同样需要正式通行权）
+          if(hasMilitaryAccess(game.player, r.cid)){
+            let exp = accessExpiry(r.cid, game.player);
+            let leftTxt = (exp === 0) ? '永久' : ('剩'+Math.max(0,exp-game.tick)+'天');
+            content.innerHTML += ` <span style="font-size:9px;color:#7ee787">🎫${leftTxt}</span>`;
+          } else {
+            content.innerHTML += `<button class="btn-sm" style="font-size:10px;background:#1a4a3a;color:#7ee787;margin-left:2px" onclick="requestMilitaryAccess('${r.cid}')">🎫 陆军通行(100💰)</button>`;
+          }
           // 租借法案：向盟友输送装备
           content.innerHTML += `<div style="font-size:10px;color:#8b949e;margin-top:2px">📦 租借法案:`;
           content.innerHTML += `<button class="btn-sm" style="font-size:9px;margin-left:2px" onclick="lendLease('${r.cid}','步兵装备',10)">+10步兵装</button>`;
@@ -6018,15 +7980,91 @@ function renderActiveTab(){
         myPuppets.forEach(pid=>{
           let pd = COUNTRY_DEFS[pid];
           let pProvs = provinces.filter(p=>p.cid===pid && p.controller===pid);
-          content.innerHTML += `<div style="font-size:11px;margin:4px 0;color:#c9d1d9">${pd.flag} ${pd.short} (${pProvs.length}省)</div>`;
-          content.innerHTML += `<div style="display:flex;gap:4px;margin:2px 0 6px">`;
+          let localTag = pd._localRegime ? ' 🏛️地方政权' : '';
+          let regimeTag = pd._regimeLabel ? ' <span style="font-size:9px;color:#8b949e">'+pd._regimeLabel+'</span>' : '';
+          content.innerHTML += `<div style="font-size:11px;margin:4px 0;color:#c9d1d9">${pd.flag} ${pd.short} (${pProvs.length}省)${localTag}${regimeTag}</div>`;
+          content.innerHTML += `<div style="display:flex;gap:4px;margin:2px 0 6px;flex-wrap:wrap">`;
           content.innerHTML += `<button class="btn-sm" style="font-size:10px;background:#2d5a1e;color:#7ee787" onclick="playerReleasePuppet('${pid}')">🔓 释放独立</button>`;
           content.innerHTML += `<button class="btn-sm" style="font-size:10px;background:#5c1a1a;color:#ff7b72" onclick="playerAnnexPuppet('${pid}')">🔗 吞并领土</button>`;
+          // 地方政权额外给"解散并入本土"（它本来就是占领区产物，不该留在世界上）
+          if(pd._localRegime){
+            content.innerHTML += `<button class="btn-sm" style="font-size:10px;background:#3a3a1a;color:#d29922" onclick="if(confirm('解散 ${pd.short}？其领土将并入你的本土。'))dissolveLocalRegime('${pid}')">🗑️ 解散并入</button>`;
+          }
           content.innerHTML += `</div>`;
         });
         content.innerHTML += '</div>';
       }
-      
+
+      // ===== 已吞并地区（全吞并制） =====
+      // 直接吞并的前国家（含原傀儡国）：玩家可选「成为傀儡国」或「释放独立」
+      {
+        let myAnnexed = [];
+        for(let aid in COUNTRY_DEFS){
+          let ad = COUNTRY_DEFS[aid];
+          if(ad && ad._annexedBy===game.player && countries[aid] && countries[aid].eliminated) myAnnexed.push(aid);
+        }
+        if(myAnnexed.length > 0){
+          content.innerHTML += '<div class="panel" style="border-color:#d29922"><h3 style="color:#d29922">🏳️ 已吞并地区</h3>';
+          content.innerHTML += '<div style="font-size:9px;color:#8b949e;margin-bottom:4px">被吞并的前国家与傀儡国可随时扶植为傀儡国或释放独立</div>';
+          myAnnexed.forEach(aid=>{
+            let ad = COUNTRY_DEFS[aid];
+            let coreProvs = provinces.filter(p=>p.cid===aid && p.controller===game.player).length;
+            let wasTag = ad._annexedWasPuppetOf && COUNTRY_DEFS[ad._annexedWasPuppetOf]
+              ? ' <span style="font-size:9px;color:#8b949e">原'+COUNTRY_DEFS[ad._annexedWasPuppetOf].short+'傀儡国</span>' : '';
+            content.innerHTML += `<div style="font-size:11px;color:#c9d1d9;margin:5px 0 2px">${ad.flag} ${ad._origShort||ad.short}地区${wasTag} · ${coreProvs}省</div>`;
+            content.innerHTML += `<div style="display:flex;gap:4px;margin:2px 0 6px;flex-wrap:wrap">`;
+            content.innerHTML += `<button class="btn-sm" style="font-size:10px;background:#5c2a5c;color:#d2a8ff" onclick="restoreAnnexed('${aid}','puppet')">🎭 成为傀儡国</button>`;
+            content.innerHTML += `<button class="btn-sm" style="font-size:10px;background:#2d5a1e;color:#7ee787" onclick="restoreAnnexed('${aid}','free')">🔓 释放独立</button>`;
+            content.innerHTML += `</div>`;
+          });
+          content.innerHTML += '</div>';
+        }
+      }
+
+      // ===== 占领区扶植地方政权 =====
+      // 只有在"占领了敌国 2 省以上 且 该国未灭"时才出现这个面板，
+      // 否则平时外交页会被一堆不可用按钮淹没。
+      {
+        let occupiedByOwner = {}; // {legalCid: [provIds]}
+        provinces.forEach(p=>{
+          if(p.controller !== game.player) return;
+          let legal = p._origOwner || p.cid;
+          if(legal === game.player) return;
+          let ld = COUNTRY_DEFS[legal];
+          if(!ld || !countries[legal]) return;
+          if(ld.puppetOf === game.player) return;
+          if(!areAtWar(game.player, legal)) return;
+          if(!occupiedByOwner[legal]) occupiedByOwner[legal] = [];
+          occupiedByOwner[legal].push(p.id);
+        });
+        let cands = Object.keys(occupiedByOwner).filter(k=>occupiedByOwner[k].length >= 2);
+        if(cands.length > 0){
+          content.innerHTML += '<div class="panel" style="border-color:#d29922"><h3 style="color:#d29922">🏛️ 占领区扶植地方政权</h3>';
+          content.innerHTML += '<div style="font-size:9px;color:#8b949e;margin-bottom:4px">在已占领的敌方领土上建立听命于你的政权，会接管该国全部被我方占领的省份</div>';
+          cands.forEach(legal=>{
+            let ld = COUNTRY_DEFS[legal];
+            let provs = occupiedByOwner[legal];
+            let existing = findLocalRegimeFor(legal, game.player);
+            content.innerHTML += `<div style="font-size:11px;color:#c9d1d9;margin:5px 0 2px">${ld.flag} ${ld.short} 占领区 · ${provs.length}省</div>`;
+            content.innerHTML += `<div style="font-size:9px;color:#8b949e;margin-bottom:3px">${provs.slice(0,5).map(i=>provinces[i].name).join('、')}${provs.length>5?'…':''}</div>`;
+            if(existing){
+              // 已有政权 → 提供"把新占领的省份划过去"
+              let ed = COUNTRY_DEFS[existing];
+              content.innerHTML += `<div style="font-size:10px;color:#a78bfa">已有 ${ed.short}，可扩张其领土：</div>`;
+              content.innerHTML += `<button class="btn-sm" style="font-size:10px;background:#3a2a5c;color:#a78bfa;margin:2px 0 6px" onclick="if(confirm('把 ${ld.short} 的 ${provs.length} 个占领省全部划归 ${ed.short}？')){${provs.map(i=>`transferProvinceToPuppet(${i},'${existing}');`).join('')}}">🗺️ 划归 ${ed.short}</button>`;
+            } else {
+              content.innerHTML += `<div style="display:flex;gap:4px;flex-wrap:wrap;margin:2px 0 6px">`;
+              LOCAL_REGIME_TYPES.forEach((rt,ri)=>{
+                let canPay = countries[game.player].cash >= rt.cost.cash && (game.skillPoints||0) >= rt.cost.sp;
+                content.innerHTML += `<button class="btn-sm" style="font-size:9px;background:${canPay?'#3a2a1a':'#2a2a2a'};color:${canPay?'#d29922':'#555'}" title="${rt.desc}" onclick="if(confirm('在 ${ld.short} 占领区扶植「${rt.name}」？\\n成本: ${rt.cost.cash}💰 + ${rt.cost.sp}国策点\\n将接管 ${provs.length} 个省份'))establishRegime(${provs[0]},'${rt.id}')">${rt.icon}${rt.name}</button>`;
+              });
+              content.innerHTML += `</div>`;
+            }
+          });
+          content.innerHTML += '</div>';
+        }
+      }
+
       // Active wars
       let myWars = game.wars.filter(w=>w.attacker===game.player||w.defender===game.player);
       if(myWars.length>0){
@@ -6423,12 +8461,14 @@ function skipTutorial(){
 
 // ==================== 引导关卡系统 ====================
 const GUIDE_STEPS = [
-  // === 基础篇：核心操作 ===
+  // ==================== 第一篇：基础操作 ====================
   {
     id:'select-capital',
     phase:'basic',
-    title:'第一步：选择首都',
-    desc:'点击地图上<strong>带★的金色五角星</strong>——那是你的首都柏林。<br>点击柏林圆点选中它。',
+    title:'选择首都',
+    desc:'点击地图上<strong>带★的金色五角星</strong>——那是你的首都柏林。<br><br>'
+      + '<span class="g-tip">💡 选中省份后，左侧面板会显示它的地形、工厂、驻军和当前的行动选项。'
+      + '后续所有操作（建造/训练/进攻）都基于「当前选中的省份」。</span>',
     check:()=>game.selectedProvince!==null && provinces[game.selectedProvince].cid==='germany',
     highlight:{type:'province', ids:[0]},
     uiHighlight:null
@@ -6436,8 +8476,10 @@ const GUIDE_STEPS = [
   {
     id:'build-factory',
     phase:'basic',
-    title:'第二步：建造民用工厂',
-    desc:'好！柏林已选中。现在在左侧<strong>建造面板</strong>点击「🏭 民用工厂」按钮。<br>民用工厂能加速所有建设。',
+    title:'建造民用工厂',
+    desc:'柏林已选中。现在在左侧<strong>建造面板</strong>点击「🏭 民用工厂」。<br><br>'
+      + '<span class="g-tip">💡 民用工厂提升该省的<b>工业产能</b>，直接影响你每天能获得的现金与装备产出。'
+      + '开局优先铺工厂，是滚雪球的第一步。</span>',
     check:()=>provinces[0].buildQueue.length>0,
     highlight:{type:'province',ids:[0]},
     uiHighlight:'#tab-content .btn-sm.build:first-child',
@@ -6446,8 +8488,10 @@ const GUIDE_STEPS = [
   {
     id:'train-unit',
     phase:'basic',
-    title:'第三步：训练步兵师',
-    desc:'切换到<strong>🎖 训练</strong>面板，确保柏林已选中，然后点击「🪖 步兵师」按钮训练一支部队。<br>部队是征服领土的核心力量。',
+    title:'训练步兵师',
+    desc:'切换到<strong>🎖 训练</strong>面板，确保柏林已选中，点击「🪖 步兵师」。<br><br>'
+      + '<span class="g-tip">💡 造兵要消耗<b>人力 + 装备</b>（不是现金）。'
+      + '兵力不够时按钮会变灰，此时要么等装备产出，要么去抢有工厂的省。</span>',
     check:()=>getUnitsAt(0,'germany').length>=1,
     highlight:{type:'province',ids:[0]},
     uiHighlight:'.tab-btn:nth-child(2)',
@@ -6456,8 +8500,12 @@ const GUIDE_STEPS = [
   {
     id:'declare-war',
     phase:'basic',
-    title:'第四步：对波兰宣战',
-    desc:'切换到<strong>🤝 外交</strong>面板，找到<strong>波兰</strong>，点击红色的「宣战」按钮。<br>波兰是德国的邻国，关系本就紧张。同阵营盟友不可互相宣战。',
+    title:'对波兰宣战',
+    desc:'切换到<strong>🤝 外交</strong>面板，找到<strong>波兰</strong>，点击红色的「宣战」。<br><br>'
+      + '<span class="g-tip">💡 三个约束：<br>'
+      + '① <b>同阵营盟友</b>不能互宣；<br>'
+      + '② 有国家<b>保证其独立</b>时，宣战会把保证国一起拖进来（见第十一步）；<br>'
+      + '③ 宣战后要等<b>动员期</b>结束才能真正开打。</span>',
     check:()=>areAtWar('germany','poland'),
     highlight:null,
     uiHighlight:'.tab-btn:nth-child(4)',
@@ -6466,8 +8514,10 @@ const GUIDE_STEPS = [
   {
     id:'attack',
     phase:'basic',
-    title:'第五步：发起进攻！',
-    desc:'<strong>点击柏林</strong>选中，然后<strong>点击华沙</strong>（柏林右侧的波兰圆点★）发起进攻。<br>部队会自动向华沙进军。',
+    title:'发起进攻',
+    desc:'<strong>点击柏林</strong>选中，再<strong>点击华沙</strong>（柏林右侧的波兰圆点★）。<br><br>'
+      + '<span class="g-tip">💡 进攻的前提是两省<b>相邻</b>。相邻关系可能是陆路（随便走）也可能是'
+      + '<b>蓝色虚线的海路</b>——海路必须有驱逐舰/航母/潜艇护航，或者用摩托化/装甲部队两栖登陆。</span>',
     check:()=>{
       let warsaw = provinces[46]; // Warsaw
       return warsaw && warsaw.controller==='germany';
@@ -6479,18 +8529,24 @@ const GUIDE_STEPS = [
   {
     id:'skill-upgrade',
     phase:'basic',
-    title:'第六步：使用国策点数',
-    desc:'占领华沙获得了<strong>1点国策点数⭐</strong>！<br>切换到<strong>⭐ 国策</strong>面板，将点数投入到任意一项技能升级。',
+    title:'花掉国策点数',
+    desc:'占领华沙获得了<strong>1 点国策点数 ⭐</strong>！<br>切换到<strong>⭐ 国策</strong>面板，把点数投进任意一项升级。<br><br>'
+      + '<span class="g-tip">💡 国策点数是<b>稀缺资源</b>——占领敌国首都、完成特定事件才会给。'
+      + '后面「占领区扶植政权」也要花它，前期别乱撒。</span>',
     check:()=>Object.values(game.skillLevels).some(v=>v>0),
     highlight:null,
     uiHighlight:'.tab-btn:nth-child(6)',
     preAction:()=>{ switchTab('skill'); setSpeed(0); updateUI(); }
   },
+
+  // ==================== 第二篇：军事进阶 ====================
   {
     id:'research-tech',
     phase:'advanced',
-    title:'第七步：研究科技',
-    desc:'切换到<strong>🔬 科技</strong>面板，选择「建造技术I」并点击<strong>研究</strong>。<br>科技能永久提升部队战斗力、建造速度和装备产出。',
+    title:'研究科技',
+    desc:'切换到<strong>🔬 科技</strong>面板，选「建造技术 I」并点<strong>研究</strong>。<br><br>'
+      + '<span class="g-tip">💡 科技是<b>永久增益</b>：战斗力、建造速度、装备产出。'
+      + '研究需要时间，越早立项收益越大。</span>',
     check:()=>{
       let gc = countries['germany'];
       return gc && gc.research && gc.research.id !== null;
@@ -6502,8 +8558,11 @@ const GUIDE_STEPS = [
   {
     id:'navy-build',
     phase:'advanced',
-    title:'第八步：建造海军',
-    desc:'<strong>点击地图上的汉堡</strong>（柏林左上方沿海城市），然后切换到<strong>🎖 训练</strong>面板，点击「🚢 驱逐舰」训练一艘。<br><br><span style="color:#6495ed">🌊 蓝色虚线表示<span style="font-weight:bold">海上航线</span>——只有海军部队（驱逐舰/潜艇/航母）可以穿行。<br>控制制海权才能安全运送陆军渡海！</span>',
+    title:'建造海军',
+    desc:'<strong>点击汉堡</strong>（柏林左上方的沿海城市），切到<strong>🎖 训练</strong>面板，点「🚢 驱逐舰」。<br><br>'
+      + '<span class="g-tip">🌊 <b>海路规则</b>：蓝色虚线是海上航线，陆军要过海必须有己方护航舰'
+      + '（驱逐舰/航母/潜艇）<b>在同一省内</b>；或者用摩托化/装甲部队走两栖登陆（不需要船，但需要制海权）。'
+      + '纯岛国（英国、日本、新西兰）如果丢了舰队，就彻底出不去了。</span>',
     check:()=>{
       let navalUnits = units.filter(u=>u.country==='germany' && UNIT_TYPES[u.type] && UNIT_TYPES[u.type].naval);
       return navalUnits.length>=1;
@@ -6515,8 +8574,10 @@ const GUIDE_STEPS = [
   {
     id:'air-build',
     phase:'advanced',
-    title:'第九步：组建空军',
-    desc:'<strong>点击柏林(0)</strong>选中，切换<strong>🎖 训练</strong>面板，点击「✈️ 战斗机联队」训练一支空军。<br><br><span style="color:#ffa500">✈️ 空军部队能<strong>飞跃任何领土</strong>（射程6），提供制空权加成和战略轰炸！</span>',
+    title:'组建空军',
+    desc:'<strong>点击柏林</strong>，切到<strong>🎖 训练</strong>面板，点「✈️ 战斗机联队」。<br><br>'
+      + '<span class="g-tip">✈️ 空军能<b>飞越任何领土</b>（射程 6），提供制空权加成和战略轰炸。'
+      + '它是唯一不受邻接关系限制的兵种——被包围时也能出击。</span>',
     check:()=>{
       let airUnits = units.filter(u=>u.country==='germany' && UNIT_TYPES[u.type] && UNIT_TYPES[u.type].air);
       return airUnits.length>=1;
@@ -6525,11 +8586,90 @@ const GUIDE_STEPS = [
     uiHighlight:'.tab-btn:nth-child(2)',
     preAction:()=>{ game.selectedProvince=0; switchTab('train'); setSpeed(0); updateUI(); drawMap(); }
   },
+
+  // ==================== 第三篇：外交博弈（本轮新增） ====================
+  {
+    id:'ally-invite',
+    phase:'diplomacy',
+    title:'认识同盟号召',
+    desc:'战争的规模会自我放大 —— 这是本作的核心机制之一。<br><br>'
+      + '<span class="g-tip">📣 <b>同盟号召</b>：任何国家投入 <b>8 个师以上</b>发动大规模攻势时，'
+      + '会自动向它的盟友发出邀请。<br><br>'
+      + '• 你<b>发出</b>的号召，盟友会自己判断要不要跟（看实力对比、关系、它自己已经打了几场仗）；<br>'
+      + '• 你<b>收到</b>的号召会弹窗，<b>游戏暂停</b>等你决定。同意就立刻对目标国宣战，拒绝则什么都不发生，'
+      + '但对邀请方关系 −8。<br>'
+      + '• 同一组「邀请方 → 目标」30 天内只会邀请一次，不会刷屏。</span>',
+    check:()=>true,
+    highlight:null,
+    uiHighlight:null,
+    preAction:()=>{ setSpeed(0); }
+  },
+  {
+    id:'guarantee',
+    phase:'diplomacy',
+    title:'警惕保证独立',
+    desc:'打开<strong>🤝 外交</strong>面板，观察各国条目上的<strong>🛡 保证</strong>标记。<br><br>'
+      + '<span class="g-tip">🛡 <b>保证独立</b>：强国（英国、法国）对若干小国提供安全承诺。'
+      + '你一旦向被保证国宣战，<b>保证国会立刻对你宣战</b>——这就是历史上「打波兰 = 打英法」的由来。<br><br>'
+      + '打之前先看外交面板的关系值：关系好的保证国也可能选择不履约。</span>',
+    check:()=>true,
+    highlight:null,
+    uiHighlight:'.tab-btn:nth-child(4)',
+    preAction:()=>{ switchTab('dip'); setSpeed(0); updateUI(); }
+  },
+  {
+    id:'puppet',
+    phase:'diplomacy',
+    title:'扶植傀儡政权',
+    desc:'继续打下波兰的第二个省（比如克拉科夫），然后在<strong>📊 战报</strong>面板找到'
+      + '「🏛️ 占领区扶植地方政权」。<br><br>'
+      + '<span class="g-tip">🏛️ <b>占领区治理</b>有三条路：<br>'
+      + '① <b>直接军事占领</b> —— 免费，但治安差、产出低；<br>'
+      + '② <b>扶植地方政权</b>（军政府/自治政府/保护国）—— 花现金 + 国策点，'
+      + '自动接管该国全部被你占领的省，变成听命于你的傀儡国；<br>'
+      + '③ <b>完全吞并</b> —— 打下它最后一块地，国家消失。<br><br>'
+      + '扶植的好处：傀儡国会自己造兵、自己打仗，还能继续向它转让新占领的省。</span>',
+    check:()=>{
+      // 允许玩家直接跳过（有些路线不打第二省）
+      let hasPuppet = Object.keys(COUNTRY_DEFS).some(k=>{
+        let d = COUNTRY_DEFS[k];
+        return d && (d.puppetOf === 'germany' || d._localRegime);
+      });
+      return hasPuppet || provinces.filter(p=>p.controller==='germany').length >= 4;
+    },
+    highlight:null,
+    uiHighlight:'.tab-btn:nth-child(5)',
+    preAction:()=>{ switchTab('stats'); setSpeed(0); updateUI(); }
+  },
+  {
+    id:'call-to-arms-info',
+    phase:'diplomacy',
+    title:'主动出击的策略',
+    desc:'现在你已经理解了完整的战争链条。<br><br>'
+      + '<span class="g-tip">⚔️ <b>什么时候该主动宣战？</b><br>'
+      + '• <b>敌对势力数量</b>：同时和 <b>3 个及以上</b>国家交战（面板上的 <b>+++</b>）时，'
+      + '不该再开新战线——多线作战会把兵力彻底摊薄；<br>'
+      + '• <b>石油和现金储备</b>要够——战争每天都在烧钱烧油，储备见底时打仗等于自爆；<br>'
+      + '• 看<b>关系值</b>：关系好的国家更容易被拉拢，关系差的国家早晚要打。<br><br>'
+      + '这套判断逻辑 AI 完全照做——它会根据地缘可达性、实力对比、'
+      + '<b>当前敌对势力数量（+++）</b>、<b>石油/现金储量</b>来决定是否宣战或参战。<br>'
+      + '<b>你可以用它来判断敌人什么时候会崩：当一个国家同时在三线以上苦战时，'
+      + '它既不会主动打你，也不会响应盟友的号召。</b><br><br>'
+      + '⚠️ 这套限制只作用于 AI —— 你自己宣战不受任何约束，想打就打。</span>',
+    check:()=>true,
+    highlight:null,
+    uiHighlight:null,
+    preAction:()=>{ setSpeed(0); }
+  },
+
+  // ==================== 第四篇：收尾 ====================
   {
     id:'save-game',
     phase:'advanced',
-    title:'第十步：保存游戏',
-    desc:'点击顶栏的<strong>「💾 存档」</strong>按钮打开存档面板。<br>选择一个空存档位保存当前进度。<br><br><span style="color:#8b949e">共10个存档位，保存在浏览器本地。</span>',
+    title:'保存游戏',
+    desc:'点击顶栏的<strong>「💾 存档」</strong>，选一个空存档位保存。<br><br>'
+      + '<span class="g-tip">💡 共 10 个存档位，存在浏览器本地。'
+      + '重开一局会重置国家定义（傀儡化、改名、阵营漂移），所以想留住的局面一定要先存档。</span>',
     check:()=>{
       let saved = false;
       try{
@@ -6547,7 +8687,13 @@ const GUIDE_STEPS = [
     id:'complete',
     phase:'complete',
     title:'🎉 引导关卡完成！',
-    desc:'你已经掌握了全部核心与进阶操作：<br>✅ 选中省份 ✅ 建造工厂 ✅ 训练部队 ✅ 宣战 ✅ 进攻 ✅ 升级国策<br>✅ 研究科技 ✅ 建造海军 ✅ 组建空军 ✅ 存读档<br><br><strong>现在你可以选择任意国家开始真正的征服之旅！</strong>',
+    desc:'你已经掌握全部核心机制：<br><br>'
+      + '<span style="color:#3fb950">✅ 基础</span> 选中 · 建造 · 训练 · 宣战 · 进攻 · 国策<br>'
+      + '<span style="color:#58a6ff">✅ 军事</span> 科研 · 海军 · 空军 · 护航跨海 · 两栖登陆<br>'
+      + '<span style="color:#d29922">✅ 外交</span> 同盟号召 · 保证独立 · 扶植傀儡 · 战争经济学<br><br>'
+      + '<strong>现在你可以选择任意国家开始真正的征服之旅！</strong><br>'
+      + '<span class="g-tip">提示：49 个国家全部有完整的攻击路线、开局部队和外交能力——'
+      + '包括新西兰、爱尔兰、菲律宾这些纯岛国，以及埃塞俄比亚、蒙古这些内陆国。选谁都不会卡死。</span>',
     check:()=>true,
     highlight:null,
     uiHighlight:null,
@@ -6565,8 +8711,11 @@ function startGuidedMission(){
   countries['germany'].isAI = false;
   
   // Give player extra resources for tutorial
+  // ★ 引导关卡要演示「战争经济学」（石油/现金），所以三项储备都得给足，
+  //   否则玩家在第四篇看到"储备不足别开战"时会一头雾水——自己的账本先红了。
   let gc = countries['germany'];
   gc.cash = 5000;
+  gc.oil = Math.max(gc.oil || 0, 400);
   gc.equipment['步兵装备'] = 20;
   gc.equipment['摩托化装备'] = 30;
   gc.equipment['坦克'] = 10;
@@ -6577,26 +8726,47 @@ function startGuidedMission(){
     if(cid!=='germany') countries[cid].isAI = false;
   }
   
-  // Put one weak Polish unit in Warsaw
-  let warsaw = provinces[46];
-  let polishUnit = {
-    id: unitNextId++,
-    type: 'infantry',
-    provinceId: 46,
-    country: 'poland',
-    hp: 30, maxHp: 100,
-    org: 50, maxOrg: 100,
-    exp: 0, lvl: 0,
-    moving: false, moveTo: null,
-    moveProgress: 0, moveTotal: 0,
-    fighting: false, fightTarget: null
-  };
-  units.push(polishUnit);
-  warsaw.unitIds.push(polishUnit.id);
+  // ★ 引导关卡是"教学"，不是"挑战"。
+  //   开局波兰按 STARTING_ARMY 会拿到 7 支部队（华沙/克拉科夫/罗兹各若干），
+  //   新手根本推不动。这里把波兰军队重置成每省 1 支残血旅，
+  //   让第五步「发起进攻」能一次成功，把注意力留在"理解机制"而不是"打赢"。
+  units = units.filter(u=>u.country !== 'poland');
+  provinces.forEach(p=>{ if(p.controller==='poland') p.unitIds = []; });
+  [46, 47, 48].forEach(pid=>{
+    let p = provinces[pid];
+    if(!p || p.controller !== 'poland') return;
+    let u = {
+      id: unitNextId++,
+      type: 'infantry',
+      provinceId: pid,
+      country: 'poland',
+      hp: 30, maxHp: 100,
+      org: 50, maxOrg: 100,
+      exp: 0, lvl: 0,
+      moving: false, moveTo: null,
+      moveProgress: 0, moveTotal: 0,
+      fighting: false, fightTarget: null
+    };
+    units.push(u);
+    p.unitIds.push(u.id);
+  });
   
   // Give Poland low stability
   countries['poland'].stability = 40;
   countries['poland'].warSupport = 20;
+
+  // ★ 引导关卡的"外交教学"场景：
+  //   历史上英法对波兰的保证正是二战爆发的引信，这里如实还原 ——
+  //   玩家在第四步宣战前就能在外交面板看到波兰条目下的保护国，
+  //   理解"打一个小国 = 引来两个大国"。
+  //
+  //   注意：本作的保证不是一张静态表，而是由 guaranteeApplies() 按
+  //   「攻击者是否轴心 / 双方阵营是否敌对」实时推导的。德国是轴心，
+  //   所以对波兰宣战必然触发英法履约 —— 无需在这里手写保证关系，
+  //   写了反而会因为字段名不存在而变成死数据。
+  //
+  //   同盟同理：德国与意大利本来就同属 axis 阵营，areAllies() 成立，
+  //   同盟号召机制可以直接工作，不需要额外挂 game.alliances。
   
   game.skillPoints = 0;
   game.skillLevels = {};
@@ -6633,16 +8803,32 @@ function showGuideStep(idx){
   
   // Build step dots — separate basic/advanced phases
   let basicCount = GUIDE_STEPS.filter(s=>s.phase==='basic').length;
-  let phaseLabel = step.phase==='basic' ? '🟢 基础篇' : step.phase==='advanced' ? '🟡 进阶篇' : '';
-  let dots = GUIDE_STEPS.map((_,i)=>{
-    let s = GUIDE_STEPS[i];
-    if(i<idx) return '<div class="g-step done"></div>';
-    if(i===idx) return '<div class="g-step active"></div>';
-    return '<div class="g-step"></div>';
-  }).join('');
-  
+  let dipCount = GUIDE_STEPS.filter(s=>s.phase==='diplomacy').length;
+  let phaseLabel = step.phase==='basic' ? '🟢 基础篇'
+                 : step.phase==='advanced' ? '🟡 军事篇'
+                 : step.phase==='diplomacy' ? '🔵 外交篇'
+                 : '';
+  // 分篇章画进度点：不同篇章之间加分隔
+  let dots = '';
+  let lastPhase = null;
+  GUIDE_STEPS.forEach((s,i)=>{
+    if(lastPhase !== null && s.phase !== lastPhase && s.phase !== 'complete'){
+      dots += '<div class="g-sep"></div>';
+    }
+    if(s.phase !== 'complete') lastPhase = s.phase;
+    if(i<idx) dots += '<div class="g-step done" title="'+s.title+'"></div>';
+    else if(i===idx) dots += '<div class="g-step active" title="'+s.title+'"></div>';
+    else dots += '<div class="g-step" title="'+s.title+'"></div>';
+  });
+
+  // 当前篇章内的进度，例如 外交篇 3/4
+  let phaseSteps = GUIDE_STEPS.filter(s=>s.phase===step.phase);
+  let phaseIdx = phaseSteps.indexOf(step) + 1;
+  let phaseProg = phaseSteps.length > 1 && step.phase !== 'complete'
+    ? ' <span style="font-size:10px;color:#8b949e">(' + phaseIdx + '/' + phaseSteps.length + ')</span>' : '';
+
   panel.innerHTML = `
-    <div class="g-title">🎯 引导关卡 — 第${idx+1}/${GUIDE_STEPS.length}步 ${phaseLabel?'<span style="font-size:11px;margin-left:6px">'+phaseLabel+'</span>':''}</div>
+    <div class="g-title">🎯 引导关卡 — 第${idx+1}/${GUIDE_STEPS.length}步 ${phaseLabel?'<span style="font-size:11px;margin-left:6px">'+phaseLabel+phaseProg+'</span>':''}</div>
     <div class="g-desc">${step.title}: ${step.desc}</div>
     <div class="g-steps">${dots}</div>
   `;
@@ -6750,8 +8936,14 @@ function completeGuidedMission(){
   let panel = document.getElementById('guide-panel');
   panel.innerHTML = `
     <div class="g-title">🎉 引导关卡完成！</div>
-    <div class="g-desc">你已经掌握了全部核心与进阶操作：<br>✅ 基础：省份选择 · 建造 · 训练 · 宣战 · 进攻 · 国策<br>✅ 进阶：科研 · 海军 · 空军 · 存读档<br><br>现在可以自由选择国家，征服世界！<br><br>
-    <button class="btn btn-go" onclick="returnToCountrySelect()" style="pointer-events:auto">🏴 选择国家开始游戏</button></div>
+    <div class="g-desc">
+      <span style="color:#3fb950">✅ 基础</span> 选中省份 · 建造工厂 · 训练部队 · 宣战 · 进攻 · 国策点数<br>
+      <span style="color:#58a6ff">✅ 军事</span> 科技研究 · 建造海军 · 组建空军 · 护航跨海 · 两栖登陆<br>
+      <span style="color:#d29922">✅ 外交</span> 同盟号召 · 保证独立 · 扶植傀儡政权 · 战争经济学<br><br>
+      现在可以自由选择国家，征服世界！
+      <br><br>
+      <button class="btn btn-go" onclick="returnToCountrySelect()" style="pointer-events:auto">🏴 选择国家开始游戏</button>
+    </div>
   `;
   document.getElementById('guide-overlay').style.display = 'block';
   
@@ -6794,6 +8986,11 @@ function returnToCountrySelect(){
   game.wars = [];
   game.log = [];
   game.selectedProvince = null;
+  
+  // 清盘后必须重新发初始舰队和初始陆军，否则重开局变成"全世界零部队"
+  units = [];
+  grantStartingNavies();
+  grantStartingArmies();
   
   document.getElementById('country-overlay').style.display = 'flex';
   renderCountrySelect();
@@ -7014,6 +9211,7 @@ function doLoadFromSlot(slot){
     game.defeated = false;      // 读档重置战败状态
     game.victoryShown = false;  // 读档重置胜利状态
     game.factionOverride = save.factionOverride || {};
+    game.militaryAccess = save.militaryAccess || {};
     game.stats = save.stats || {byCountry:{}};
     if(!game.stats.byCountry){
       game.stats.byCountry = {};
@@ -7108,9 +9306,19 @@ function doLoadFromSlot(slot){
       p.unitIds.push(u.id);
     }
 
+    // 静坐战：恢复战线动员时钟 + 省份原属国（旧存档无此字段时按"已开打"处理）
+    game.warEffort = save.warEffort || {};
+    game.pushNotes = game.pushNotes || {};
+    if(Array.isArray(save.origOwner)){
+      provinces.forEach((p, i)=>{ if(save.origOwner[i]) p._origOwner = save.origOwner[i]; });
+    } else {
+      provinces.forEach(p=>{ if(!p._origOwner) p._origOwner = p.cid; });
+    }
     // Restore puppet relationships (存档含快照则优先用快照；旧存档回退到当前定义)
     if(save.puppets){
       resetCountryDefs();
+      // 先重建地方政权定义，再应用傀儡关系（否则快照里 "china_r42"→"china" 找不到宗主）
+      rebuildLocalRegimes(save.localRegimes);
       applyPuppetState(save.puppets);
     } else {
       for(let cid in COUNTRY_DEFS){
@@ -7166,8 +9374,12 @@ function buildSaveData(){
     firedEvents: [...firedEvents],
     seaControl: game.seaControl || {},
     factionOverride: game.factionOverride || {},
+    militaryAccess: game.militaryAccess || {},
     stats: game.stats || {byCountry:{}},
-    puppets: collectPuppetMap() // 傀儡关系快照（含国名"XX属XX"状态）
+    puppets: collectPuppetMap(), // 傀儡关系快照（含国名"XX属XX"状态）
+    localRegimes: collectLocalRegimes(), // 占领区扶植的地方政权（_localRegime 定义，读档需重建）
+    warEffort: game.warEffort || {},   // 战线动员时钟（静坐战）
+    origOwner: provinces.map(p=>p._origOwner || p.cid) // 省份原属国快照
   };
 
   for(let cid in countries){
@@ -8100,7 +10312,7 @@ function mpStartClientAnim(){
   MP._animTimer = setInterval(()=>{
     if(!MP.active || MP.isHost || MP._dead) return;
     if(game.paused) return;
-    let tickMs = [0, 4000, 2000, 800][game.speed] || 2000;
+    let tickMs = TICK_MS[game.speed] || 7000;
     if(tickMs <= 0) return;
     let step = 300 / tickMs;
     let changed = false;
@@ -8152,6 +10364,7 @@ function mpApplySnapshot(save){
     game.log = save.log || [];
     game.seaControl = save.seaControl || {};
     game.factionOverride = save.factionOverride || {};
+    game.militaryAccess = save.militaryAccess || {};
     game.stats = save.stats || {byCountry:{}};
     unitNextId = save.unitNextId || unitNextId;
     firedEvents = new Set(save.firedEvents || []);
@@ -8233,6 +10446,14 @@ function mpApplySnapshot(save){
       units.push(u);
       p.unitIds.push(u.id);
     }
+    // 静坐战：恢复战线动员时钟 + 省份原属国（旧存档无此字段时按"已开打"处理）
+    game.warEffort = save.warEffort || {};
+    game.pushNotes = game.pushNotes || {};
+    if(Array.isArray(save.origOwner)){
+      provinces.forEach((p, i)=>{ if(save.origOwner[i]) p._origOwner = save.origOwner[i]; });
+    } else {
+      provinces.forEach(p=>{ if(!p._origOwner) p._origOwner = p.cid; });
+    }
     // 傀儡关系：快照优先（含"XX属XX"国名同步），旧快照回退到当前定义
     if(save.puppets){
       resetCountryDefs();
@@ -8261,7 +10482,8 @@ function mpInstallClientWrappers(){
   MP._wrapped = true;
   const FNS = ['buildInSelected','trainInSelected','buildFortsAll','startResearch',
                'declareWar','proposePeace','lendLease','diploAid','inviteToFaction',
-               'playerReleasePuppet','playerAnnexPuppet'];
+               'playerReleasePuppet','playerAnnexPuppet',
+               'establishRegime','transferProvinceToPuppet','dissolveLocalRegime'];
   FNS.forEach(name=>{
     let orig = window[name];
     if(typeof orig !== 'function') return;
@@ -8337,7 +10559,9 @@ function mpExecCmd(cmd){
       buildInSelected:buildInSelected, trainInSelected:trainInSelected, buildFortsAll:buildFortsAll,
       startResearch:startResearch, declareWar:declareWar, proposePeace:proposePeace,
       lendLease:lendLease, diploAid:diploAid, inviteToFaction:inviteToFaction,
-      playerReleasePuppet:playerReleasePuppet, playerAnnexPuppet:playerAnnexPuppet
+      playerReleasePuppet:playerReleasePuppet, playerAnnexPuppet:playerAnnexPuppet,
+      establishRegime:establishRegime, transferProvinceToPuppet:transferProvinceToPuppet,
+      dissolveLocalRegime:dissolveLocalRegime
     };
     let fn = table[cmd.fn];
     if(!fn) return;
@@ -8356,9 +10580,12 @@ function mpExecCmd(cmd){
 // ==================== 游戏循环 ====================
 let gameInterval = null;
 
+// 游戏速度表（毫秒/天）：索引 0=暂停 1=慢速 2=正常 3=快速
+// 全局只在这一处定义，联网客户端插值也读它，改节奏只改这里即可
+const TICK_MS = [0, 14000, 7000, 3000];
+
 function gameLoop(){
-  let speeds = [0, 4000, 2000, 800];
-  let speed = speeds[game.speed];
+  let speed = TICK_MS[game.speed];
   
   if(gameInterval) clearInterval(gameInterval);
   
