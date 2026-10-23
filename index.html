@@ -2831,6 +2831,7 @@ function moveUnit(unit, toProvinceId){
     unit.moveTo = toProvinceId;
     unit.moveProgress = 0;
     unit.moveTotal = dist / (speed * 1.5); // Air speed multiplier (slowed)
+    unit._orderAt = Date.now(); // 行军插值起点：新下令的部队从 0 开始平滑走，不继承本 tick 已流逝时间
     unit.fighting = false;
     unit.fightTarget = null;
     // If flying into enemy territory, start air combat
@@ -2874,6 +2875,7 @@ function moveUnit(unit, toProvinceId){
   unit.moveTo = toProvinceId;
   unit.moveProgress = 0;
   unit.moveTotal = dist / speed;
+  unit._orderAt = Date.now(); // 行军插值起点
   
   // Reset fighting flag; will be re-set if entering enemy territory
   unit.fighting = false;
@@ -3583,11 +3585,19 @@ function drawMap(){
   
   // ---- MARCHING UNITS ----
   let marchingUnits = units.filter(u=>u.moving && u.moveTo!==null && u.moveTotal>0);
+  // 行军平滑插值：moveProgress 每 gameTick(1天=3~14s)才 +1，直接用它画会一顿一顿。
+  // 在两次 tick 之间按真实时间补足小数进度（联机客户端由 mpStartClientAnim 自己推进 moveProgress，不重复叠加）。
+  let animClock = (!(window.MP && MP.active && !MP.isHost) && !game.paused && game._tickAt && TICK_MS[game.speed]>0);
   marchingUnits.forEach(u=>{
     let fromP = provinces[u.provinceId];
     let toP = provinces[u.moveTo];
     if(!fromP || !toP) return;
-    let t = u.moveProgress / u.moveTotal;
+    let frac = 0;
+    if(animClock){
+      let base = Math.max(game._tickAt, u._orderAt || 0);
+      frac = Math.min(1, (Date.now() - base) / TICK_MS[game.speed]);
+    }
+    let t = Math.min(1, (u.moveProgress + frac) / u.moveTotal);
     let mx = fromP.x + (toP.x - fromP.x) * t;
     let my = fromP.y + (toP.y - fromP.y) * t;
     let isAttack = toP.controller !== u.country;
@@ -4128,6 +4138,7 @@ function gameTick(){
   if(!game.player) return;
   if(window.MP && MP.active && !MP.isHost) return; // 联机客户端：不跑本地模拟，只应用主机快照
   game.tick++;
+  game._tickAt = Date.now();   // 行军插值基准：drawMap 用它算两次 tick 之间的平滑进度
   
   // Time advance — cap year at 1949 to prevent overflow
   game.date.day++;
@@ -10739,12 +10750,29 @@ function gameLoop(){
   if(gameInterval) clearInterval(gameInterval);
 
   ensureTrainingTimer();
+  ensureMoveAnim();
 
   if(speed===0) return;
 
   gameInterval = setInterval(()=>{
     gameTick();
   }, speed);
+}
+
+// 行军动画循环：gameTick 之间高频重绘地图，配合 drawMap 里的 animFrac 插值，
+// 让部队行军平滑移动而不是每 3~14 秒瞬移一格。只重绘、不改任何游戏状态，
+// 到达/交战判定仍由 gameTick 权威处理。没有部队行军时自动空转（开销≈0）。
+function ensureMoveAnim(){
+  if(ensureMoveAnim._t) return;
+  ensureMoveAnim._t = setInterval(()=>{
+    if(game.paused) return;
+    if(window.MP && MP.active && !MP.isHost) return; // 客户端走 mpStartClientAnim
+    let hasMarching = false;
+    for(let u of units){ if(u.moving && u.moveTotal>0){ hasMarching=true; break; } }
+    if(hasMarching){
+      try{ drawMap(); }catch(e){}
+    }
+  }, 50);
 }
 
 // 训练队列结算计时器（真实时间，500ms 一查；暂停时不结算、不倒计时消耗）
@@ -10771,8 +10799,11 @@ setSpeed = function(s){
 // ---- 版本与更新日志 ----
 // 每次发布新版本：改 GAME_VERSION，并在 UPDATE_HISTORY 顶部加一条。
 // 玩家打开线上版时若版本号与 localStorage 记录不同，就弹「本次版本更新了以下内容」弹窗。
-const GAME_VERSION = 'v1.6.3';
+const GAME_VERSION = 'v1.6.4';
 const UPDATE_HISTORY = [
+  { ver:'v1.6.4', date:'2026-10-23', items:[
+    '🚚 **行军动画平滑化**：部队行军不再一顿一顿瞬移——在两次结算之间按真实时间平滑插值移动，画面 20 帧/秒持续重绘；到达/交战判定完全不变',
+  ]},
   { ver:'v1.6.3', date:'2026-10-23', items:[
     '⏱ **训练耗时系统**：训练部队不再瞬间成军——陆军类 5 秒、海军/空军 10 秒；点击训练立即扣装备人力，到点部队自动成军；训练面板显示每支部队的倒计时进度条；训练期间丢省会取消并全额退款',
     '✨ **流畅度优化**：训练倒计时每 0.5 秒平滑刷新，进度条不再一跳一跳',
