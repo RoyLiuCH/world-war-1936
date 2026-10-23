@@ -1315,6 +1315,19 @@ const UNIT_TYPES = {
   bomber:{name:'轰炸机联队',atk:35,def:10,spd:3,hp:50,cost:500,manpower:1,eqName:'坦克',air:true,bomber:true,fuel:0.3}
 };
 const FUEL_LEVELS = ['🟢','🟡','🔴']; // fuel status icons
+
+// ==================== 训练耗时 ====================
+// 用户需求：训练部队需要真实时间 —— 陆军类默认 5 秒，海军/空军 10 秒
+const TRAIN_TIME_LAND = 5;   // 步兵/摩托化/装甲/守备队
+const TRAIN_TIME_NAVY = 10;  // 驱逐舰/潜艇/航母
+const TRAIN_TIME_AIR  = 10;  // 战斗机/轰炸机
+function trainTimeSec(typeKey){
+  let t = UNIT_TYPES[typeKey];
+  if(!t) return TRAIN_TIME_LAND;
+  if(t.naval) return TRAIN_TIME_NAVY;
+  if(t.air) return TRAIN_TIME_AIR;
+  return TRAIN_TIME_LAND;
+}
 function getFuelStatus(cid){
   // returns 0=充足 1=紧张 2=短缺
   let c = countries[cid];
@@ -1695,6 +1708,7 @@ function initGame(){
   game.log = [];
   game.factionOverride = {};
   game.militaryAccess = {};
+  game.trainingQueue = [];
   game.accessAskCd = 0;
   game.recruitCd = 0;
   game.stats = {byCountry:{}};
@@ -1844,11 +1858,11 @@ const STARTING_ARMY = {
 };
 // 直接入列：不检查也不扣除人力/装备（发放的是开局既有的常备军，
 // 不是新征召的部队，走 createUnit 会因开局资源不足而静默失败）
-function spawnUnitRaw(provinceId, typeKey){
+function spawnUnitRaw(provinceId, typeKey, countryOverride){
   let type = UNIT_TYPES[typeKey];
   let province = provinces[provinceId];
   if(!type || !province) return null;
-  let cid = province.controller;
+  let cid = countryOverride || province.controller;
   if(!countries[cid]) return null;
   let u = {
     id: unitNextId++,
@@ -7871,18 +7885,32 @@ function renderActiveTab(){
       
     case 'train':
       content.innerHTML = '<div class="panel"><h3>🎖 训练部队</h3>';
-      content.innerHTML += '<p style="font-size:11px;color:#8b949e">在选中的省份训练部队</p>';
+      content.innerHTML += '<p style="font-size:11px;color:#8b949e">在选中的省份训练部队（⏱ 训练需要时间：陆军 5 秒 / 海军·空军 10 秒）</p>';
       let eq = c.equipment;
-      content.innerHTML += `<button class="btn-sm train" style="width:100%;margin:3px 0" onclick="trainInSelected('infantry')">🪖 步兵师 (1步兵装备👥2) 攻20/防25/速3</button>`;
-      content.innerHTML += `<button class="btn-sm train" style="width:100%;margin:3px 0" onclick="trainInSelected('motorized')">🚛 摩托化师 (1摩托装备👥2) 攻30/防20/速5 ⛽0.2/天</button>`;
-      content.innerHTML += `<button class="btn-sm train" style="width:100%;margin:3px 0" onclick="trainInSelected('armor')">🛡 装甲师 (1坦克👥1) 攻45/防30/速4 ⛽0.4/天</button>`;
-      content.innerHTML += `<button class="btn-sm train" style="width:100%;margin:3px 0;background:#1a3a4c;border-color:#1a5276" onclick="trainInSelected('destroyer')">⚓ 驱逐舰 (1摩托装备👥1) 攻35/防25/速4 海军护航 ⛽0.3/天</button>`;
-      content.innerHTML += `<button class="btn-sm train" style="width:100%;margin:3px 0;background:#2a1a4c;border-color:#5a3a8c" onclick="trainInSelected('carrier')">🛩 航空母舰 (1坦克👥2 1200💰) 攻28/防32/速3 舰载机+登陆指挥 ⛽0.6/天</button>`;
-      content.innerHTML += `<button class="btn-sm train" style="width:100%;margin:3px 0;background:#1a3a3c;border-color:#1a5a6c" onclick="trainInSelected('submarine')">🦈 潜艇 (1摩托装备👥1 500💰) 攻40/防12/速3 隐形攻击+商船袭击 ⛽0.25/天</button>`;
+      content.innerHTML += `<button class="btn-sm train" style="width:100%;margin:3px 0" onclick="trainInSelected('infantry')">🪖 步兵师 (1步兵装备👥2 ⏱5s) 攻20/防25/速3</button>`;
+      content.innerHTML += `<button class="btn-sm train" style="width:100%;margin:3px 0" onclick="trainInSelected('motorized')">🚛 摩托化师 (1摩托装备👥2 ⏱5s) 攻30/防20/速5 ⛽0.2/天</button>`;
+      content.innerHTML += `<button class="btn-sm train" style="width:100%;margin:3px 0" onclick="trainInSelected('armor')">🛡 装甲师 (1坦克👥1 ⏱5s) 攻45/防30/速4 ⛽0.4/天</button>`;
+      content.innerHTML += `<button class="btn-sm train" style="width:100%;margin:3px 0;background:#1a3a4c;border-color:#1a5276" onclick="trainInSelected('destroyer')">⚓ 驱逐舰 (1摩托装备👥1 ⏱10s) 攻35/防25/速4 海军护航 ⛽0.3/天</button>`;
+      content.innerHTML += `<button class="btn-sm train" style="width:100%;margin:3px 0;background:#2a1a4c;border-color:#5a3a8c" onclick="trainInSelected('carrier')">🛩 航空母舰 (1坦克👥2 1200💰 ⏱10s) 攻28/防32/速3 舰载机+登陆指挥 ⛽0.6/天</button>`;
+      content.innerHTML += `<button class="btn-sm train" style="width:100%;margin:3px 0;background:#1a3a3c;border-color:#1a5a6c" onclick="trainInSelected('submarine')">🦈 潜艇 (1摩托装备👥1 500💰 ⏱10s) 攻40/防12/速3 隐形攻击+商船袭击 ⛽0.25/天</button>`;
       content.innerHTML += '<hr style="border-color:#30363d;margin:4px 0"><div style="font-size:10px;color:#58a6ff;margin-bottom:2px">✈️ 空军</div>';
-      content.innerHTML += `<button class="btn-sm train" style="width:100%;margin:3px 0;background:#1a2a4a;border-color:#2a4a7a" onclick="trainInSelected('fighter')">✈️ 战斗机联队 (1摩托装备👥1 400💰) 攻25/防15/速6 制空权+12 ⛽0.2/天</button>`;
-      content.innerHTML += `<button class="btn-sm train" style="width:100%;margin:3px 0;background:#3a1a1a;border-color:#6a2a2a" onclick="trainInSelected('bomber')">💣 轰炸机联队 (1坦克👥1 500💰) 攻35/防10/速4 战略轰炸+8 ⛽0.3/天</button>`;
-      
+      content.innerHTML += `<button class="btn-sm train" style="width:100%;margin:3px 0;background:#1a2a4a;border-color:#2a4a7a" onclick="trainInSelected('fighter')">✈️ 战斗机联队 (1摩托装备👥1 400💰 ⏱10s) 攻25/防15/速6 制空权+12 ⛽0.2/天</button>`;
+      content.innerHTML += `<button class="btn-sm train" style="width:100%;margin:3px 0;background:#3a1a1a;border-color:#6a2a2a" onclick="trainInSelected('bomber')">💣 轰炸机联队 (1坦克👥1 500💰 ⏱10s) 攻35/防10/速4 战略轰炸+8 ⛽0.3/天</button>`;
+
+      // 训练队列（真实时间倒计时）
+      let myQueue = (game.trainingQueue||[]).filter(q=>q.country===game.player);
+      if(myQueue.length > 0){
+        content.innerHTML += '<div style="margin-top:6px;font-size:10px;color:#f0c040">🏭 训练中：</div>';
+        let now = Date.now();
+        myQueue.forEach(q=>{
+          let left = Math.max(0, q.readyAt - now);
+          let pct = Math.max(0, Math.min(100, (1 - left/q.totalMs)*100));
+          let pn = provinces[q.provId] ? provinces[q.provId].name : '?';
+          content.innerHTML += `<div style="margin:2px 0"><span style="font-size:10px">${pn} · ${UNIT_TYPES[q.type].name} · 剩 ${(left/1000).toFixed(0)}s</span>`
+            + `<div class="progress-bar" style="height:6px"><div class="progress-fill" style="width:${pct}%"></div></div></div>`;
+        });
+      }
+
       content.innerHTML += `<div style="margin-top:6px;font-size:11px;color:#8b949e">`;
       content.innerHTML += `步兵装备: ${Math.floor(eq['步兵装备'])} | 摩托装备: ${Math.floor(eq['摩托化装备'])} | 坦克: ${Math.floor(eq['坦克'])}<br>`;
       content.innerHTML += `人力池: ${Math.floor(c.manpowerPool)}`;
@@ -8334,24 +8362,59 @@ function trainInSelected(type){
     addLog('⚠️','只能在自己的领土上训练部队');
     return;
   }
-  let result = createUnit(game.selectedProvince, type);
-  if(!result){
-    // 明确指出缺什么，避免"有资源却招不了兵"的困惑
-    let c = countries[game.player];
-    let t = UNIT_TYPES[type];
-    if(c.equipment[t.eqName] < 1){
-      addLog('⚠️','缺少'+t.eqName+'（现有'+Math.floor(c.equipment[t.eqName])+'）——请先建造军用工厂生产装备');
-    } else if(c.manpowerPool < t.manpower){
-      addLog('⚠️','人力不足（需'+t.manpower+'，现有'+Math.floor(c.manpowerPool)+'）——人力随时间恢复，可升级国策「人力资源」');
-    } else {
-      addLog('⚠️','装备或人力不足');
-    }
+  let c = countries[game.player];
+  let t = UNIT_TYPES[type];
+  // 先校验资源（明确指出缺什么，避免"有资源却招不了兵"的困惑）
+  if(c.equipment[t.eqName] < 1){
+    addLog('⚠️','缺少'+t.eqName+'（现有'+Math.floor(c.equipment[t.eqName])+'）——请先建造军用工厂生产装备');
     return;
   }
-  addLog('🎖',p.name+' 训练了新的 '+UNIT_TYPES[type].name);
+  if(c.manpowerPool < t.manpower){
+    addLog('⚠️','人力不足（需'+t.manpower+'，现有'+Math.floor(c.manpowerPool)+'）——人力随时间恢复，可升级国策「人力资源」');
+    return;
+  }
+  // 扣资源入训练队列 —— 部队要训练一段时间才成军（陆军 5 秒 / 海军·空军 10 秒）
+  let sec = trainTimeSec(type);
+  c.equipment[t.eqName]--;
+  c.manpowerPool -= t.manpower;
+  if(!game.trainingQueue) game.trainingQueue = [];
+  game.trainingQueue.push({
+    provId: p.id, type: type, country: game.player,
+    readyAt: Date.now() + sec*1000, totalMs: sec*1000
+  });
+  addLog('🎖',p.name+' 开始训练 '+t.name+'（'+sec+' 秒后成军）');
   SFX.train();
   updateUI();
   checkGuideProgress();
+}
+
+// 训练队列结算：到点的部队成军；期间丢省/亡国的退款解散
+// 用真实时间（Date.now），不受游戏速度/暂停影响计时的只是检查频率——暂停时不结算
+function processTraining(){
+  if(!game.trainingQueue || game.trainingQueue.length===0) return 0;
+  let now = Date.now();
+  let spawned = 0;
+  let remain = [];
+  for(let q of game.trainingQueue){
+    if(now < q.readyAt){ remain.push(q); continue; }
+    let c = countries[q.country];
+    let p = provinces[q.provId];
+    if(!c || c.eliminated || !p || p.controller !== q.country){
+      // 退款：省丢了/国家没了，装备与人力退回
+      if(c && !c.eliminated){
+        let t = UNIT_TYPES[q.type];
+        if(t){ c.equipment[t.eqName] = (c.equipment[t.eqName]||0) + 1; c.manpowerPool += t.manpower; }
+        addLog('⚠️','训练中的 '+t.name+' 因失去'+p.name+' 取消（资源已退回）');
+      }
+      continue;
+    }
+    spawnUnitRaw(q.provId, q.type, q.country);
+    spawned++;
+    addLog('🎖',p.name+' 训练完成：新的 '+UNIT_TYPES[q.type].name+' 成军！');
+  }
+  game.trainingQueue = remain;
+  if(spawned>0){ updateUI(); drawMap(); checkGuideProgress(); }
+  return spawned;
 }
 
 function startResearch(techId){
@@ -9295,6 +9358,7 @@ function doLoadFromSlot(slot){
     game.victoryShown = false;  // 读档重置胜利状态
     game.factionOverride = save.factionOverride || {};
     game.militaryAccess = save.militaryAccess || {};
+    game.trainingQueue = (save.trainingQueue||[]).map(q=>({...q}));
     game.stats = save.stats || {byCountry:{}};
     if(!game.stats.byCountry){
       game.stats.byCountry = {};
@@ -9458,6 +9522,7 @@ function buildSaveData(){
     seaControl: game.seaControl || {},
     factionOverride: game.factionOverride || {},
     militaryAccess: game.militaryAccess || {},
+    trainingQueue: (game.trainingQueue||[]).map(q=>({provId:q.provId, type:q.type, country:q.country, readyAt:q.readyAt, totalMs:q.totalMs})),
     stats: game.stats || {byCountry:{}},
     puppets: collectPuppetMap(), // 傀儡关系快照（含国名"XX属XX"状态）
     localRegimes: collectLocalRegimes(), // 占领区扶植的地方政权（_localRegime 定义，读档需重建）
@@ -10448,6 +10513,7 @@ function mpApplySnapshot(save){
     game.seaControl = save.seaControl || {};
     game.factionOverride = save.factionOverride || {};
     game.militaryAccess = save.militaryAccess || {};
+    game.trainingQueue = (save.trainingQueue||[]).map(q=>({...q}));
     game.stats = save.stats || {byCountry:{}};
     unitNextId = save.unitNextId || unitNextId;
     firedEvents = new Set(save.firedEvents || []);
@@ -10669,14 +10735,29 @@ const TICK_MS = [0, 14000, 7000, 3000];
 
 function gameLoop(){
   let speed = TICK_MS[game.speed];
-  
+
   if(gameInterval) clearInterval(gameInterval);
-  
+
+  ensureTrainingTimer();
+
   if(speed===0) return;
-  
+
   gameInterval = setInterval(()=>{
     gameTick();
   }, speed);
+}
+
+// 训练队列结算计时器（真实时间，500ms 一查；暂停时不结算、不倒计时消耗）
+function ensureTrainingTimer(){
+  if(ensureTrainingTimer._t) return;
+  ensureTrainingTimer._t = setInterval(()=>{
+    if(game.paused) return;
+    try{ processTraining(); }catch(e){ console.error('processTraining error:', e); }
+    // 流畅度：训练面板打开且队列非空时，每 0.5s 平滑刷新倒计时进度条（不整屏重绘地图）
+    if(game.activeTab==='train' && game.trainingQueue && game.trainingQueue.length>0){
+      try{ renderActiveTab(); }catch(e){}
+    }
+  }, 500);
 }
 
 // Override setSpeed to update loop
@@ -10690,8 +10771,12 @@ setSpeed = function(s){
 // ---- 版本与更新日志 ----
 // 每次发布新版本：改 GAME_VERSION，并在 UPDATE_HISTORY 顶部加一条。
 // 玩家打开线上版时若版本号与 localStorage 记录不同，就弹「本次版本更新了以下内容」弹窗。
-const GAME_VERSION = 'v1.6.2';
+const GAME_VERSION = 'v1.6.3';
 const UPDATE_HISTORY = [
+  { ver:'v1.6.3', date:'2026-10-23', items:[
+    '⏱ **训练耗时系统**：训练部队不再瞬间成军——陆军类 5 秒、海军/空军 10 秒；点击训练立即扣装备人力，到点部队自动成军；训练面板显示每支部队的倒计时进度条；训练期间丢省会取消并全额退款',
+    '✨ **流畅度优化**：训练倒计时每 0.5 秒平滑刷新，进度条不再一跳一跳',
+  ]},
   { ver:'v1.6.2', date:'2026-10-22', items:[
     '🧭 **驻停/敌军标识互斥**：鼠标悬停省份时，「🎫 驻停」与「⚔️ 敌军」不再混在一起——交战中显示红色「敌军（交战中）」，驻停/借道才显示蓝色「驻停」；我方持证部队标注「我方持证驻停」',
   ]},
