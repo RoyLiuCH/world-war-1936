@@ -2060,6 +2060,21 @@ const SEA_ROUTE_PAIRS_V2 = [
 ];
 SEA_ROUTE_PAIRS_V2.forEach(([a,b])=>markSea(a,b));
 
+// ---- 补给网点补漏（v1.9.1）----
+// 自动建边删掉一批"跨海假陆路"后，几个小国只剩 2 个可打目标，玩法上太窄
+// （吉布提/也门/马耳他/冈比亚/黄金海岸/苏里南/南洋群岛）。这里按史实补上真实航线与陆界。
+function linkLand(a,b){
+  let exists = ADJACENCY.some(([x,y])=>(x===a&&y===b)||(x===b&&y===a));
+  if(!exists) ADJACENCY.push([a,b]);
+}
+markSea(190,154);  // 索马里海岸（吉布提）↔ 萨那（也门）：曼德海峡
+markSea(217,167);  // 马耳他 ↔ 的黎波里（利比亚）：地中海
+markSea(241,239);  // 南洋群岛（密克罗尼西亚）↔ 关岛
+markSea(241,243);  // 南洋群岛 ↔ 塞班
+markSea(236,136);  // 苏里南 ↔ 加拉加斯（委内瑞拉）：加勒比海
+markSea(199,232);  // 冈比亚 ↔ 几内亚比绍：西非近海
+linkLand(197,181); // 黄金海岸（加纳）↔ 上沃尔特（布基纳法索）：真实陆界
+
 // Unit types
 const UNIT_TYPES = {
   infantry:{name:'步兵师',atk:20,def:25,spd:5,hp:100,cost:300,manpower:2,eqName:'步兵装备',fuel:0},
@@ -2434,8 +2449,43 @@ function initCountry(cid){
   };
 }
 
+// ---- 陆地邻接自检：中心连线大部分落在海上 → 这条边根本不成立 ----
+// v1.9.0 自动建边时按粗粒度"陆桥"判定，把一批远距离跨海关系误标成了陆路
+// （堪培拉↔塔什干、马尼拉↔伊尔库茨克、惠灵顿↔特古西加尔巴、维也纳↔的黎波里），
+// 结果澳大利亚/新西兰/菲律宾/荷属东印度被判成陆路国、内陆国奥地利也要"海军"。
+// 这里用真实海岸线（pointInLand）复核：跨国、距离 >45px、陆地占比 <60% 的边直接删掉。
+// 短距离（<=45px，直布罗陀/博斯普鲁斯这类真海峡）保持原样；
+// 同一国家内部的边不动（苏联/加拿大这种跨大陆国家本来就有长边）。
+let _seaEdgesClassified = false;
+function reclassifySeaEdges(){
+  if(_seaEdgesClassified) return;
+  _seaEdgesClassified = true;
+  for(let i=ADJACENCY.length-1; i>=0; i--){
+    let [a,b] = ADJACENCY[i];
+    let k = Math.min(a,b)+':'+Math.max(a,b);
+    if(SEA_ROUTES.has(k)) continue;
+    let A = provinces[a], B = provinces[b];
+    if(!A || !B) continue;
+    if(A.cid === B.cid) continue;
+    let d = Math.hypot(A.x-B.x, A.y-B.y);
+    if(d <= 45) continue;
+    const N = 16;
+    let inland = 0;
+    for(let j=1;j<N;j++){
+      let t = j/N;
+      if(pointInLand(A.x+(B.x-A.x)*t, A.y+(B.y-A.y)*t)) inland++;
+    }
+    let frac = inland/(N-1);
+    // 距离越远要求越严：>80px 必须是"基本全程走陆地"，否则一定是跨海误判
+    let need = d > 80 ? 0.92 : 0.6;
+    if(frac < need) ADJACENCY.splice(i,1);
+  }
+}
+
 function initGame(){
+  sanitizeBorders();   // 清洗重复国界环（必须在任何国界判定/裁剪之前）
   provinces = PROVINCE_DEFS.map(initProvince);
+  reclassifySeaEdges();  // 复核跨海邻接（依赖上面建好的 provinces 坐标）
   // Clean any leftover custom properties
   provinces.forEach(p=>{ delete p._fortTimer; });
   countries = {};
@@ -2557,6 +2607,11 @@ const STARTING_NAVY = {
   solomon: {destroyer:1},
   trinidad: {destroyer:1},
   usvi: {destroyer:1},
+  malta: {destroyer:1},
+  ceylon: {destroyer:1},
+  vanuatu: {destroyer:1},
+  timor: {destroyer:1},
+  micronesia: {destroyer:1},
 };
 function grantStartingNavies(){
   for(let cid in STARTING_NAVY){
@@ -4094,9 +4149,12 @@ function buildProvinceShapes(){  // 清空缓存
         for(let i=0;i<best.length;i+=2) poly.push({x:best[i], y:best[i+1]});
         PROVINCE_SHAPES[p0.id] = poly;
       } else {
+        // 微型地区无国界数据（香港/马耳他/关岛等）：用省中心的小方块，
+        // 绝不能用 FAR 大方块 —— 那会铺满整张地图，把颜色糊掉
+        let R = 26;
         PROVINCE_SHAPES[p0.id] = [
-          {x:p0.x-FAR, y:p0.y-FAR}, {x:p0.x+FAR, y:p0.y-FAR},
-          {x:p0.x+FAR, y:p0.y+FAR}, {x:p0.x-FAR, y:p0.y+FAR}
+          {x:p0.x-R, y:p0.y-R}, {x:p0.x+R, y:p0.y-R},
+          {x:p0.x+R, y:p0.y+R}, {x:p0.x-R, y:p0.y+R}
         ];
       }
       continue;
@@ -4107,11 +4165,35 @@ function buildProvinceShapes(){  // 清空缓存
   provinces.forEach(p=>{
     if(!borderOwnerOf(p.cid)) PROVINCE_SHAPES[p.id] = globalShapes[p.id];
   });
-  // 中心不在本国真实国界内的省（历史边界差异：柯尼斯堡/克里米亚等）→
-  // 改回全局 Voronoi 单元（范围受限），渲染时也不裁国界，作为飞地单独显示
+  // 中心不在本国真实国界内的省：真正的历史飞地（柯尼斯堡/南苏丹等）才走"不裁国界"分支。
+  // ★ 只有偏离 >8px 才算飞地 —— 其余都是海岸线取整造成的 0~5px 贴边误差，
+  //   若一并当成飞地，它们就会带着几千像素宽的 global Voronoi 块铺满地图（颜色糊掉的根源）。
   provinces.forEach(p=>{
-    p._outOfBorder = WORLD_BORDERS[p.cid] ? !pointInCountry(p.cid, p.x, p.y) : false;
-    if(p._outOfBorder) PROVINCE_SHAPES[p.id] = globalShapes[p.id];
+    let owner = borderOwnerOf(p.cid);
+    if(!owner){ p._outOfBorder = false; return; }
+    p._outOfBorder = !pointInCountry(p.cid, p.x, p.y) && borderDistOf(p.cid, p.x, p.y) > 8;
+    if(p._outOfBorder){
+      // 真飞地：单元限制在省中心附近的小方块内，绝不外溢
+      let cell = clipPolyToRect(globalShapes[p.id], p.x-35, p.y-35, p.x+35, p.y+35);
+      PROVINCE_SHAPES[p.id] = (cell && cell.length >= 3) ? cell : [
+        {x:p.x-18, y:p.y-18}, {x:p.x+18, y:p.y-18}, {x:p.x+18, y:p.y+18}, {x:p.x-18, y:p.y+18}
+      ];
+    }
+  });
+  // 没有国界数据的微型地区（香港/马耳他/关岛/百慕大等）：global Voronoi 单元可能宽达几千像素，
+  // 又因为不裁国界会直接铺到海上 —— 统一限制在省中心的小方块内。
+  provinces.forEach(p=>{
+    if(borderOwnerOf(p.cid)) return;
+    let cell = PROVINCE_SHAPES[p.id];
+    if(!cell || cell.length < 3) return;
+    let minX=1e9,maxX=-1e9,minY=1e9,maxY=-1e9;
+    cell.forEach(v=>{ if(v.x<minX)minX=v.x; if(v.x>maxX)maxX=v.x; if(v.y<minY)minY=v.y; if(v.y>maxY)maxY=v.y; });
+    if(maxX-minX > 90 || maxY-minY > 90){
+      let clipped = clipPolyToRect(cell, p.x-45, p.y-45, p.x+45, p.y+45);
+      PROVINCE_SHAPES[p.id] = (clipped && clipped.length >= 3) ? clipped : [
+        {x:p.x-18, y:p.y-18}, {x:p.x+18, y:p.y-18}, {x:p.x+18, y:p.y+18}, {x:p.x-18, y:p.y+18}
+      ];
+    }
   });
   provinces.forEach(p=>{
     let rough = PROVINCE_SHAPES[p.id];
@@ -4353,17 +4435,59 @@ function pointInLand(x, y){
   return inside;
 }
 
+// ---- 国界数据清洗（★ 关键）----
+// Natural Earth 转换时每个国家的最外环被写了两遍（两次取整相差约 0.5px），
+// 而命中判定与 canvas 裁剪都用「奇偶规则」——同一个环出现两次会互相抵消，
+// 于是整个国家被判成"不在国界内"：v1.9.0 里 251 个省中有 152 个被误判成飞地，
+// 全部跳过国界裁剪，巨型 Voronoi 省块（单省小国是 6000×6005 的方块）直接铺满地图，
+// 颜色层层叠加 → 整张地图糊成一片淡蓝白。这就是"色彩突然失真"的根源。
+// 启动时把「包围盒 + 面积几乎相同」的重复环去掉，只留一个。
+let _bordersSanitized = false;
+function sanitizeBorders(){
+  if(_bordersSanitized) return;
+  _bordersSanitized = true;
+  for(let cid in WORLD_BORDERS){
+    let rings = WORLD_BORDERS[cid];
+    if(!rings || !rings.length) continue;
+    let kept = [], boxes = [];
+    for(let r of rings){
+      if(!r || r.length < 8) continue;          // 不足 4 个点无法成面
+      let minX=1e9,minY=1e9,maxX=-1e9,maxY=-1e9;
+      for(let i=0;i<r.length;i+=2){
+        if(r[i]<minX) minX=r[i];
+        if(r[i]>maxX) maxX=r[i];
+        if(r[i+1]<minY) minY=r[i+1];
+        if(r[i+1]>maxY) maxY=r[i+1];
+      }
+      let area = Math.abs(ringArea(r));
+      let dup = false;
+      for(let b of boxes){
+        if(Math.abs(b.minX-minX)<1.6 && Math.abs(b.maxX-maxX)<1.6 &&
+           Math.abs(b.minY-minY)<1.6 && Math.abs(b.maxY-maxY)<1.6 &&
+           Math.abs(b.area-area) < Math.max(1, b.area*0.02)){ dup = true; break; }
+      }
+      if(dup) continue;
+      boxes.push({minX, minY, maxX, maxY, area});
+      kept.push(r);
+    }
+    WORLD_BORDERS[cid] = kept;
+  }
+  _borderPath2D = {};   // 路径缓存作废（可能已按旧数据建过）
+}
+
 // 国界归属：某些势力与他国共用真实国界（1936 年的满洲国在 Natural Earth 里没有独立边界，
 // 用中国国界；两者一起做 Voronoi 划分，满洲国就自然占据东北那块）
 function borderOwnerOf(cid){
   if(cid === 'manchukuo') return 'china';
-  return WORLD_BORDERS[cid] ? cid : null;
+  let rings = WORLD_BORDERS[cid];
+  // 空数组（微型地区：香港/马耳他/关岛等）等同于没有国界数据
+  return (rings && rings.length) ? cid : null;
 }
 
 // 点是否落在某国的真实国界内（无国界数据的势力一律放行）
 function pointInCountry(cid, x, y){
   let rings = WORLD_BORDERS[borderOwnerOf(cid) || cid];
-  if(!rings) return true;
+  if(!rings || !rings.length) return true;
   let inside = false;
   for(let r of rings){
     let n = r.length/2;
@@ -4375,21 +4499,67 @@ function pointInCountry(cid, x, y){
   return inside;
 }
 
+// 到国界折线的最近距离（顶点采样；用于容忍海岸线取整误差）
+function borderDistOf(cid, x, y){
+  let rings = WORLD_BORDERS[borderOwnerOf(cid) || cid];
+  if(!rings || !rings.length) return 0;
+  let best = 1e9;
+  for(let r of rings){
+    for(let i=0;i<r.length;i+=2){
+      let d = Math.hypot(r[i]-x, r[i+1]-y);
+      if(d < best) best = d;
+    }
+  }
+  return best;
+}
+
+// 把多边形裁到一个矩形内（Sutherland-Hodgman，四边各切一次）
+function clipPolyToRect(poly, x0, y0, x1, y1){
+  if(!poly || poly.length < 3) return poly;
+  function cut(pts, inside, ix){
+    let out = [];
+    for(let i=0;i<pts.length;i++){
+      let cur = pts[i], nxt = pts[(i+1)%pts.length];
+      let ci = inside(cur), ni = inside(nxt);
+      if(ci) out.push(cur);
+      if(ci !== ni){
+        let q = ix(cur, nxt);
+        if(q) out.push(q);
+      }
+    }
+    return out;
+  }
+  const lerpX = (a,b,t)=>({x:a.x+(b.x-a.x)*t, y:a.y+(b.y-a.y)*t});
+  let p = poly;
+  p = cut(p, v=>v.x>=x0, (a,b)=>lerpX(a,b,(x0-a.x)/((b.x-a.x)||1e-9)));
+  p = cut(p, v=>v.x<=x1, (a,b)=>lerpX(a,b,(x1-a.x)/((b.x-a.x)||1e-9)));
+  p = cut(p, v=>v.y>=y0, (a,b)=>lerpX(a,b,(y0-a.y)/((b.y-a.y)||1e-9)));
+  p = cut(p, v=>v.y<=y1, (a,b)=>lerpX(a,b,(y1-a.y)/((b.y-a.y)||1e-9)));
+  return p;
+}
+
 // 多边形命中检测：优先"点在省份块内"，回退到"最近中心点"
 // ★ 省块是 Voronoi 单元（会延伸到国境外），所以命中前先判「点在陆地内」+「点在该省所属国的真实国界内」，
 //   否则点一片空海或邻国领土也会选中几百像素外的省。
+// 命中时该省是否接受这个点：飞地放行；其余要求落在本国国界内
+// （3px 容差：国界折线经过取整，沿海省份的中心/边界点常有 1~2px 误差）
+function provinceHitOK(p, x, y){
+  if(p._outOfBorder) return true;
+  if(pointInCountry(p.cid, x, y)) return true;
+  return borderDistOf(p.cid, x, y) <= 9;
+}
 function getProvinceAtPoint(mx, my){
   if(!pointInLand(mx, my)) return null;
   for(let p of provinces){
     let bb = PROVINCE_BBOXES[p.id];
     if(!bb) continue;
     if(mx < bb.minX-4 || mx > bb.maxX+4 || my < bb.minY-4 || my > bb.maxY+4) continue;
-    if(pointInPoly(mx, my, PROVINCE_SHAPES[p.id]) && (p._outOfBorder || pointInCountry(p.cid, mx, my))) return p.id;
+    if(pointInPoly(mx, my, PROVINCE_SHAPES[p.id]) && provinceHitOK(p, mx, my)) return p.id;
   }
   let best = null, bestD = Infinity;
   for(let p of provinces){
     let d = Math.hypot(mx-p.x, my-p.y);
-    if(d < bestD && (p._outOfBorder || pointInCountry(p.cid, mx, my))){ bestD = d; best = p.id; }
+    if(d < bestD && provinceHitOK(p, mx, my)){ bestD = d; best = p.id; }
   }
   return bestD <= 28 ? best : null;
 }
@@ -4442,6 +4612,33 @@ function drawMap(){
   //   国界由 Natural Earth 50m 数据决定，国内再用 Voronoi 省块细分成省 —— 才像真世界地图。
   ctx.save();
   clipLandPath();
+  // 季节天气图层（降雪/泥泞）必须在「陆地 ∩ 本国国界」的裁剪里绘制：
+  // 稀疏国家的 Voronoi 单元可能有几千像素宽（单省小国直接铺满 6000px 方块），
+  // 不裁剪就会从省块溢出、把整张地图（含海洋）糊成一片浅蓝白 —— 这就是"颜色忽然变淡"的元凶。
+  let _winterOn = isWinter(), _mudOn = isMud();
+  function drawWeather(list){
+    if(!_winterOn && !_mudOn) return;
+    list.forEach(p=>{
+      let cold = _winterOn && isColdProvince(p);
+      if(!cold && !_mudOn) return;
+      let poly = PROVINCE_SHAPES[p.id];
+      if(!poly || poly.length<3) return;
+      ctx.beginPath();
+      ctx.moveTo(poly[0].x, poly[0].y);
+      for(let i=1;i<poly.length;i++) ctx.lineTo(poly[i].x, poly[i].y);
+      ctx.closePath();
+      if(cold){
+        ctx.fillStyle = 'rgba(225,240,255,0.16)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(225,240,255,0.35)';
+        ctx.lineWidth = 1 / mapScale;
+        ctx.stroke();
+      } else {
+        ctx.fillStyle = 'rgba(139,115,85,0.14)';
+        ctx.fill();
+      }
+    });
+  }
   // 省块绘制：第一层底色（拼接缝天然成省界）+ 第二层国色（含选中/悬停/可攻击高亮）
   function drawProvGroup(list){
     list.forEach(p=>{
@@ -4505,6 +4702,7 @@ function drawMap(){
         if(owner === cid) fillCountryPath(cid, hexToRgba(def?def.color:'#666', 0.30));
       }
       drawProvGroup(inBorder);
+      drawWeather(inBorder);
       ctx.restore();
     }
     // 飞地 / 历史边界省（柯尼斯堡、克里米亚等）：中心在本国真实国界外，
@@ -4512,6 +4710,7 @@ function drawMap(){
     if(floating.length){
       ctx.save();
       drawProvGroup(floating);
+      drawWeather(floating);
       ctx.restore();
     }
   }
@@ -4723,22 +4922,11 @@ function drawMap(){
     ctx.fillText(name, pick.x, pick.y);
   });
   
-  // 冬季视觉：寒冷地带覆盖白雪（整个省份块铺雪）
-  if(isWinter()){
+  // 冬季视觉补充：省块降雪已在上面的「国界裁剪」阶段画完（drawWeather），
+  // 这里只补雪花标记与飘雪粒子 —— 它们尺寸很小，不会外溢污染地图
+  if(_winterOn){
     provinces.forEach(p=>{
       if(!isColdProvince(p)) return;
-      let poly = PROVINCE_SHAPES[p.id];
-      if(!poly || poly.length<3) return;
-      ctx.beginPath();
-      ctx.moveTo(poly[0].x, poly[0].y);
-      for(let i=1;i<poly.length;i++) ctx.lineTo(poly[i].x, poly[i].y);
-      ctx.closePath();
-      ctx.fillStyle = 'rgba(225,240,255,0.16)';
-      ctx.fill();
-      ctx.strokeStyle = 'rgba(225,240,255,0.35)';
-      ctx.lineWidth = 1 / mapScale;
-      ctx.stroke();
-      // 雪花粒子（伪随机固定位置，避免闪烁）
       ctx.fillStyle = 'rgba(255,255,255,0.7)';
       ctx.font = (6/mapScale)+'px sans-serif';
       ctx.textAlign = 'center';
@@ -4756,19 +4944,7 @@ function drawMap(){
       ctx.fill();
     }
   }
-  // 泥泞季视觉：整块棕色泥泞
-  if(isMud()){
-    provinces.forEach(p=>{
-      let poly = PROVINCE_SHAPES[p.id];
-      if(!poly || poly.length<3) return;
-      ctx.beginPath();
-      ctx.moveTo(poly[0].x, poly[0].y);
-      for(let i=1;i<poly.length;i++) ctx.lineTo(poly[i].x, poly[i].y);
-      ctx.closePath();
-      ctx.fillStyle = 'rgba(139,115,85,0.14)';
-      ctx.fill();
-    });
-  }
+  // 泥泞季的省块棕色同样在 drawWeather 里按国界裁剪绘制，这里无需重复铺一遍
   
   // War connections (dashed red lines)
   game.wars.forEach(w=>{
@@ -12007,8 +12183,14 @@ setSpeed = function(s){
 // ---- 版本与更新日志 ----
 // 每次发布新版本：改 GAME_VERSION，并在 UPDATE_HISTORY 顶部加一条。
 // 玩家打开线上版时若版本号与 localStorage 记录不同，就弹「本次版本更新了以下内容」弹窗。
-const GAME_VERSION = 'v1.9.0';
+const GAME_VERSION = 'v1.9.1';
 const UPDATE_HISTORY = [
+  { ver:'v1.9.1', date:'2026-10-24', items:[
+    '🎨 **修复地图整片泛白/浅蓝失真**：冬季降雪与泥泞季图层原来不按国界裁剪，遇到几千像素宽的巨型省块就会溢出、把整张地图（连海洋一起）糊成一片浅蓝白；现在降雪/泥泞只在「陆地 ∩ 本国国界」内绘制，雪只下在该下的高纬度省份里',
+    '🧭 **修复国界数据重复环**：每个国家的最外环曾被导出两遍，奇偶规则下互相抵消，导致 251 个省里有 152 个被误判成"在国界外"、跳过所有裁剪——这是颜色糊掉的深层原因；启动时自动清洗重复环，误判降到 6 个真实飞地（柯尼斯堡/南苏丹等，且色块限制在本地不再外溢）',
+    '🗺️ **清理跨海假陆路**：自动建边误把堪培拉↔塔什干、马尼拉↔伊尔库茨克、维也纳↔的黎波里等远距离跨海关系标成陆路，现在按真实海岸线复核删除；澳大利亚/新西兰/菲律宾/荷属东印度/马耳他等重新正确判定为纯岛国，内陆国奥地利不再"需要海军"',
+    '⚓ **补齐小国初始舰队**：马耳他/锡兰/瓦努阿图/帝汶/密克罗尼西亚等纯岛国开局发 1 艘驱逐舰，不再有无船出不了海的死局；吉布提/也门/冈比亚/黄金海岸/苏里南等补上史实航线与陆界，攻击面回到 3 个以上',
+  ]},
   { ver:'v1.9.0', date:'2026-10-24', items:[
     '🌏 **全世界 159 个国家**：一次性补齐全球所有主权国家与殖民地——欧洲的卢森堡/冰岛、巴尔干的克罗地亚/斯洛文尼亚/波黑、中东的沙特/伊拉克/叙利亚/黎巴嫩/外约旦、非洲的埃塞俄比亚以外的利比里亚/苏丹/索马里/尼日利亚/黄金海岸/比属刚果等、拉美的阿根廷/智利/秘鲁/哥伦比亚/委内瑞拉/古巴等、亚洲的阿富汗/尼泊尔/暹罗以外的老挝柬埔寨/荷属东印度各地、大洋洲的澳大利亚领地——全部有自己的国名、国旗、领袖、颜色、开局部队和初始舰队',
     '🗺️ **新增 135 个省份**：全世界省份从 116 个扩到 251 个，新增国家按真实地理落位（西伯利亚/巴布亚/格陵兰等地补省），并自动建立陆路邻接与跨海航路，全图保持单连通——每个国家都有可攻击目标',
