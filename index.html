@@ -1711,9 +1711,7 @@ function initGame(){
   game.trainingQueue = [];
   game.accessAskCd = 0;
   game.recruitCd = 0;
-  // 🥚 彩蛋（中国输入 LRY）：触发过一次就永久生效（本局 + 记录到 localStorage，重开局无需重输）
-  game._lryCheat = false;
-  try{ if(localStorage.getItem('ww1936_lryCheat')==='1') game._lryCheat = true; }catch(e){}
+  game._lryCheat = false; // 🥚 彩蛋（中国输入 LRY）：仅本局生效，不持久化
   game.stats = {byCountry:{}};
   for(let cid in COUNTRY_DEFS){
     game.stats.byCountry[cid] = {kills:0, losses:0, provTaken:0, unitsLost:0, nukesDropped:0};
@@ -9378,7 +9376,6 @@ function doLoadFromSlot(slot){
     game.factionOverride = save.factionOverride || {};
     game.militaryAccess = save.militaryAccess || {};
     game.trainingQueue = (save.trainingQueue||[]).map(q=>({...q}));
-    game._lryCheat = !!save.lryCheat;
     game.stats = save.stats || {byCountry:{}};
     if(!game.stats.byCountry){
       game.stats.byCountry = {};
@@ -9543,7 +9540,6 @@ function buildSaveData(){
     factionOverride: game.factionOverride || {},
     militaryAccess: game.militaryAccess || {},
     trainingQueue: (game.trainingQueue||[]).map(q=>({provId:q.provId, type:q.type, country:q.country, readyAt:q.readyAt, totalMs:q.totalMs})),
-    lryCheat: !!game._lryCheat,
     stats: game.stats || {byCountry:{}},
     puppets: collectPuppetMap(), // 傀儡关系快照（含国名"XX属XX"状态）
     localRegimes: collectLocalRegimes(), // 占领区扶植的地方政权（_localRegime 定义，读档需重建）
@@ -10535,7 +10531,6 @@ function mpApplySnapshot(save){
     game.factionOverride = save.factionOverride || {};
     game.militaryAccess = save.militaryAccess || {};
     game.trainingQueue = (save.trainingQueue||[]).map(q=>({...q}));
-    game._lryCheat = !!save.lryCheat;
     game.stats = save.stats || {byCountry:{}};
     unitNextId = save.unitNextId || unitNextId;
     firedEvents = new Set(save.firedEvents || []);
@@ -10892,7 +10887,6 @@ function initLRYCheat(){
     buf = '';
     if(game.player==='china' && !game._lryCheat){
       game._lryCheat = true;
-      try{ localStorage.setItem('ww1936_lryCheat','1'); }catch(e){}
       let c = countries.china;
       if(c){
         c.manpowerPool = Math.max(c.manpowerPool||0, 9999999);
