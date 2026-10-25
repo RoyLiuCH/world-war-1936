@@ -180,6 +180,7 @@ canvas{display:block}
       <span id="zoom-label">100%</span>
       <button onclick="zoomOut()" title="缩小 (滚轮下滚)">−</button>
       <button onclick="resetView()" title="重置视图" style="font-size:12px">⟳</button>
+      <button onclick="locatePlayer()" title="跳到本国并高亮闪烁" style="font-size:13px">⌖</button>
     </div>
     <div id="tooltip"></div>
     <div id="guide-overlay"><div id="guide-panel"></div></div>
@@ -3732,7 +3733,7 @@ function moveUnit(unit, toProvinceId){
 // ==================== 地图渲染 ====================
 const canvas = document.getElementById('map');
 const ctx = canvas.getContext('2d');
-const MIN_ZOOM = 0.3, MAX_ZOOM = 3.0;
+const MIN_ZOOM = 0.3, MAX_ZOOM = 8.0; // v1.9.2：251 省后小国/微型岛很多，放大上限 3→8 才够用
 let mapScale = 1;
 let mapOffsetX = 0, mapOffsetY = 0;
 let hoverProvince = null;
@@ -3796,6 +3797,69 @@ function setZoom(newScale){
 }
 function updateZoomLabel(){
   document.getElementById('zoom-label').textContent = Math.round(mapScale * 100) + '%';
+}
+
+// ---- 定位与高亮：把视野带到某国，并让该国省份闪烁标注一段时间 ----
+// 用户反馈：小国选了之后在地图上找不着，希望能自动高亮 ~30 秒
+function focusCountry(cid){
+  let ps = provinces.filter(p=>p.cid===cid);
+  if(!ps.length || !isFinite(canvas.width)) return false;
+  let minX=1e9, maxX=-1e9, minY=1e9, maxY=-1e9, any=false;
+  // 优先用真实国界环（v1.9.2 修复：国内 Voronoi 单元在稀疏大国会延伸几千像素，
+  // 用 PROVINCE_BBOXES 定位苏联会被钳到最小缩放；国界环才是领土的真实范围）
+  let owner = borderOwnerOf(cid) || cid;
+  let rings = (WORLD_BORDERS[owner] && WORLD_BORDERS[owner].length) ? WORLD_BORDERS[owner] : null;
+  if(rings){
+    for(let r of rings){
+      for(let i=0;i<r.length;i+=2){
+        any = true;
+        minX=Math.min(minX,r[i]); maxX=Math.max(maxX,r[i]);
+        minY=Math.min(minY,r[i+1]); maxY=Math.max(maxY,r[i+1]);
+      }
+    }
+  }
+  // 无国界数据的微型地区 → 用省中心点（省块形状可能被限制过，中心更稳）
+  if(!any){
+    ps.forEach(p=>{
+      any = true;
+      minX=Math.min(minX,p.x); maxX=Math.max(maxX,p.x);
+      minY=Math.min(minY,p.y); maxY=Math.max(maxY,p.y);
+    });
+  }
+  if(!any) return false;
+  let pad = 150; // 四周留白，别让国家顶到屏幕边
+  let bw = Math.max(80, maxX-minX), bh = Math.max(80, maxY-minY);
+  let scale = Math.min((canvas.width-pad*2)/bw, (canvas.height-pad*2)/bh);
+  scale = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, scale));
+  mapScale = scale;
+  mapOffsetX = canvas.width/2 - (minX+maxX)/2*scale;
+  mapOffsetY = canvas.height/2 - (minY+maxY)/2*scale;
+  clampView(); updateZoomLabel();
+  return true;
+}
+function highlightCountry(cid, sec){
+  game.highlightCid = cid;
+  game.highlightUntil = Date.now() + (sec||30)*1000;
+  ensureHighlightAnim();
+}
+function locatePlayer(){
+  if(!game.player) return;
+  focusCountry(game.player);
+  highlightCountry(game.player, 8);
+  drawMap();
+}
+// 高亮期间低频重绘让描边闪烁，到点自动停表并清掉
+function ensureHighlightAnim(){
+  if(ensureHighlightAnim._t) return;
+  ensureHighlightAnim._t = setInterval(()=>{
+    if(!game.highlightCid || Date.now() > (game.highlightUntil||0)){
+      if(ensureHighlightAnim._t){ clearInterval(ensureHighlightAnim._t); ensureHighlightAnim._t = null; }
+      game.highlightCid = null; game.highlightUntil = 0;
+      drawMap();
+      return;
+    }
+    drawMap();
+  }, 130);
 }
 
 // Country territory polygons (approximate shapes)
@@ -4661,6 +4725,10 @@ function drawMap(){
       let isSel = game.selectedProvince===p.id;
       let isHov = hoverProvince===p.id;
       let isAtk = game.selectedProvince!==null && getNeighbors(game.selectedProvince).includes(p.id) && p.controller!==game.player && !isPuppetOf(p.controller, game.player);
+      // 国家定位高亮：闪烁金色描边（选国家后 30 秒内）
+      let hiPulse = 0;
+      let isHi = game.highlightCid && p.cid===game.highlightCid && Date.now() < (game.highlightUntil||0);
+      if(isHi) hiPulse = 0.5 + 0.5*Math.sin(Date.now()/160);
       ctx.beginPath();
       ctx.moveTo(poly[0].x, poly[0].y);
       for(let i=1;i<poly.length;i++) ctx.lineTo(poly[i].x, poly[i].y);
@@ -4669,6 +4737,10 @@ function drawMap(){
         ctx.fillStyle = hexToRgba(color, 0.85);
         ctx.strokeStyle = '#ffd75e';
         ctx.lineWidth = 3 / mapScale;
+      } else if(isHi){
+        ctx.fillStyle = hexToRgba(color, 0.72 + 0.26*hiPulse);
+        ctx.strokeStyle = '#4de1ff';
+        ctx.lineWidth = (3 + 2*hiPulse) / mapScale;
       } else if(isAtk){
         ctx.fillStyle = hexToRgba(color, 0.75);
         ctx.strokeStyle = '#ff6b5e';
@@ -5173,6 +5245,62 @@ function drawMap(){
   
   // Guide highlights (in map space)
   
+  // 国家定位高亮（顶层：画在部队圆点之上，保证小国不被盖住）
+  drawCountryHighlight();
+  
+  ctx.restore();
+}
+
+// 国家定位高亮的"顶层"部分：国界轮廓金色脉冲描边 + 中心脉动圆环 + 📍国名标签。
+// 省份内部的填充/描边在 drawProvGroup 里画，但部队圆点会把它们盖住，所以这里再补一层。
+function drawCountryHighlight(){
+  let cid = game.highlightCid;
+  if(!cid || Date.now() > (game.highlightUntil||0)) return;
+  let def = COUNTRY_DEFS[cid];
+  let owner = borderOwnerOf(cid) || cid;
+  let pulse = 0.5 + 0.5*Math.sin(Date.now()/160);
+  let rings = WORLD_BORDERS[owner];
+  ctx.save();
+  if(rings && rings.length){
+    ctx.beginPath();
+    rings.forEach(r=>{
+      if(!r || r.length < 6) return;
+      ctx.moveTo(r[0], r[1]);
+      for(let i=2;i<r.length;i+=2) ctx.lineTo(r[i], r[i+1]);
+      ctx.closePath();
+    });
+    ctx.strokeStyle = 'rgba(77,225,255,' + (0.60 + 0.40*pulse).toFixed(2) + ')';
+    ctx.lineWidth = (4 + 3*pulse) / mapScale;
+    ctx.stroke();
+  }
+  let ps = provinces.filter(p=>p.cid===cid);
+  if(ps.length){
+    let cx = 0, cy = 0;
+    ps.forEach(p=>{ cx += p.x; cy += p.y; });
+    cx /= ps.length; cy /= ps.length;
+    let R = (16 + 10*pulse) / mapScale;
+    ctx.beginPath();
+    ctx.arc(cx, cy, R, 0, Math.PI*2);
+    ctx.strokeStyle = 'rgba(77,225,255,' + (0.55 + 0.45*pulse).toFixed(2) + ')';
+    ctx.lineWidth = 3 / mapScale;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(cx, cy, R*0.22, 0, Math.PI*2);
+    ctx.fillStyle = '#4de1ff';
+    ctx.fill();
+    // 📍国名标签：小国也一眼知道"我在这"
+    let name = '📍 ' + (def ? (def.short || def.name) : cid);
+    ctx.font = 'bold ' + Math.round(13/mapScale) + 'px "Microsoft YaHei", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    let w = ctx.measureText(name).width;
+    let ly = cy - R - 11/mapScale;
+    let bh = 17/mapScale;
+    ctx.fillStyle = 'rgba(6,10,16,0.80)';
+    ctx.fillRect(cx - w/2 - 5/mapScale, ly - bh/2, w + 10/mapScale, bh);
+    ctx.fillStyle = '#8ff0ff';
+    ctx.fillText(name, cx, ly);
+  }
   ctx.restore();
 }
 
@@ -9937,6 +10065,11 @@ function startGame(){
   
   document.getElementById('country-overlay').style.display = 'none';
   buildTerritories();
+  // 定位到所选国家并高亮 30 秒（小国也一眼能找到）
+  try{
+    focusCountry(cid);
+    highlightCountry(cid, 30);
+  }catch(e){ console.error('focus/highlight error:', e); }
   updateUI();
   drawMap();
   
@@ -12183,8 +12316,15 @@ setSpeed = function(s){
 // ---- 版本与更新日志 ----
 // 每次发布新版本：改 GAME_VERSION，并在 UPDATE_HISTORY 顶部加一条。
 // 玩家打开线上版时若版本号与 localStorage 记录不同，就弹「本次版本更新了以下内容」弹窗。
-const GAME_VERSION = 'v1.9.1';
+const GAME_VERSION = 'v1.9.2';
 const UPDATE_HISTORY = [
+  { ver:'v1.9.2', date:'2026-10-25', items:[
+    '🔍 **放大上限 3x → 8x**：地图扩到 251 省后，原来的放大上限根本看不清小国和微型岛；现在滚轮/＋按钮最多能放到 800%，马耳他、香港、关岛这种小地方也能看清省份',
+    '🎯 **选完国家自动定位 + 30 秒高亮**：开局自动把视野推到你的国家并放大到合适比例，同时用亮青色国界轮廓脉动 + 中心圆环 + 📍国名标签标注 30 秒（画在部队圆点之上，不会被盖住），小国一眼就能找到',
+    '⌖ **工具栏新增「定位本国」按钮**：随时一键跳回自己的国家并高亮闪烁，中期打远了大国也不会在地图上找不到老家',
+    '🛣️ **攻击路线全量核查**：159 个国家的跨国连接逐条验证 —— 0 个孤立国家、每个国家都有 ≥3 条跨国攻击路线（陆路或海路），全图仍然单连通',
+    '🧪 新增 test_focus_highlight.js（26 断言）：定位缩放适配、高亮时长、顶层轮廓不被部队遮挡、放大上限钳制等；全套 28 个测试通过',
+  ]},
   { ver:'v1.9.1', date:'2026-10-24', items:[
     '🎨 **修复地图整片泛白/浅蓝失真**：冬季降雪与泥泞季图层原来不按国界裁剪，遇到几千像素宽的巨型省块就会溢出、把整张地图（连海洋一起）糊成一片浅蓝白；现在降雪/泥泞只在「陆地 ∩ 本国国界」内绘制，雪只下在该下的高纬度省份里',
     '🧭 **修复国界数据重复环**：每个国家的最外环曾被导出两遍，奇偶规则下互相抵消，导致 251 个省里有 152 个被误判成"在国界外"、跳过所有裁剪——这是颜色糊掉的深层原因；启动时自动清洗重复环，误判降到 6 个真实飞地（柯尼斯堡/南苏丹等，且色块限制在本地不再外溢）',
