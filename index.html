@@ -1195,6 +1195,43 @@ const PROVINCE_DEFS = [
 [248,'uae','特鲁西尔阿曼',846,240,'plains',1,1,0,0,2,2],
 [249,'faeroe','法罗',632,114,'plains',1,0,0,0,0,1],
 [250,'aland','奥兰',717,108,'plains',1,0,0,0,0,1],
+// ---- v1.9.3 城市细化（35 个新省，ID 追加在末尾保持旧存档稳定） ----
+// 坐标由统一投影生成：x = 786 + 3.6*(lon-37.6)，y = 124 + 3.605*(55.75-lat)
+[251,'china','成都',1025,214,'hills',0,1,1,1,0,4],
+[252,'china','昆明',1021,224,'mountain',0,1,0,0,0,3],
+[253,'china','兰州',1024,191,'plains',0,1,0,0,0,2],
+[254,'china','长沙',1056,210,'plains',0,1,0,0,1,3],
+[255,'china','济南',1071,190,'plains',0,1,1,1,0,2],
+[256,'china','南宁',1041,243,'hills',0,1,0,0,0,2],
+[257,'manchukuo','奉天',1094,175,'plains',0,1,1,1,0,3],
+[258,'ussr','哈尔科夫',758,135,'urban',0,1,1,1,0,3],
+[259,'ussr','罗斯托夫',771,145,'plains',0,1,1,0,0,3],
+[260,'ussr','敖德萨',738,148,'plains',0,1,0,0,0,2],
+[261,'ussr','喀山',804,124,'plains',0,1,0,0,0,3],
+[262,'ussr','阿尔汉格尔斯克',773,86,'hills',0,1,0,0,0,2],
+[263,'ussr','海参崴',1004,157,'urban',0,1,0,0,0,2],
+[264,'usa','底特律',352,172,'urban',0,2,1,1,0,3],
+[265,'usa','波士顿',392,172,'urban',0,1,0,0,0,2],
+[266,'usa','丹佛',269,172,'hills',0,1,0,0,0,2],
+[267,'usa','休斯顿',263,209,'plains',0,1,0,1,1,3],
+[268,'usa','西雅图',225,156,'plains',0,1,0,0,0,2],
+[269,'japan','名古屋',1140,189,'urban',0,2,1,1,0,3],
+[270,'japan','仙台',1153,178,'plains',0,1,0,0,0,2],
+[271,'japan','鹿儿岛',1116,202,'plains',0,1,0,0,0,2],
+[272,'uk','爱丁堡',635,114,'hills',0,1,0,0,0,2],
+[273,'uk','曼彻斯特',643,132,'urban',0,1,1,0,0,2],
+[274,'france','南特',645,155,'plains',0,1,0,0,0,2],
+[275,'france','图卢兹',654,162,'plains',0,1,0,0,0,2],
+[276,'germany','德累斯顿',699,141,'urban',0,1,1,1,0,2],
+[277,'germany','斯图加特',682,150,'hills',0,1,1,0,0,2],
+[278,'italy','威尼斯',694,152,'plains',0,1,0,0,0,2],
+[279,'italy','热那亚',682,156,'hills',0,1,0,0,0,2],
+[280,'poland','但泽',717,126,'plains',0,1,0,0,0,2],
+[281,'turkey','埃尔祖鲁姆',770,171,'hills',0,1,0,0,0,2],
+[282,'india','加尔各答',945,235,'urban',0,2,1,1,0,4],
+[283,'canada','蒙特利尔',322,152,'urban',0,1,0,0,0,2],
+[284,'brazil','萨尔瓦多',469,302,'plains',0,1,0,0,0,2],
+[285,'australia','珀斯',1162,440,'plains',0,1,0,0,0,2],
 ];
 
 // Province adjacency: province pairs that border each other
@@ -1850,6 +1887,37 @@ const ADJACENCY = [
 [228,230],
 [229,231],
 [230,231],
+// ---- v1.9.3 城市细化：新省份邻接（全部同国内部边，跨国边界保持原样） ----
+// 中国内地
+[251,37],[251,253],[252,37],[253,40],[254,39],[254,38],[254,34],[255,35],[255,36],[256,38],[256,37],
+// 满洲国（奉天）
+[257,92],[257,93],
+// 苏联
+[258,24],[258,259],[259,27],[259,23],[260,24],[261,21],[261,23],[262,21],[262,22],[263,117],
+// 美国
+[264,43],[264,42],[265,42],[265,41],[266,44],[266,43],[267,44],[268,45],
+// 日本
+[269,30],[269,29],[270,29],[270,32],[271,31],[271,33],
+// 英国
+[272,9],[273,7],[273,8],
+// 法国
+[274,13],[274,10],[275,13],[275,12],[275,11],
+// 德国
+[276,0],[276,2],[277,2],[277,5],
+// 意大利
+[278,17],[278,16],[279,19],[279,17],
+// 波兰（但泽走廊）
+[280,46],[280,48],
+// 土耳其
+[281,56],
+// 英属印度（加尔各答）
+[282,80],[282,122],
+// 加拿大
+[283,59],[283,60],
+// 巴西
+[284,88],
+// 澳大利亚
+[285,84],
 ];
 
 // Sea routes — cross-ocean adjacency requiring naval capability
@@ -2643,12 +2711,12 @@ function grantStartingNavies(){
 const STARTING_ARMY = {
   // ---- 陆军强国 ----
   germany:        {infantry:8, armor:1, motorized:1},
-  ussr:           {infantry:10, armor:2},
+  ussr:           {infantry:13, armor:2},   // +3：v1.9.3 苏联扩到 18 省，按「每省至少 1 部队」补齐
   france:         {infantry:7, armor:1, motorized:1},
   japan:          {infantry:7, armor:1},
   italy:          {infantry:6, motorized:1},
   uk:             {infantry:4, motorized:1},
-  usa:            {infantry:4, motorized:1},
+  usa:            {infantry:7, motorized:1},   // +3：11 省对齐（含海外省驻军）
   china:          {infantry:14, garrison:2},   // 人多装备差，用数量体现人海
   poland:         {infantry:6, garrison:1},
   // ---- 中等国家 ----
@@ -2667,7 +2735,7 @@ const STARTING_ARMY = {
   austria:        {infantry:2, garrison:1},
   switzerland:    {infantry:2, garrison:2},    // 全民皆兵的山地要塞
   brazil:         {infantry:3, garrison:1},
-  india:          {infantry:4, garrison:1},    // 英属印度陆军规模庞大
+  india:          {infantry:6, garrison:1},    // 英属印度陆军规模庞大（7 省对齐）
   // ---- 小国 / 自治领 ----
   portugal:       {infantry:1, garrison:1},
   denmark:        {infantry:1, garrison:1},
@@ -4348,7 +4416,7 @@ function drawOcean(){
   for(let i=0;i<950;i++){
     let x = rnd()*mapWidth, y = rnd()*mapHeight;
     let a = 0.03 + rnd()*0.05;
-    let r = 0.6 + rnd()*1.8;
+    let r = (0.6 + rnd()*1.8) / mapScale;   // 波浪亮纹同样折算，否则 8x 下变成 27px 大斑点
     ctx.beginPath();
     ctx.arc(x, y, r, 0, Math.PI*2);
     ctx.fillStyle = 'rgba(120,175,240,' + a.toFixed(3) + ')';
@@ -4358,7 +4426,7 @@ function drawOcean(){
   for(let i=0;i<400;i++){
     let x = rnd()*mapWidth, y = rnd()*mapHeight;
     let a = 0.04 + rnd()*0.06;
-    let r = 1 + rnd()*3;
+    let r = (1 + rnd()*3) / mapScale;
     ctx.beginPath();
     ctx.arc(x, y, r, 0, Math.PI*2);
     ctx.fillStyle = 'rgba(2,8,18,' + a.toFixed(3) + ')';
@@ -4900,9 +4968,10 @@ function drawMap(){
   }
   
   // ---- 城市标记（小圆点 + 首都星标）----
+  // 尺寸按缩放折算（/mapScale）：保持屏幕上的大小恒定，否则高倍放大下圆点会变成巨型圆
   provinces.forEach(p=>{
     let color = COUNTRY_DEFS[p.controller]?COUNTRY_DEFS[p.controller].color:'#888';
-    let radius = p.capital ? 5.5 : 4;
+    let radius = (p.capital ? 5.5 : 4) / mapScale;
     let isSelected = game.selectedProvince===p.id;
     let isHovered = hoverProvince===p.id;
     let isAttackable = game.selectedProvince!==null && getNeighbors(game.selectedProvince).includes(p.id) && p.controller!==game.player && !isPuppetOf(p.controller, game.player);
@@ -4910,7 +4979,7 @@ function drawMap(){
     // 城市光晕（选中/悬停/可攻击）
     if(isSelected || isHovered || isAttackable){
       ctx.beginPath();
-      ctx.arc(p.x, p.y, radius+5, 0, Math.PI*2);
+      ctx.arc(p.x, p.y, radius + 5/mapScale, 0, Math.PI*2);
       ctx.fillStyle = isSelected?'rgba(255,215,94,0.35)':isAttackable?'rgba(255,107,94,0.35)':'rgba(255,255,255,0.2)';
       ctx.fill();
     }
@@ -4929,7 +4998,7 @@ function drawMap(){
       ctx.fillStyle = '#ffd75e';
       ctx.font = 'bold '+(10/mapScale)+'px sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText('★', p.x, p.y-9);
+      ctx.fillText('★', p.x, p.y-9/mapScale);
     }
     
     let myUnitCount = (game.player && p.controller===game.player) ? (unitCountByProv[p.id]||0) : 0;
@@ -4938,8 +5007,8 @@ function drawMap(){
     if(myUnitCount>0 || enemyUnitCount>0){
       ctx.font = 'bold '+(9/mapScale)+'px sans-serif';
       ctx.textAlign = 'center';
-      if(myUnitCount>0){ ctx.fillStyle = '#fff'; ctx.fillText(myUnitCount, p.x+11, p.y-11); }
-      if(enemyUnitCount>0){ ctx.fillStyle = '#ff7b72'; ctx.fillText(enemyUnitCount, p.x+11, p.y+3); }
+      if(myUnitCount>0){ ctx.fillStyle = '#fff'; ctx.fillText(myUnitCount, p.x+11/mapScale, p.y-11/mapScale); }
+      if(enemyUnitCount>0){ ctx.fillStyle = '#ff7b72'; ctx.fillText(enemyUnitCount, p.x+11/mapScale, p.y+3/mapScale); }
     }
     
     // 悬停/选中显示城市名
@@ -4947,7 +5016,7 @@ function drawMap(){
       ctx.fillStyle = '#fff';
       ctx.font = (11/mapScale)+'px Microsoft YaHei';
       ctx.textAlign = 'center';
-      ctx.fillText(p.name, p.x, p.y+18);
+      ctx.fillText(p.name, p.x, p.y+18/mapScale);
     }
   });
   
@@ -5002,7 +5071,7 @@ function drawMap(){
       ctx.fillStyle = 'rgba(255,255,255,0.7)';
       ctx.font = (6/mapScale)+'px sans-serif';
       ctx.textAlign = 'center';
-      let sx = p.x - 8, sy = p.y - 8;
+      let sx = p.x - 8/mapScale, sy = p.y - 8/mapScale;
       ctx.fillText('❄', sx, sy);
     });
     // 漂浮雪花背景粒子
@@ -5011,7 +5080,7 @@ function drawMap(){
       let fx = (game.tick*2 + i*97) % (mapWidth+40) - 20;
       let fy = (game.tick*3 + i*131) % (mapHeight+40) - 20;
       ctx.beginPath();
-      ctx.arc(fx, fy, 1.5, 0, Math.PI*2);
+      ctx.arc(fx, fy, 1.5/mapScale, 0, Math.PI*2);
       ctx.fillStyle = 'rgba(255,255,255,0.35)';
       ctx.fill();
     }
@@ -5071,12 +5140,12 @@ function drawMap(){
     
     // Glow
     ctx.beginPath();
-    ctx.arc(mx, my, 6, 0, Math.PI*2);
+    ctx.arc(mx, my, 6/mapScale, 0, Math.PI*2);
     ctx.fillStyle = hexToRgbaA(dotColor, 0.3);
     ctx.fill();
     // Core dot
     ctx.beginPath();
-    ctx.arc(mx, my, 3.5, 0, Math.PI*2);
+    ctx.arc(mx, my, 3.5/mapScale, 0, Math.PI*2);
     ctx.fillStyle = dotColor;
     ctx.fill();
     ctx.strokeStyle = '#fff';
@@ -5087,7 +5156,7 @@ function drawMap(){
       ctx.font = 'bold '+(10/mapScale)+'px sans-serif';
       ctx.fillStyle = '#ff4444';
       ctx.textAlign = 'center';
-      ctx.fillText('⚔', mx, my-8);
+      ctx.fillText('⚔', mx, my-8/mapScale);
     }
   });
   
@@ -5101,7 +5170,7 @@ function drawMap(){
     ctx.save();
     if(anim.type==='explosion'){
       // Expanding ring
-      let r = anim.radius * (0.5 + progress*2);
+      let r = anim.radius * (0.5 + progress*2) / mapScale;
       ctx.beginPath();
       ctx.arc(anim.x, anim.y, r, 0, Math.PI*2);
       ctx.fillStyle = hexToRgbaA(anim.color, alpha*0.4);
@@ -5117,7 +5186,7 @@ function drawMap(){
       ctx.fill();
     }
     else if(anim.type==='smoke'){
-      let r = anim.radius * (0.3 + progress*1.5);
+      let r = anim.radius * (0.3 + progress*1.5) / mapScale;
       ctx.beginPath();
       ctx.arc(anim.x, anim.y, r, 0, Math.PI*2);
       ctx.fillStyle = hexToRgbaA(anim.color, alpha*0.25);
@@ -5125,7 +5194,7 @@ function drawMap(){
     }
     else if(anim.type==='tracer'){
       // Flashing ring around fighting province
-      let r = 18 + Math.sin(progress*Math.PI*4)*6;
+      let r = (18 + Math.sin(progress*Math.PI*4)*6) / mapScale;
       ctx.beginPath();
       ctx.arc(anim.x, anim.y, r, 0, Math.PI*2);
       ctx.strokeStyle = hexToRgbaA('#ff4444', alpha*0.7);
@@ -5139,12 +5208,12 @@ function drawMap(){
         ctx.font = 'bold '+(14/mapScale)+'px sans-serif';
         ctx.fillStyle = hexToRgbaA('#fff', alpha);
         ctx.textAlign = 'center';
-        ctx.fillText('⚔️', anim.x, anim.y-22);
+        ctx.fillText('⚔️', anim.x, anim.y-22/mapScale);
       }
     }
     else if(anim.type==='capture'){
       // Expanding ring that fades
-      let r = anim.radius * (0.2 + progress*2);
+      let r = anim.radius * (0.2 + progress*2) / mapScale;
       ctx.beginPath();
       ctx.arc(anim.x, anim.y, r, 0, Math.PI*2);
       ctx.strokeStyle = hexToRgbaA(anim.color, alpha*0.8);
@@ -5160,7 +5229,7 @@ function drawMap(){
       let cx = ox + (anim.x - ox)*progress;
       let cy = oy + (anim.y - oy)*progress;
       ctx.beginPath();
-      ctx.arc(cx, cy, 2.5*(1-progress), 0, Math.PI*2);
+      ctx.arc(cx, cy, 2.5*(1-progress)/mapScale, 0, Math.PI*2);
       ctx.fillStyle = hexToRgbaA('#ffd700', alpha);
       ctx.fill();
     }
@@ -5170,13 +5239,13 @@ function drawMap(){
       let effectiveProgress = Math.max(0, Math.min(1, progress*60/(60-delay)));
       if(effectiveProgress<0.1){
         // Whiteout flash
-        let r = anim.radius * effectiveProgress/0.1;
+        let r = anim.radius * effectiveProgress/0.1 / mapScale;
         ctx.beginPath(); ctx.arc(anim.x, anim.y, r, 0, Math.PI*2);
         ctx.fillStyle = hexToRgbaA('#ffffff', 0.9);
         ctx.fill();
       } else if(effectiveProgress<0.4){
         // Fireball
-        let r = anim.radius * (0.5 + effectiveProgress*1.5);
+        let r = anim.radius * (0.5 + effectiveProgress*1.5) / mapScale;
         let grad = ctx.createRadialGradient(anim.x, anim.y, r*0.1, anim.x, anim.y, r);
         grad.addColorStop(0, hexToRgbaA('#ffffff', 0.8*(1-effectiveProgress/0.4)));
         grad.addColorStop(0.3, hexToRgbaA('#ff6b35', 0.6*(1-effectiveProgress/0.4)));
@@ -5191,18 +5260,18 @@ function drawMap(){
       if(progress<0.15){ /* delay before cloud */ }
       else{
         let cp = (progress-0.15)/0.85;
-        let riseY = anim.y - cp*80;
+        let riseY = anim.y - cp*80/mapScale;
         // Stem
         ctx.strokeStyle = hexToRgbaA('#8b7355', 0.5*(1-cp));
         ctx.lineWidth = 8/mapScale;
-        ctx.beginPath(); ctx.moveTo(anim.x, anim.y); ctx.lineTo(anim.x, riseY-20);
+        ctx.beginPath(); ctx.moveTo(anim.x, anim.y); ctx.lineTo(anim.x, riseY-20/mapScale);
         ctx.stroke();
         // Cap
-        let capR = anim.radius * 0.3 * (0.5 + cp*1.5);
-        ctx.beginPath(); ctx.arc(anim.x, riseY-20, capR, 0, Math.PI*2);
+        let capR = anim.radius * 0.3 * (0.5 + cp*1.5) / mapScale;
+        ctx.beginPath(); ctx.arc(anim.x, riseY-20/mapScale, capR, 0, Math.PI*2);
         ctx.fillStyle = hexToRgbaA('#5c4033', 0.4*(1-cp));
         ctx.fill();
-        ctx.beginPath(); ctx.arc(anim.x, riseY-20, capR*0.7, 0, Math.PI*2);
+        ctx.beginPath(); ctx.arc(anim.x, riseY-20/mapScale, capR*0.7, 0, Math.PI*2);
         ctx.fillStyle = hexToRgbaA('#8b7355', 0.3*(1-cp));
         ctx.fill();
       }
@@ -5211,7 +5280,7 @@ function drawMap(){
       // Expanding shockwave ring
       let delay = anim.delay || 0;
       let effectiveProgress = anim.frame<delay ? 0 : (anim.frame-delay)/(anim.maxFrames-delay);
-      let r = anim.radius * (0.3 + effectiveProgress*2);
+      let r = anim.radius * (0.3 + effectiveProgress*2) / mapScale;
       ctx.beginPath(); ctx.arc(anim.x, anim.y, r, 0, Math.PI*2);
       ctx.strokeStyle = hexToRgbaA('#ff6b35', 0.5*(1-effectiveProgress));
       ctx.lineWidth = 4/mapScale;
@@ -5227,7 +5296,7 @@ function drawMap(){
       if(!areAtWar(game.player, p.controller)) return;
       let sx = p.x, sy = p.y;
       ctx.beginPath();
-      ctx.arc(sx, sy, 20, 0, Math.PI*2);
+      ctx.arc(sx, sy, 20/mapScale, 0, Math.PI*2);
       ctx.fillStyle = 'rgba(255,107,53,0.2)';
       ctx.fill();
       ctx.strokeStyle = 'rgba(255,107,53,0.8)';
@@ -5238,8 +5307,8 @@ function drawMap(){
       // Crosshair
       ctx.strokeStyle = '#ff6b35';
       ctx.lineWidth = 1.5/mapScale;
-      ctx.beginPath(); ctx.moveTo(sx-12,sy); ctx.lineTo(sx+12,sy); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(sx,sy-12); ctx.lineTo(sx,sy+12); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(sx-12/mapScale,sy); ctx.lineTo(sx+12/mapScale,sy); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(sx,sy-12/mapScale); ctx.lineTo(sx,sy+12/mapScale); ctx.stroke();
     });
   }
   
@@ -7903,17 +7972,58 @@ function aiAskAccessFromPlayer(){
 }
 
 // 弹窗：AI 请求玩家开放国境
+// ⚠️ 千万不要用 window.confirm —— 它在 gameTick 里同步阻塞主线程，Chrome 把对话框
+// 显示成标签页顶部的小气泡，玩家经常注意不到，表现就是"游戏假死/死机，时间不再推进"。
+// 这里改用游戏内覆盖层弹窗（与「同盟号召」同一套模式）：自动暂停 + 玩家点选后恢复。
 function showAccessRequestDialog(cid){
   let cd = COUNTRY_DEFS[cid];
   if(!cd) return;
-  let ok = window.confirm(
-    '🎫 军队通行请求\n\n'
-    + cd.short + ' 请求你的军队通行权（军事通行证）。\n\n'
-    + '同意后：' + cd.short + ' 的部队可以进入并驻停你的领土，也可借道你的领土向第三国行军——不会与你的部队交战。\n'
-    + '注意：这也意味着你的国境对其敞开。\n\n'
-    + '确定 = 同意 / 取消 = 拒绝'
-  );
-  if(ok){
+  if(game._accessDialogCid) return;          // 已经有一个在显示，别叠加
+  game._accessDialogCid = cid;
+  game._accessPrePaused = game.paused;
+  game.paused = true;                        // 等玩家决定期间冻结时间
+  if(typeof updateBottomBar === 'function') updateBottomBar();
+
+  let ov = document.getElementById('accessreq-overlay');
+  if(!ov){
+    ov = document.createElement('div');
+    ov.className = 'modal-overlay';
+    ov.id = 'accessreq-overlay';
+    ov.style.zIndex = '262';
+    document.body.appendChild(ov);
+  }
+  ov.style.display = 'flex';
+  ov.innerHTML =
+    '<div class="modal" style="max-width:460px;text-align:center">'
+    + '<h2 style="font-size:17px">🎫 军队通行请求</h2>'
+    + '<div style="background:#0d1117;border:1px solid #30363d;border-radius:8px;padding:18px 16px;margin:14px 0">'
+    +   '<div style="font-size:30px;margin-bottom:8px">'+(cd.flag||'🏳️')+'</div>'
+    +   '<div style="color:#c9d1d9;font-size:14px;line-height:1.7">'
+    +     '<b style="color:#f0c040">'+cd.short+'</b> 请求你的<b>军队通行权</b>'
+    +   '</div>'
+    +   '<div style="color:#8b949e;font-size:11px;margin-top:10px;line-height:1.6">'
+    +     '同意后：'+cd.short+' 的部队可以进入并驻停你的领土，<br>'
+    +     '也可借道你的领土向第三国行军 —— 不会与你的部队交战。<br>'
+    +     '<span style="color:#d29922">注意：这也意味着你的国境对其敞开。</span>'
+    +   '</div>'
+    + '</div>'
+    + '<div style="display:flex;gap:10px;justify-content:center">'
+    +   '<button class="btn btn-go" style="flex:1;margin-top:0" onclick="answerAccessRequest(true)">✅ 同意</button>'
+    +   '<button class="btn btn-skip" style="flex:1;margin-left:0;margin-top:0;color:#ff7b72;border-color:#5c2a2a" onclick="answerAccessRequest(false)">❌ 拒绝</button>'
+    + '</div>'
+    + '</div>';
+  SFX.click && SFX.click();
+}
+
+// 玩家在通行请求弹窗里做出选择
+function answerAccessRequest(accept){
+  let ov = document.getElementById('accessreq-overlay');
+  if(ov) ov.style.display = 'none';
+  let cid = game._accessDialogCid;
+  game._accessDialogCid = null;
+  if(!cid) return;
+  let cd = COUNTRY_DEFS[cid] || {short:cid};
+  if(accept){
     grantAccess(cid, game.player, ACCESS_DURATION_DAYS);
     let rel = (game.relations[cid] && game.relations[cid][game.player]) || 0;
     if(game.relations[cid]) game.relations[cid][game.player] = Math.min(100, rel + 10);
@@ -7923,6 +8033,9 @@ function showAccessRequestDialog(cid){
     if(game.relations[cid]) game.relations[cid][game.player] = Math.max(-80, rel - 8);
     addLog('❌','你拒绝了 '+cd.short+' 的军队通行请求');
   }
+  // 恢复玩家原来的暂停状态
+  if(!game._accessPrePaused) game.paused = false;
+  if(typeof updateBottomBar === 'function') updateBottomBar();
   updateUI();
 }
 
@@ -12316,8 +12429,14 @@ setSpeed = function(s){
 // ---- 版本与更新日志 ----
 // 每次发布新版本：改 GAME_VERSION，并在 UPDATE_HISTORY 顶部加一条。
 // 玩家打开线上版时若版本号与 localStorage 记录不同，就弹「本次版本更新了以下内容」弹窗。
-const GAME_VERSION = 'v1.9.2';
+const GAME_VERSION = 'v1.9.3';
 const UPDATE_HISTORY = [
+  { ver:'v1.9.3', date:'2026-11-01', items:[
+    '🏙️ **城市细化：新增 35 个省份**：中国（成都/昆明/兰州/长沙/济南/南宁）、苏联（哈尔科夫/罗斯托夫/敖德萨/喀山/阿尔汉格尔斯克/海参崴）、美国（底特律/波士顿/丹佛/休斯顿/西雅图）、日本（名古屋/仙台/鹿儿岛）、满洲国（奉天）、英法德意波（曼彻斯特/爱丁堡/南特/图卢兹/德累斯顿/斯图加特/威尼斯/热那亚/但泽）以及加尔各答/蒙特利尔/萨尔瓦多/珀斯/埃尔祖鲁姆 —— 主战国版图不再空旷，全部 286 省保持连通',
+    '🔵 **修复放大后圆圈变巨型**：城市圆点/部队圆点/交战环/占领火花/核弹蘑菇云/海浪斑点等所有图元半径统一按缩放折算，800% 放大下屏幕上的尺寸和 100% 一致，不再出现盖住半个省的大圆',
+    '🪟 **修复选科技后游戏假死**：AI 向你申请军队通行权时原来用的是浏览器原生 confirm 弹窗，会卡死整个游戏循环；现在换成游戏内弹出层（自动暂停游戏，点「同意/拒绝」后恢复），同盟号召弹窗同理',
+    '🧪 新增 test_no_blocking_dialog.js（30 断言）：主循环 200 tick 零阻塞弹窗、通行弹窗同意/拒绝行为、全图元 8x 缩放半径不变量等；全套测试通过',
+  ]},
   { ver:'v1.9.2', date:'2026-10-25', items:[
     '🔍 **放大上限 3x → 8x**：地图扩到 251 省后，原来的放大上限根本看不清小国和微型岛；现在滚轮/＋按钮最多能放到 800%，马耳他、香港、关岛这种小地方也能看清省份',
     '🎯 **选完国家自动定位 + 30 秒高亮**：开局自动把视野推到你的国家并放大到合适比例，同时用亮青色国界轮廓脉动 + 中心圆环 + 📍国名标签标注 30 秒（画在部队圆点之上，不会被盖住），小国一眼就能找到',
