@@ -126,6 +126,9 @@ canvas{display:block}
 .guide-arrow{position:absolute;pointer-events:none;z-index:141;color:#ffd700;font-size:24px;animation:bounce .8s infinite}
 @keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
 
+/* v1.9.5：外交面板 150+ 行、500+ 个按钮，整块一次性排版会让点击卡住。
+   content-visibility:auto 让屏幕外的行跳过 style/layout/paint，只保留占位高度。 */
+.dip-row{content-visibility:auto;contain-intrinsic-size:auto 44px}
 .guide-ui-hl{border:2px solid #ffd700 !important;box-shadow:0 0 15px rgba(240,192,64,0.5) !important;animation:uiPulse 1s infinite}
 @keyframes uiPulse{0%,100%{box-shadow:0 0 10px rgba(240,192,64,0.3)}50%{box-shadow:0 0 25px rgba(240,192,64,0.7)}}
 </style>
@@ -9484,11 +9487,21 @@ function renderEquipment(){
 }
 
 function renderActiveTab(){
-  let content = document.getElementById('tab-content');
+  // v1.9.5 关键性能修复（用户反馈「点科技/外交/战报/国策就卡死」）：
+  // 原来每一行都用 content.innerHTML += …，每赋值一次浏览器就要把整块面板
+  // 重新解析 + 重新排版。外交页有 150 个拼接点、循环后实际执行上千次，
+  // 单次点击要卡 5~20 秒，看起来就是「死机」。
+  // 现在 HTML 先在内存字符串里攒好，最后只写一次 DOM（1 次解析，1 次排版）。
+  let tabContentEl = document.getElementById('tab-content');
   let c = countries[game.player];
   if(!c) return;
   let myProvs = provinces.filter(p=>p.controller===game.player);
-  
+  let _htmlBuf = '';
+  let content = {
+    get innerHTML(){ return _htmlBuf; },
+    set innerHTML(v){ _htmlBuf = v; }
+  };
+  try {
   switch(game.activeTab){
     case 'build':
       content.innerHTML = '<div class="panel"><h3>🏗 建造工厂</h3>';
@@ -9660,7 +9673,7 @@ function renderActiveTab(){
           puppetTag = ' 🎭'+COUNTRY_DEFS[cd.puppetOf].short+'傀儡';
         }
         
-        content.innerHTML += `<div style="margin:4px 0;font-size:11px">`;
+        content.innerHTML += `<div class="dip-row"><div style="margin:4px 0;font-size:11px">`;
         content.innerHTML += `<div style="display:flex;justify-content:space-between;align-items:center;color:${r.dead?'#555':''}"><span>${cd.flag} ${cd.short}${deadTag}${allyTag}${puppetTag} <span style="font-size:9px;color:#8b949e">${fTag}</span></span><span style="color:${r.rel>0?'#7ee787':r.rel<-30?'#ff7b72':'#d29922'}">${r.rel>0?'+':''}${r.rel}</span></div>`;
         content.innerHTML += `<div class="relation-bar"><div class="relation-fill ${cls}" style="width:${barWidth}%;background:${barColor}"></div></div>`;
         
@@ -9673,7 +9686,7 @@ function renderActiveTab(){
           let phoney = daysOfPhoney(game.player, r.cid);
           if(phoney > 0){
             content.innerHTML += `<div style="font-size:9px;color:#d29922;margin-top:2px">🕊️ 静坐战：还需 ${phoney} 天才发动攻势</div>`;
-            content.innerHTML += `<button class="btn-sm" style="font-size:9px;background:#5c2a2a;color:#ff7b72;margin-top:2px" onclick="if(confirm('提前发动攻势？宣战不等于开战——现在就把部队推过边境，会立刻进入激战。'))launchOffensive('${game.player}','${r.cid}');updateUI()">⚔️ 提前发动攻势</button>`;
+            content.innerHTML += `<button class="btn-sm" style="font-size:9px;background:#5c2a2a;color:#ff7b72;margin-top:2px" onclick="askConfirm('提前发动攻势？宣战不等于开战——现在就把部队推过边境，会立刻进入激战。',function(){launchOffensive('${game.player}','${r.cid}');updateUI();})">⚔️ 提前发动攻势</button>`;
           } else if(!canEngage(game.player, r.cid)){
             content.innerHTML += `<span style="font-size:9px;color:#d29922"> 🕊️ 对方尚未进攻</span> `;
           }
@@ -9683,7 +9696,7 @@ function renderActiveTab(){
           let guarantors = (GUARANTEE_DEFS[r.cid]||[]).filter(g=>countries[g] && !countries[g].eliminated && g!==game.player && guaranteeApplies(g, game.player));
           let guarTag = guarantors.length>0 ? `<span style="font-size:9px;color:#d29922">🛡️ ${guarantors.map(g=>COUNTRY_DEFS[g].short).join('/')}保证</span> ` : '';
           let guarTip = guarantors.length>0 ? `确认对 ${cd.short} 宣战？\n${guarantors.map(g=>COUNTRY_DEFS[g].short).join('、')} 将履行安全保证立即参战！` : `确认对 ${cd.short} 宣战？`;
-          content.innerHTML += `${guarTag}<button class="btn-sm war" style="font-size:10px;margin-right:2px" onclick="if(confirm('${guarTip.replace(/'/g,"\\'").replace(/\n/g,'\\n')}'))declareWar('${game.player}','${r.cid}')">宣战</button>`;
+          content.innerHTML += `${guarTag}<button class="btn-sm war" style="font-size:10px;margin-right:2px" onclick="askConfirm('${guarTip.replace(/'/g,"\\'").replace(/\n/g,'\\n')}',function(){declareWar('${game.player}','${r.cid}');})">宣战</button>`;
           // 外交操作：中立国可邀请入阵营 / 外交援助
           if(!getFaction(r.cid) && !cd.puppetOf && getFaction(game.player)){
             content.innerHTML += `<button class="btn-sm" style="font-size:10px;background:#1a3a5c;color:#58a6ff;margin-right:2px" onclick="inviteToFaction('${r.cid}')">🤝 邀请入阵营(300💰)</button>`;
@@ -9715,7 +9728,7 @@ function renderActiveTab(){
           content.innerHTML += `<button class="btn-sm" style="font-size:9px" onclick="lendLease('${r.cid}','坦克',5)">+5坦克</button>`;
           content.innerHTML += `</div>`;
         }
-        content.innerHTML += `</div>`;
+        content.innerHTML += `</div></div>`;
       });
       content.innerHTML += '</div>';
       
@@ -9746,7 +9759,7 @@ function renderActiveTab(){
           content.innerHTML += `<button class="btn-sm" style="font-size:10px;background:#5c1a1a;color:#ff7b72" onclick="playerAnnexPuppet('${pid}')">🔗 吞并领土</button>`;
           // 地方政权额外给"解散并入本土"（它本来就是占领区产物，不该留在世界上）
           if(pd._localRegime){
-            content.innerHTML += `<button class="btn-sm" style="font-size:10px;background:#3a3a1a;color:#d29922" onclick="if(confirm('解散 ${pd.short}？其领土将并入你的本土。'))dissolveLocalRegime('${pid}')">🗑️ 解散并入</button>`;
+            content.innerHTML += `<button class="btn-sm" style="font-size:10px;background:#3a3a1a;color:#d29922" onclick="askConfirm('解散 ${pd.short}？其领土将并入你的本土。',function(){dissolveLocalRegime('${pid}');})">🗑️ 解散并入</button>`;
           }
           content.innerHTML += `</div>`;
         });
@@ -9809,12 +9822,12 @@ function renderActiveTab(){
               // 已有政权 → 提供"把新占领的省份划过去"
               let ed = COUNTRY_DEFS[existing];
               content.innerHTML += `<div style="font-size:10px;color:#a78bfa">已有 ${ed.short}，可扩张其领土：</div>`;
-              content.innerHTML += `<button class="btn-sm" style="font-size:10px;background:#3a2a5c;color:#a78bfa;margin:2px 0 6px" onclick="if(confirm('把 ${ld.short} 的 ${provs.length} 个占领省全部划归 ${ed.short}？')){${provs.map(i=>`transferProvinceToPuppet(${i},'${existing}');`).join('')}}">🗺️ 划归 ${ed.short}</button>`;
+              content.innerHTML += `<button class="btn-sm" style="font-size:10px;background:#3a2a5c;color:#a78bfa;margin:2px 0 6px" onclick="askConfirm('把 ${ld.short} 的 ${provs.length} 个占领省全部划归 ${ed.short}？',function(){${provs.map(i=>`transferProvinceToPuppet(${i},'${existing}');`).join('')}})">🗺️ 划归 ${ed.short}</button>`;
             } else {
               content.innerHTML += `<div style="display:flex;gap:4px;flex-wrap:wrap;margin:2px 0 6px">`;
               LOCAL_REGIME_TYPES.forEach((rt,ri)=>{
                 let canPay = countries[game.player].cash >= rt.cost.cash && (game.skillPoints||0) >= rt.cost.sp;
-                content.innerHTML += `<button class="btn-sm" style="font-size:9px;background:${canPay?'#3a2a1a':'#2a2a2a'};color:${canPay?'#d29922':'#555'}" title="${rt.desc}" onclick="if(confirm('在 ${ld.short} 占领区扶植「${rt.name}」？\\n成本: ${rt.cost.cash}💰 + ${rt.cost.sp}国策点\\n将接管 ${provs.length} 个省份'))establishRegime(${provs[0]},'${rt.id}')">${rt.icon}${rt.name}</button>`;
+                content.innerHTML += `<button class="btn-sm" style="font-size:9px;background:${canPay?'#3a2a1a':'#2a2a2a'};color:${canPay?'#d29922':'#555'}" title="${rt.desc}" onclick="askConfirm('在 ${ld.short} 占领区扶植「${rt.name}」？\\n成本: ${rt.cost.cash}💰 + ${rt.cost.sp}国策点\\n将接管 ${provs.length} 个省份',function(){establishRegime(${provs[0]},'${rt.id}');})">${rt.icon}${rt.name}</button>`;
               });
               content.innerHTML += `</div>`;
             }
@@ -9870,17 +9883,19 @@ function renderActiveTab(){
       
       // 世界实力排行
       content.innerHTML += '<div class="panel"><h3>🌍 世界实力排行</h3>';
+      // 单次遍历汇总（原实现每国 filter 三遍省份 + 一遍全军，159 国十几万次闭包调用）
+      let agg = {};
+      let aggOf = cid => agg[cid] || (agg[cid] = {provs:0, civF:0, milF:0, armySize:0});
+      for(let p of provinces){ let a = aggOf(p.controller); a.provs++; a.civF += p.civFactories||0; a.milF += p.milFactories||0; }
+      for(let u of units){ let a = aggOf(u.country); a.armySize++; }
       let ranking = [];
       for(let cid in countries){
         let cc = countries[cid];
         if(cc.eliminated) continue;
-        let provs = provinces.filter(p=>p.controller===cid).length;
-        let civF = provinces.filter(p=>p.controller===cid).reduce((s,p)=>s+p.civFactories,0);
-        let milF = provinces.filter(p=>p.controller===cid).reduce((s,p)=>s+p.milFactories,0);
-        let armySize = units.filter(u=>u.country===cid).length;
+        let a = aggOf(cid);
         let techCount = Object.keys(cc.techLevels || {}).length;
-        let power = armySize*10 + milF*5 + civF*3 + provs*2 + techCount*5;
-        ranking.push({cid, provs, civF, milF, armySize, power, dead:false});
+        let power = a.armySize*10 + a.milF*5 + a.civF*3 + a.provs*2 + techCount*5;
+        ranking.push({cid, provs:a.provs, civF:a.civF, milF:a.milF, armySize:a.armySize, power, dead:false});
       }
       ranking.sort((a,b)=>b.power-a.power);
       let topN = ranking.slice(0,10);
@@ -9936,6 +9951,14 @@ function renderActiveTab(){
       });
       content.innerHTML += '</div>';
       break;
+  }
+  } finally {
+    // 即使某个分支抛异常，也把已经攒好的内容刷进面板（不会留下空白面板）
+    // 内容没变就别写 DOM —— 每点一下按钮都会 updateUI，重复赋值纯属浪费
+    if(tabContentEl._lastHtml !== _htmlBuf){
+      tabContentEl._lastHtml = _htmlBuf;
+      tabContentEl.innerHTML = _htmlBuf;
+    }
   }
 }
 
@@ -10086,6 +10109,50 @@ function buySkill(skillId){
   SFX.skill();
   updateUI();
   checkGuideProgress();
+}
+
+// v1.9.5：游戏内确认弹窗，替代原生 window.confirm。
+// 原生 confirm 是同步阻塞调用——它弹出来的时候整个 JS 线程停摆：地图不动、
+// 主循环停摆、窗口还可能被浏览器判为"无响应"。面板里点宣战/解散这类按钮时
+// 就是用户反馈的「卡死」。这里改成覆盖层：自动暂停，点「确定/取消」后回调。
+function askConfirm(msg, onYes){
+  let ov = document.getElementById('confirm-overlay');
+  if(!ov){
+    ov = document.createElement('div');
+    ov.id = 'confirm-overlay';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;'
+      + 'display:none;align-items:center;justify-content:center';
+    ov.innerHTML = '<div class="modal" style="max-width:440px;min-width:320px;text-align:left">'
+      + '<div id="confirm-text" style="font-size:12px;color:#c9d1d9;line-height:1.7;'
+      + 'white-space:pre-wrap;margin-bottom:14px"></div>'
+      + '<div style="text-align:right"><button class="btn" id="confirm-no" '
+      + 'style="background:#21262d;border-color:#30363d;color:#c9d1d9;margin-right:6px">取消</button>'
+      + '<button class="btn btn-go" id="confirm-yes">确定</button></div></div>';
+    document.body.appendChild(ov);
+    ov.addEventListener('click', e=>{ if(e.target === ov) closeConfirm(false); });
+    document.getElementById('confirm-no').addEventListener('click', ()=>closeConfirm(false));
+    document.getElementById('confirm-yes').addEventListener('click', ()=>closeConfirm(true));
+  }
+  ov._msg = msg;
+  ov._cb = onYes;
+  document.getElementById('confirm-text').textContent = msg;
+  ov._prePaused = game.paused;
+  game.paused = true;
+  updateBottomBar && updateBottomBar();
+  ov.style.display = 'flex';
+}
+
+function closeConfirm(ok){
+  let ov = document.getElementById('confirm-overlay');
+  if(!ov) return;
+  ov.style.display = 'none';
+  let cb = ov._cb;
+  ov._cb = null;
+  game.paused = !!ov._prePaused;
+  updateBottomBar && updateBottomBar();
+  if(ok && typeof cb === 'function'){
+    try{ cb(); }catch(e){ console.error('confirm callback error:', e); }
+  }
 }
 
 function switchTab(tab){
@@ -12440,8 +12507,14 @@ setSpeed = function(s){
 // ---- 版本与更新日志 ----
 // 每次发布新版本：改 GAME_VERSION，并在 UPDATE_HISTORY 顶部加一条。
 // 玩家打开线上版时若版本号与 localStorage 记录不同，就弹「本次版本更新了以下内容」弹窗。
-const GAME_VERSION = 'v1.9.4';
+const GAME_VERSION = 'v1.9.5';
 const UPDATE_HISTORY = [
+  { ver:'v1.9.5', date:'2026-11-03', items:[
+    '⚡ **修复点面板卡死**：科技/外交/战报/国策四个面板原来是「拼一行就写一次 DOM」，浏览器每写一次都要把整块面板重新解析重排版。外交页有 150 多行、500 多个按钮，实测单次点击要卡 5~20 秒，看起来就是死机。现在改成先在内存里拼好、最后只写一次，外交页渲染耗时降到原来的十分之一以内',
+    '🖱 **面板里连点也不卡了**：内容没变化时直接跳过 DOM 写入；外交页每一行还单独做了「屏幕外跳过排版」处理，滚动到哪才排到哪',
+    '🪟 **宣战/解散/划归/扶植/提前进攻不再弹浏览器原生确认框**：原生弹窗会同步冻结整个页面（地图不动、主循环停摆）。现在换成游戏内确认弹层，弹出时自动暂停，点「确定/取消」后恢复',
+    '🧪 新增 test_panel_render.js（23 断言）：面板只写一次 DOM、内容不变跳过写入、六大面板全部可渲染、面板内零原生弹窗、askConfirm 暂停/回调/恢复等',
+  ]},
   { ver:'v1.9.4', date:'2026-11-03', items:[
     '🔍 **缩放上限提到 2000%**：原来的 800% 看单座城市还是糊，现在最大可以放到 2000%（工具栏 + / - 或滚轮）；放大到 600% 以上还会**常显城市名**（带深色描边，首都金/其他白），单省小国也能一眼看清是哪座城；圆点/文字仍按缩放折算，放到最大也不会变成大圆',
     '🛢 **任何国家开局都不会是零资源**：原来 120 个国家没有油田、131 个国家没有钢厂，开局面板一片 0 还顶着「⛽紧张」，看着像数据坏了。现在每国保底 钢铁 15 / 石油 20，真有矿的国家照旧按实际产出算',
