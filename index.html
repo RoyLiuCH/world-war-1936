@@ -2495,7 +2495,11 @@ function initCountry(cid){
   return {
     id:cid, ...def,
     civFactories:totalCiv, milFactories:totalMil,
-    steel:totalSteel, oil:totalOil*200, manpower:totalMan, // 石油=燃料储备（200x放大为库存）
+    // v1.9.4：任何国家开局都不允许「零资源」。
+    // 原实现是 steel:totalSteel / oil:totalOil*200，而 131 国没有钢厂、120 国没有油田，
+    // 开局面板全是 0 并顶着「⛽紧张」，玩家看着像数据坏了。
+    // 底数取「十几个」的量级：钢铁 15 / 石油 20（石油是 200x 放大的燃料库存，20 约等于 10 天小耗量）。
+    steel:Math.max(totalSteel, 15), oil:Math.max(totalOil*200, 20), manpower:totalMan, // 石油=燃料储备（200x放大为库存）
     cash:5000,
     equipment:{'步兵装备':100,'摩托化装备':50,'坦克':20},
     equipmentProd:{'步兵装备':0,'摩托化装备':0,'坦克':0},
@@ -3801,7 +3805,7 @@ function moveUnit(unit, toProvinceId){
 // ==================== 地图渲染 ====================
 const canvas = document.getElementById('map');
 const ctx = canvas.getContext('2d');
-const MIN_ZOOM = 0.3, MAX_ZOOM = 8.0; // v1.9.2：251 省后小国/微型岛很多，放大上限 3→8 才够用
+const MIN_ZOOM = 0.3, MAX_ZOOM = 20.0; // v1.9.4：用户要求上限提到 2000%，小国/单省国家也能看清单个城市
 let mapScale = 1;
 let mapOffsetX = 0, mapOffsetY = 0;
 let hoverProvince = null;
@@ -5011,11 +5015,16 @@ function drawMap(){
       if(enemyUnitCount>0){ ctx.fillStyle = '#ff7b72'; ctx.fillText(enemyUnitCount, p.x+11/mapScale, p.y+3/mapScale); }
     }
     
-    // 悬停/选中显示城市名
-    if(isHovered || isSelected){
-      ctx.fillStyle = '#fff';
-      ctx.font = (11/mapScale)+'px Microsoft YaHei';
+    // 悬停/选中显示城市名；放大到 600% 以上常显
+    // （v1.9.4：缩放上限提到 2000% 后，如果还是只有光点，放到最大也看不出是哪座城）
+    if(isHovered || isSelected || mapScale >= 6){
+      ctx.font = (isHovered||isSelected ? 11 : 10)/mapScale + 'px Microsoft YaHei';
       ctx.textAlign = 'center';
+      // 深色描边保证在浅色省份上也读得清
+      ctx.lineWidth = 2.5/mapScale;
+      ctx.strokeStyle = 'rgba(0,0,0,0.75)';
+      ctx.strokeText(p.name, p.x, p.y+18/mapScale);
+      ctx.fillStyle = p.capital ? '#ffd75e' : '#fff';
       ctx.fillText(p.name, p.x, p.y+18/mapScale);
     }
   });
@@ -5880,9 +5889,11 @@ function gameTick(){
     if(fuelUse > 0){
       c.oil = Math.max(0, c.oil - fuelUse);
     }
-    // 燃料状态评估（参考阈值 = 60天产出 + 200基础）
-    let fuelMax = oilIncome * 0.5 * resBonus * 60 + 200;
-    c.fuelRatio = fuelMax>0 ? Math.min(2, c.oil/fuelMax) : 1;
+    // 燃料状态评估（v1.9.4：参考值改为「自身 30 天耗油量」）
+    // 原实现是「60 天产出 + 200 基础」，于是任何没有油田的国家（120 个）开局就被判 ⛽紧张，
+    // 哪怕它一支部队都不烧油。现在：没耗油部队 → 永远充足；有 → 看自己的储备能撑几天。
+    let fuelRef = fuelUse * 30;
+    c.fuelRatio = fuelRef > 0 ? Math.min(2, c.oil / fuelRef) : 1;
     let wasShort = c._fuelShortage;
     c._fuelShortage = c.oil <= 1 && fuelUse > 0;
     if(cid===game.player){
@@ -12429,8 +12440,13 @@ setSpeed = function(s){
 // ---- 版本与更新日志 ----
 // 每次发布新版本：改 GAME_VERSION，并在 UPDATE_HISTORY 顶部加一条。
 // 玩家打开线上版时若版本号与 localStorage 记录不同，就弹「本次版本更新了以下内容」弹窗。
-const GAME_VERSION = 'v1.9.3';
+const GAME_VERSION = 'v1.9.4';
 const UPDATE_HISTORY = [
+  { ver:'v1.9.4', date:'2026-11-03', items:[
+    '🔍 **缩放上限提到 2000%**：原来的 800% 看单座城市还是糊，现在最大可以放到 2000%（工具栏 + / - 或滚轮）；放大到 600% 以上还会**常显城市名**（带深色描边，首都金/其他白），单省小国也能一眼看清是哪座城；圆点/文字仍按缩放折算，放到最大也不会变成大圆',
+    '🛢 **任何国家开局都不会是零资源**：原来 120 个国家没有油田、131 个国家没有钢厂，开局面板一片 0 还顶着「⛽紧张」，看着像数据坏了。现在每国保底 钢铁 15 / 石油 20，真有矿的国家照旧按实际产出算',
+    '⛽ **燃料紧张判定改成按自己的用量算**：以前参考值是「60 天产出 + 200 基础」，没有油田的国家哪怕一支部队都不烧油也永远显示紧张。现在没耗油部队 = 充足，有耗油部队才看「这点油还能撑几天」',
+  ]},
   { ver:'v1.9.3', date:'2026-11-01', items:[
     '🏙️ **城市细化：新增 35 个省份**：中国（成都/昆明/兰州/长沙/济南/南宁）、苏联（哈尔科夫/罗斯托夫/敖德萨/喀山/阿尔汉格尔斯克/海参崴）、美国（底特律/波士顿/丹佛/休斯顿/西雅图）、日本（名古屋/仙台/鹿儿岛）、满洲国（奉天）、英法德意波（曼彻斯特/爱丁堡/南特/图卢兹/德累斯顿/斯图加特/威尼斯/热那亚/但泽）以及加尔各答/蒙特利尔/萨尔瓦多/珀斯/埃尔祖鲁姆 —— 主战国版图不再空旷，全部 286 省保持连通',
     '🔵 **修复放大后圆圈变巨型**：城市圆点/部队圆点/交战环/占领火花/核弹蘑菇云/海浪斑点等所有图元半径统一按缩放折算，800% 放大下屏幕上的尺寸和 100% 一致，不再出现盖住半个省的大圆',
