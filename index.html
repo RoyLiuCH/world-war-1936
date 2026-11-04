@@ -12833,7 +12833,7 @@ setSpeed = function(s){
 const GAME_VERSION = 'v1.9.8';
 const UPDATE_HISTORY = [
   { ver:'v1.9.8', date:'2026-11-04', items:[
-    '📁 **反馈改成直接存到你电脑上**：不再只存在浏览器里。点「反馈」面板里的「选择保存文件夹」（比如 D:\\Qst）授权一次，之后每次提交都会**静默写入那个文件夹**里的 txt（浏览器会记住这个目录，不用每次再选）。浏览器出于安全不允许网页自己新建文件夹，所以这一次授权必须由你亲手点',
+    '📁 **反馈直接写进你这台电脑的文件夹**：不再是浏览器本地记录、也不是存档。第一次点「提交反馈」会弹一次文件夹选择框（建议 D:\\Qst），选完永久记住 —— 以后每次提交都**静默写一个 txt 进那个文件夹，不再弹任何窗口**，成功后会显示完整文件路径，你可以直接在资源管理器里看到它。没有联网上传（一个字节都不外传）。浏览器安全模型不允许网页自己创建/写入任意路径，所以这**一次**点选必须由你亲手完成',
     '📴 **断网时反馈按钮自动变灰**：检测到没联网就把右上角「❓ 反馈」置灰，点击只弹一行提示「目前未连接网络，不可反馈」，不会打开面板也不会卡住游戏；网络恢复自动变回可用',
     '🌍 **补齐 23 个小国**：缅甸、不丹、锡金、马尔代夫、砂拉越、北婆罗洲、澳门、安道尔、摩纳哥、圣马力诺、列支敦士登、但泽自由市、格陵兰、纽芬兰、波多黎各、百慕大、汤加、西萨摩亚、瑙鲁、巴布亚新几内亚、塞舌尔、圣赫勒拿、亚丁 —— 全部带真实国界轮廓、首都、资源、初始部队与陆/海路（纯岛国配驱逐舰），国家总数 159 → 182',
     '🛡️ **新增国策线「反抗合并」**：只对「要被吞并的小国」开放 —— ①反抗铺设（3 天，稳定度 -20）②禁止吞并（通过后对方再想靠国策和平吞并你会直接失败）③国际申诉（七大列强关系 +18，战争支持 +10）④武装抵抗（防御 +15，人力 +30）',
@@ -12993,11 +12993,12 @@ function showDisclaimer(){
 // 右上角「❓ 反馈」按钮：
 //   · 断网时按钮置灰、点击提示「目前未连接网络，不可反馈」（游戏内浮层，不用原生 alert）
 //   · 点击后自动暂停游戏（冻结），输入并提交后恢复原暂停状态
-//   · 反馈**存到玩家本机磁盘**：第一次选择保存文件夹（建议 D:\Qst），之后静默写 txt
-//     （File System Access API + IndexedDB 记住目录句柄）；不支持时退化为另存为/下载
-const FEEDBACK_DIR = 'D:\\Qst';   // 推荐的反馈保存文件夹（首次选择目录时提示）
+//   · 反馈**直接写进玩家这台电脑上的文件夹**（建议 D:\Qst）：
+//     整个游戏只需要选一次文件夹 → 句柄存进 IndexedDB → 以后每次提交都静默写 txt，
+//     不再弹任何「另存为」窗口。没有存档系统参与，也不上传服务器。
+const FEEDBACK_DIR = 'D:\\Qst';   // 推荐/默认的反馈落盘文件夹
 const FEEDBACK_IDB = 'ww1936_fs';
-const FEEDBACK_UPLOAD_URL = '';   // 想接服务端时填接口地址；留空则只存本机
+const FEEDBACK_UPLOAD_URL = '';   // 想接服务端时填接口地址；留空则纯本机，一个字节都不外传
 
 // ---- 轻量浮动提示（替代原生 alert，避免阻塞游戏循环）----
 function showFloatTip(msg, opts){
@@ -13078,27 +13079,50 @@ function fbIdbSet(k, v){
   });
 }
 
-// 让玩家挑一个保存目录（推荐 D:\Qst），句柄持久化后以后就不用再选
+// 让玩家挑一次落盘目录（推荐 D:\Qst）。
+// 浏览器硬限制：网页不能自己创建/写入任意路径 —— 必须由玩家亲手选一次目录，
+// 这是唯一的一次性动作；句柄存进 IndexedDB 之后，后续提交全部静默写盘。
 function pickFeedbackDir(){
   if(!window.showDirectoryPicker){
-    showFloatTip('当前浏览器不支持记住文件夹，将改用「另存为」/下载', {color:'#d29922'});
+    showFloatTip('当前浏览器不支持「记住文件夹」，只能落到下载目录', {color:'#d29922'});
     return Promise.resolve(null);
   }
-  return window.showDirectoryPicker({mode:'readwrite'}).then(function(dir){
+  let opt = {mode:'readwrite'};
+  try{ opt.id = 'ww1936_feedback'; }catch(e){}
+  return window.showDirectoryPicker(opt).then(function(dir){
     window.__fbDirHandle = dir;
-    return fbIdbSet('feedbackDir', dir).then(function(){ return dir; });
+    updateFeedbackDirState();
+    // 记住目录；IndexedDB 不可用（隐私模式/被禁用）时也不影响本次写入
+    return fbIdbSet('feedbackDir', dir).then(function(){ return dir; }).catch(function(){ return dir; });
   }).then(function(dir){
-    showFloatTip('✅ 反馈将自动保存到「'+dir.name+'」文件夹', {color:'#3fb950'});
-    let st = document.getElementById('feedback-dir-state');
-    if(st) st.innerHTML = '📁 自动保存到：<b style="color:#7ee787">'+dir.name+'</b>';
+    showFloatTip('✅ 以后反馈直接存进「'+dir.name+'」，不再问你', {color:'#3fb950'});
+    updateFeedbackDirState();
     return dir;
-  }).catch(function(){ return null; });
+  }).catch(function(){ return null; });   // 玩家点了取消
 }
 
-// 把反馈写到本机文件夹：已选目录 → 静默写文件；否则另存为 → 再退化为下载
-// 已选目录时写盘是异步的；未选过目录时立刻走 picker/下载（同步触发，用户当场看到结果）
+function updateFeedbackDirState(){
+  let st = document.getElementById('feedback-dir-state');
+  if(!st) return;
+  let d = window.__fbDirHandle;
+  if(d){
+    let nm = (d.name === 'Qst') ? FEEDBACK_DIR : d.name;
+    st.innerHTML = '📁 保存位置：<b style="color:#7ee787">'+nm+'</b>　（提交即写入，不再弹窗）';
+  } else {
+    st.innerHTML = '📁 首次提交时选一次文件夹（建议 '+FEEDBACK_DIR+'），之后就不用管了';
+  }
+}
+
+function feedbackFileName(){
+  let d = new Date();
+  let p = function(n){ return (n<10?'0':'')+n; };
+  return 'feedback_' + d.getFullYear() + p(d.getMonth()+1) + p(d.getDate()) + '-'
+       + p(d.getHours()) + p(d.getMinutes()) + p(d.getSeconds()) + '.txt';
+}
+
+// 把反馈写进玩家本机文件夹（静默，无对话框）。返回 'dir' | 'download' | 'none'
 async function saveFeedbackFile(text, fname){
-  fname = fname || ('feedback_' + new Date().toISOString().slice(0,19).replace(/[:T]/g,'-') + '.txt');
+  fname = fname || feedbackFileName();
   let dir = window.__fbDirHandle;
   if(dir){
     try{
@@ -13110,27 +13134,17 @@ async function saveFeedbackFile(text, fname){
         let w = await fh.createWritable();
         await w.write(text);
         if(w.close) await w.close();
+        window.__fbLastPath = dir.name + String.fromCharCode(92) + fname;
         return 'dir';
       }
     }catch(e){ try{ console.warn('[feedback] 目录写入失败:', e && e.message); }catch(_){} }
   }
-  return saveFeedbackFileFallback(text, fname);
+  return feedbackDownloadFallback(text, fname);
 }
 
-function saveFeedbackFileFallback(text, fname){
-  // 系统另存为（玩家可自己选 D:\Qst）
-  try{
-    if(typeof window.showSaveFilePicker === 'function'){
-      window.showSaveFilePicker({
-        suggestedName: fname,
-        types: [{description:'文本反馈', accept:{'text/plain':['.txt']}}]
-      }).then(function(h){ return h.createWritable ? h.createWritable() : h; })
-        .then(function(w){ return w.write ? w.write(text).then(function(){ return w.close && w.close(); }) : null; })
-        .catch(function(){});
-      return 'picker';
-    }
-  }catch(e){}
-  // 退化：浏览器下载（进默认下载目录）
+// 只有「浏览器完全不支持 File System Access」时才用：落到系统下载文件夹。
+// 这里**故意不调用 showSaveFilePicker** —— 那个窗口太像"另存为存档"，会让人误以为在存进度。
+function feedbackDownloadFallback(text, fname){
   try{
     let blob = new Blob([text], {type:'text/plain;charset=utf-8'});
     let a = document.createElement('a');
@@ -13140,6 +13154,7 @@ function saveFeedbackFileFallback(text, fname){
     document.body.appendChild(a);
     a.click();
     setTimeout(function(){ try{ document.body.removeChild(a); }catch(e){} }, 0);
+    window.__fbLastPath = '下载文件夹 / ' + fname;
     return 'download';
   }catch(e){}
   return 'none';
@@ -13171,11 +13186,11 @@ function openFeedbackPanel(){
   ov.innerHTML =
     '<div style="background:#161b22;border:1px solid #3fb950;border-radius:10px;max-width:540px;width:92%;padding:20px 24px;box-shadow:0 8px 40px rgba(0,0,0,0.6)">'
     + '<div style="font-size:17px;font-weight:bold;color:#3fb950">❓ 问题反馈</div>'
-    + '<div style="font-size:11.5px;color:#8b949e;margin:6px 0 10px">游戏已自动暂停。请描述你遇到的问题或建议（_bug、平衡性、新玩法点子都可以）。提交后会<b style="color:#c9d1d9">直接存到你这台电脑的文件夹</b>（首次会让你选目录，建议 '+FEEDBACK_DIR+'；浏览器不允许网页自己建目录，所以需要你点一下「选择保存文件夹」）。</div>'
+    + '<div style="font-size:11.5px;color:#8b949e;margin:6px 0 10px">游戏已自动暂停。请描述你遇到的问题或建议（bug、平衡性、新玩法点子都可以）。提交后会<b style="color:#c9d1d9">直接写进你这台电脑上的文件夹</b>（建议 '+FEEDBACK_DIR+'）：第一次点「提交」会弹一次文件夹选择框，选完就永久记住，以后提交不再弹任何窗口，也不上传到任何服务器。</div>'
     + '<textarea id="feedback-text" placeholder="请输入反馈内容（至少 5 个字）…" style="width:100%;box-sizing:border-box;height:130px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;padding:8px;font-size:13px;resize:vertical"></textarea>'
     + '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px">'
-    + '<span id="feedback-dir-state" style="font-size:11px;color:#8b949e">📁 尚未选择保存文件夹</span>'
-    + '<button id="feedback-pickdir" style="background:#21262d;color:#58a6ff;border:1px solid #30363d;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;white-space:nowrap">选择保存文件夹</button>'
+    + '<span id="feedback-dir-state" style="font-size:11px;color:#8b949e">📁 首次提交时选一次文件夹（建议 '+FEEDBACK_DIR+'），之后就不用管了</span>'
+    + '<button id="feedback-pickdir" style="background:#21262d;color:#58a6ff;border:1px solid #30363d;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;white-space:nowrap">换文件夹</button>'
     + '</div>'
     + '<div style="font-size:11px;color:#8b949e;margin-top:4px" id="feedback-hint"></div>'
     + '<div style="text-align:right;margin-top:12px">'
@@ -13185,11 +13200,10 @@ function openFeedbackPanel(){
   document.body.appendChild(ov);
   let ta = document.getElementById('feedback-text');
   if(ta) ta.focus();
-  // 显示已记住的保存目录名
+  // 显示已记住的落盘目录名
   fbIdbGet('feedbackDir').then(function(dir){
     if(dir) window.__fbDirHandle = dir;
-    let st = document.getElementById('feedback-dir-state');
-    if(st && dir) st.innerHTML = '📁 自动保存到：<b style="color:#7ee787">'+dir.name+'</b>';
+    updateFeedbackDirState();
   }).catch(function(){});
   function done(){
     ov.remove();
@@ -13201,7 +13215,7 @@ function openFeedbackPanel(){
   let cancelBtn = document.getElementById('feedback-cancel');
   if(cancelBtn) cancelBtn.addEventListener('click', done);
   let submitBtn = document.getElementById('feedback-submit');
-  if(submitBtn) submitBtn.addEventListener('click', ()=>{
+  if(submitBtn) submitBtn.addEventListener('click', function(){
     let text = (ta && ta.value ? ta.value : '').trim();
     let hint = document.getElementById('feedback-hint');
     if(text.length < 5){ if(hint) hint.innerHTML = '<span style="color:#ff7b72">反馈内容太短了，至少写 5 个字</span>'; return; }
@@ -13216,26 +13230,45 @@ function openFeedbackPanel(){
       date: (game.tick!==undefined && game.date) ? fmtDate() : '',
       text: text
     };
-    // 1) 本地反馈历史（最多 50 条，防止无限膨胀）
-    try{
-      let list = JSON.parse(localStorage.getItem('ww1936_feedbacks')||'[]');
-      list.unshift(rec); if(list.length>50) list.length = 50;
-      localStorage.setItem('ww1936_feedbacks', JSON.stringify(list));
-    }catch(e){}
-    // 2) 存到本机文件夹（异步，先给用户成功反馈）
     let body = '【世界大战1936 玩家反馈】\n时间: '+rec.time+'\n版本: '+rec.ver+'\n游玩国家: '+rec.country+'\n游戏内日期: '+rec.date+'\n\n'+rec.text+'\n';
-    if(hint) hint.innerHTML = '<span style="color:#3fb950">✅ 反馈已提交，正在保存到本机…</span>';
-    saveFeedbackFile(body).then(function(how){
-      let h = document.getElementById('feedback-hint');
-      if(!h) return;
-      if(how === 'dir') h.innerHTML = '<span style="color:#3fb950">✅ 已保存到所选文件夹</span>';
-      else if(how === 'picker') h.innerHTML = '<span style="color:#3fb950">✅ 请在保存窗口中选择 '+FEEDBACK_DIR+' 文件夹</span>';
-      else if(how === 'download') h.innerHTML = '<span style="color:#d29922">✅ 已下载到浏览器下载目录（可移动到 '+FEEDBACK_DIR+'）</span>';
-      else h.innerHTML = '<span style="color:#d29922">✅ 已记录在游戏内反馈列表（本机文件夹写入失败）</span>';
-    }).catch(function(){});
-    uploadFeedback(rec);
-    addLog('📝','感谢反馈！你的意见已记录，我们会认真阅读');
-    setTimeout(done, 1600);
+
+    // 真正落盘的收尾动作（静默写文件，无对话框）
+    function record(){
+      // 顺便留一份游戏内历史（最多 50 条），仅作备份，不影响磁盘文件
+      try{
+        let list = JSON.parse(localStorage.getItem('ww1936_feedbacks')||'[]');
+        list.unshift(rec); if(list.length>50) list.length = 50;
+        localStorage.setItem('ww1936_feedbacks', JSON.stringify(list));
+      }catch(e){}
+      if(hint) hint.innerHTML = '<span style="color:#3fb950">✅ 正在写入文件夹…</span>';
+      saveFeedbackFile(body).then(function(how){
+        let h = document.getElementById('feedback-hint');
+        if(!h) return;
+        let where = window.__fbLastPath || FEEDBACK_DIR;
+        if(how === 'dir') h.innerHTML = '<span style="color:#3fb950">✅ 已存到你电脑上：<b>'+where+'</b></span>';
+        else if(how === 'download') h.innerHTML = '<span style="color:#d29922">✅ 本浏览器不支持直接写文件夹，已下载到本机：<b>'+where+'</b></span>';
+        else h.innerHTML = '<span style="color:#ff7b72">✗ 写入失败，请点右上角「换文件夹」重新选一次</span>';
+        if(how !== 'none') setTimeout(done, 2100);
+      }).catch(function(){});
+      uploadFeedback(rec);
+      addLog('📝','感谢反馈！你的意见已记录，我们会认真阅读');
+    }
+
+    // 还没选过目录 → 就在这次点击里弹一次文件夹选择框（用户手势仍在，浏览器才允许），
+    // 选完立刻静默写入 —— 不会再有第二个「另存为」窗口。
+    if(!window.__fbDirHandle && typeof window.showDirectoryPicker === 'function'){
+      if(hint) hint.innerHTML = '<span style="color:#58a6ff">请选一个文件夹（建议 '+FEEDBACK_DIR+'），只需这一次</span>';
+      pickFeedbackDir().then(function(dir){
+        if(!dir){
+          let h2 = document.getElementById('feedback-hint');
+          if(h2) h2.innerHTML = '<span style="color:#ff7b72">没有选择文件夹，反馈还没写进电脑（内容还在，再点一次「提交反馈」即可）</span>';
+          return;
+        }
+        record();
+      });
+      return;
+    }
+    record();
   });
 }
 
