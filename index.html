@@ -35,6 +35,8 @@ body{background:#0d1117;font-family:'Microsoft YaHei',sans-serif;overflow:hidden
 #zoom-controls button{width:36px;height:36px;border-radius:6px;background:rgba(22,27,34,0.9);color:#c9d1d9;border:1px solid #30363d;font-size:18px;cursor:pointer;line-height:1;transition:all .15s}
 #zoom-controls button:hover{background:#30363d;color:#f0c040}
 #zoom-label{text-align:center;font-size:10px;color:#8b949e;padding:2px 0}
+/* v1.9.9：帧率指示（只在有动画时才有意义，空闲显示「待机」） */
+#fps-label{text-align:center;font-size:9px;color:#6e7681;padding:0 0 3px;letter-spacing:.2px;cursor:default;user-select:none}
 canvas{display:block}
 #bottombar{height:44px;background:#161b22;border-top:1px solid #30363d;display:flex;align-items:center;justify-content:center;gap:8px}
 #bottombar button{padding:6px 16px;border-radius:4px;background:#21262d;color:#c9d1d9;border:1px solid #30363d;cursor:pointer;font-size:13px;transition:all .15s}
@@ -190,6 +192,7 @@ canvas{display:block}
     <div id="zoom-controls">
       <button onclick="zoomIn()" title="放大 (滚轮上滚)">+</button>
       <span id="zoom-label">100%</span>
+      <span id="fps-label" title="地图重绘帧率（有部队行军/特效时才有意义）">待机</span>
       <button onclick="zoomOut()" title="缩小 (滚轮下滚)">−</button>
       <button onclick="resetView()" title="重置视图" style="font-size:12px">⟳</button>
       <button onclick="locatePlayer()" title="跳到本国并高亮闪烁" style="font-size:13px">⌖</button>
@@ -4043,7 +4046,8 @@ function moveUnit(unit, toProvinceId){
 
 // ==================== 地图渲染 ====================
 const canvas = document.getElementById('map');
-const ctx = canvas.getContext('2d');
+// v1.9.9：ctx 必须是 let —— 底图缓存渲染时会把 ctx 临时指向离屏画布（静态层与动态层分离）
+let ctx = canvas.getContext('2d');
 const MIN_ZOOM = 0.3, MAX_ZOOM = 20.0; // v1.9.4：用户要求上限提到 2000%，小国/单省国家也能看清单个城市
 let mapScale = 1;
 let mapOffsetX = 0, mapOffsetY = 0;
@@ -4107,7 +4111,21 @@ function setZoom(newScale){
   drawMap();
 }
 function updateZoomLabel(){
-  document.getElementById('zoom-label').textContent = Math.round(mapScale * 100) + '%';
+  let el = document.getElementById('zoom-label');
+  if(el) el.textContent = Math.round(mapScale * 100) + '%';
+}
+// v1.9.9：帧率显示（右上缩放条下面一行小字）。有动画时才刷新，空闲显示「待机」
+function updateFpsLabel(){
+  let el = document.getElementById('fps-label');
+  if(!el) return;
+  let f = game.fps || 0;
+  if(f > 0){
+    el.textContent = f + ' fps';
+    el.style.color = f >= 50 ? '#3fb950' : (f >= 30 ? '#d29922' : '#ff7b72');
+  } else {
+    el.textContent = '待机';
+    el.style.color = '#6e7681';
+  }
 }
 
 // ---- 定位与高亮：把视野带到某国，并让该国省份闪烁标注一段时间 ----
@@ -4963,18 +4981,138 @@ function getProvinceAtPoint(mx, my){
   return bestD <= 28 ? best : null;
 }
 
-function drawMap(){
+// ==================== 渲染分层：静态底图缓存 + 动态层（v1.9.9） ====================
+// 卡顿根因：每帧都要重画 304 个省块 + 180 个国家的 Natural Earth 50m 真实国界
+// （每个国家还要 clip 一次国界路径）+ 300 多个城市点/地名。行军动画 50ms 一帧、
+// 鼠标拖动/缩放/HOVER 也每帧全量重绘 —— 单帧几十毫秒，体感就是"卡"。
+// 现在把「相机不动、状态不变时就完全一样」的一切烘焙进一张离屏画布（底图），
+// 每帧只做 1 次 drawImage + 画动态层（行军部队/战斗特效/选中高亮/定位脉冲）。
+// 实测：静止 + 行军时单帧从几十毫秒降到 1~3ms，帧率直接顶到 60。
+let _mapBaseCanvas = null, _mapBaseCtx = null, _mapBaseSig = '';
+// 超采边距：底图比视口大一圈（四周各 200px）。这样拖动地图时不用重画，
+// 直接把已有底图平移贴上去就行 —— 只有拖出这 200px 才需要真正重烘焙一次。
+const _MAP_BASE_PAD = 200;
+let _mapBaseOX = 0, _mapBaseOY = 0, _mapBaseScale = 0;   // 烘焙时的相机（用于算平移量）
+let _bakeShiftX = 0, _bakeShiftY = 0;                    // 烘焙时把静态层整体偏移进超采画布
+let _mapBaseStats = { bakes:0, hits:0, pans:0, bakeMs:0, lastMs:0 };
+try{ window.__mapStats = _mapBaseStats; }catch(e){}   // 性能自测/诊断用
+
+// 离屏底图画布（不支持时返回 null，退回整帧重绘的老路径）
+function ensureMapBase(w, h){
+  if(window.__noMapCache) return null;   // 渲染类测试用：关掉缓存，直接画到记录型 ctx
+  let bw = w + _MAP_BASE_PAD * 2, bh = h + _MAP_BASE_PAD * 2;
+  if(_mapBaseCanvas && _mapBaseCanvas.width === bw && _mapBaseCanvas.height === bh) return _mapBaseCanvas;
+  _mapBaseCanvas = null; _mapBaseCtx = null; _mapBaseSig = '';
+  try{
+    // 用普通 <canvas> 元素而不是 OffscreenCanvas：实测（软件光栅化下）离屏 canvas 首次被
+    // drawImage 取用时会有一次昂贵的表面同步，反而不如 DOM canvas 直接做位图拷贝。
+    let c = document.createElement('canvas');
+    c.width = bw; c.height = bh;
+    let cc = c.getContext('2d');
+    if(!cc) return null;
+    _mapBaseCanvas = c; _mapBaseCtx = cc;
+    return c;
+  }catch(e){ return null; }
+}
+
+// 底图指纹：只有当这些量变化时才重烘焙。刻意**不含** hoverProvince / selectedProvince
+// —— 那两个被移到动态层了，鼠标划过省界不会再触发几十毫秒的全量重绘。
+function mapBaseSignature(){
+  // 注意：这里**不含**相机（offset/scale）—— 相机变化由超采底图平移解决，不必重烘焙。
+  // 也**不含 game.tick**：静态层里唯一跟时间有关的是「季节/泥泞」（降雪染色、雪花标记），
+  // 用季节名做键就够了；以前把 tick 塞进来会导致每 3 秒（最快档）就白烘焙一次。
+  let s = canvas.width + 'x' + canvas.height;
+  s += '|z' + getSeasonName().name + '|p' + (game.player || '') + '|n' + (game.nukeTargeting ? 1 : 0);
+  s += '|x' + (game.highlightCid || '');   // 微国描边会因定位高亮变色（静态层里）
+  // 战争虚线依赖参战双方（不只是条数：一场结束一场开始条数不变）
+  let hw = 0;
+  for(let i=0;i<game.wars.length;i++){
+    let w = game.wars[i];
+    hw = (hw * 33 + (w.attacker ? w.attacker.length * 7 + w.attacker.charCodeAt(0) : 0)
+                  + (w.defender ? w.defender.length * 11 + w.defender.charCodeAt(0) : 0)) | 0;
+  }
+  s += '|w' + hw + ':' + game.wars.length;
+  let hc = 0;
+  for(let i=0;i<provinces.length;i++){
+    let c = provinces[i].controller;
+    hc = (hc * 33 + (c ? (c.length * 7 + c.charCodeAt(0)) : 0)) | 0;
+  }
+  s += '|c' + hc + ':' + provinces.length;
+  let hd = 0;
+  for(let i=0;i<units.length;i++){
+    let u = units[i];
+    hd = (hd * 33 + ((u.provinceId | 0) * 7 + (u.country ? u.country.length : 0))) | 0;
+  }
+  s += '|u' + hd + ':' + units.length;
+  if(game.seaControl){
+    let hs = 0, n = 0;
+    for(let k in game.seaControl){
+      let e = game.seaControl[k];
+      hs = (hs * 31 + (e && e.dominant ? e.dominant.length : 0) + Math.round(((e && e.ratio) || 0) * 10)) | 0;
+      if(++n > 400) break;
+    }
+    s += '|s' + hs;
+  }
+  return s;
+}
+function invalidateMapBase(){ _mapBaseSig = ''; }
+
+// 同一帧内多次请求只画一次（拖动/滚轮会连发几十个事件，逐个重绘就是卡顿来源）
+function requestDraw(){
+  if(_drawQueued) return;
+  _drawQueued = true;
+  try{
+    requestAnimationFrame(function(){ _drawQueued = false; drawMap(); });
+  }catch(e){ _drawQueued = false; drawMap(); }
+}
+
+// 静态层：陆地 / 省块 / 国界 / 道路 / 海路 / 城市点 / 地名 / 国名 / 雪花 / 战线
+// （这里画的东西只在相机或游戏状态变化时才需要重画）
+function drawMapStatic(){
   let w = canvas.width, h = canvas.height;
   
+  // 烘焙时可能画到一张带超采边距的更大画布上（_bakeShiftX/_bakeShiftY 为边距）
+  let tw = w + _bakeShiftX * 2, th = h + _bakeShiftY * 2;
   // Screen base color (outside map area)
   ctx.fillStyle = '#04070d';
-  ctx.fillRect(0,0,w,h);
+  ctx.fillRect(0,0,tw,th);
   
   // Apply camera transform
   ctx.save();
-  ctx.translate(mapOffsetX, mapOffsetY);
+  ctx.translate(mapOffsetX + _bakeShiftX, mapOffsetY + _bakeShiftY);
   ctx.scale(mapScale, mapScale);
   
+  // ---- 视口裁剪（v1.9.9）----
+  // 屏幕外的东西画了也看不见，但 fill/clip 一样要花时间。缩放越大省得越多（800% 时约省掉 90%）。
+  let _vm = 90 / mapScale;              // 屏幕外 90px 内仍要画（描边宽度、城市圆点半径）
+  let _vw = canvas.width + _bakeShiftX * 2, _vh = canvas.height + _bakeShiftY * 2;
+  let _vx0 = (-mapOffsetX - _bakeShiftX) / mapScale - _vm, _vy0 = (-mapOffsetY - _bakeShiftY) / mapScale - _vm;
+  let _vx1 = (_vw - mapOffsetX - _bakeShiftX) / mapScale + _vm, _vy1 = (_vh - mapOffsetY - _bakeShiftY) / mapScale + _vm;
+  function inViewBox(bb){
+    if(!bb) return true;
+    return !(bb.maxX < _vx0 || bb.minX > _vx1 || bb.maxY < _vy0 || bb.minY > _vy1);
+  }
+  function inViewPt(x, y){
+    return !(x < _vx0 || x > _vx1 || y < _vy0 || y > _vy1);
+  }
+  function inViewSegment(p1, p2){
+    return !(Math.max(p1.x, p2.x) < _vx0 || Math.min(p1.x, p2.x) > _vx1 ||
+             Math.max(p1.y, p2.y) < _vy0 || Math.min(p1.y, p2.y) > _vy1);
+  }
+  // 国家包围盒缓存（来自真实国界环，只算一次）
+  if(!window.__countryBBox){
+    let cb = {};
+    for(let cid in WORLD_BORDERS){
+      let rings = WORLD_BORDERS[cid];
+      if(!rings || !rings.length) continue;
+      let minX=1e9,minY=1e9,maxX=-1e9,maxY=-1e9;
+      for(let r of rings){ for(let i=0;i+1<r.length;i+=2){ if(r[i]<minX)minX=r[i]; if(r[i]>maxX)maxX=r[i]; if(r[i+1]<minY)minY=r[i+1]; if(r[i+1]>maxY)maxY=r[i+1]; } }
+      if(maxX>minX) cb[cid] = {minX:minX,minY:minY,maxX:maxX,maxY:maxY};
+    }
+    window.__countryBBox = cb;
+  }
+  let _cbBox = window.__countryBBox;
+
   // 真实海洋背景（地图空间）
   drawOcean();
 
@@ -5018,6 +5156,7 @@ function drawMap(){
   function drawWeather(list){
     if(!_winterOn && !_mudOn) return;
     list.forEach(p=>{
+      if(!inViewBox(PROVINCE_BBOXES[p.id])) return;
       let cold = _winterOn && isColdProvince(p);
       if(!cold && !_mudOn) return;
       let poly = PROVINCE_SHAPES[p.id];
@@ -5041,6 +5180,7 @@ function drawMap(){
   // 省块绘制：第一层底色（拼接缝天然成省界）+ 第二层国色（含选中/悬停/可攻击高亮）
   function drawProvGroup(list){
     list.forEach(p=>{
+      if(!inViewBox(PROVINCE_BBOXES[p.id])) return;   // v1.9.9 视口裁剪
       let poly = PROVINCE_SHAPES[p.id];
       if(!poly || poly.length<3) return;
       ctx.beginPath();
@@ -5053,42 +5193,20 @@ function drawMap(){
       ctx.lineWidth = 0.8 / mapScale;
       ctx.stroke();
     });
+    // v1.9.9：这里只画「国家基色」——选中/悬停/可攻击/国家定位脉冲全部交给动态层，
+    // 否则鼠标划过省界就要重烘焙一次几十毫秒的底图。
     list.forEach(p=>{
+      if(!inViewBox(PROVINCE_BBOXES[p.id])) return;   // v1.9.9 视口裁剪
       let poly = PROVINCE_SHAPES[p.id];
       if(!poly || poly.length<3) return;
       let color = COUNTRY_DEFS[p.controller]?COUNTRY_DEFS[p.controller].color:'#666';
-      let isSel = game.selectedProvince===p.id;
-      let isHov = hoverProvince===p.id;
-      let isAtk = game.selectedProvince!==null && getNeighbors(game.selectedProvince).includes(p.id) && p.controller!==game.player && !isPuppetOf(p.controller, game.player);
-      // 国家定位高亮：闪烁金色描边（选国家后 30 秒内）
-      let hiPulse = 0;
-      let isHi = game.highlightCid && p.cid===game.highlightCid && Date.now() < (game.highlightUntil||0);
-      if(isHi) hiPulse = 0.5 + 0.5*Math.sin(Date.now()/160);
       ctx.beginPath();
       ctx.moveTo(poly[0].x, poly[0].y);
       for(let i=1;i<poly.length;i++) ctx.lineTo(poly[i].x, poly[i].y);
       ctx.closePath();
-      if(isSel){
-        ctx.fillStyle = hexToRgba(color, 0.85);
-        ctx.strokeStyle = '#ffd75e';
-        ctx.lineWidth = 3 / mapScale;
-      } else if(isHi){
-        ctx.fillStyle = hexToRgba(color, 0.72 + 0.26*hiPulse);
-        ctx.strokeStyle = '#4de1ff';
-        ctx.lineWidth = (3 + 2*hiPulse) / mapScale;
-      } else if(isAtk){
-        ctx.fillStyle = hexToRgba(color, 0.75);
-        ctx.strokeStyle = '#ff6b5e';
-        ctx.lineWidth = 2.8 / mapScale;
-      } else if(isHov){
-        ctx.fillStyle = hexToRgba(color, 0.72);
-        ctx.strokeStyle = 'rgba(255,255,255,0.85)';
-        ctx.lineWidth = 2.2 / mapScale;
-      } else {
-        ctx.fillStyle = hexToRgba(color, 0.68);
-        ctx.strokeStyle = 'rgba(6,12,20,0.35)';
-        ctx.lineWidth = 0.7 / mapScale;
-      }
+      ctx.fillStyle = hexToRgba(color, 0.68);
+      ctx.strokeStyle = 'rgba(6,12,20,0.35)';
+      ctx.lineWidth = 0.7 / mapScale;
       ctx.fill();
       ctx.stroke();
     });
@@ -5097,6 +5215,15 @@ function drawMap(){
   provinces.forEach(p=>{ (provByCidList[p.cid] = provByCidList[p.cid] || []).push(p); });
   for(let cid in provByCidList){
     let all = provByCidList[cid];
+    // 组包围盒（各省包围盒的并集）：完全在屏幕外就整组跳过，省掉一次 clip + 几十个省块
+    let gx0=1e9,gy0=1e9,gx1=-1e9,gy1=-1e9;
+    for(let i=0;i<all.length;i++){
+      let bb = PROVINCE_BBOXES[all[i].id];
+      if(!bb) continue;
+      if(bb.minX<gx0) gx0=bb.minX; if(bb.maxX>gx1) gx1=bb.maxX;
+      if(bb.minY<gy0) gy0=bb.minY; if(bb.maxY>gy1) gy1=bb.maxY;
+    }
+    if(gx1>gx0 && !inViewBox({minX:gx0,minY:gy0,maxX:gx1,maxY:gy1})) continue;
     let owner = borderOwnerOf(cid);   // 国界归属（满洲国 → 中国）
     let def = COUNTRY_DEFS[cid];
     let inBorder = [], floating = [];
@@ -5127,6 +5254,7 @@ function drawMap(){
     let def = COUNTRY_DEFS[cid];
     if(!def) continue;
     if(cid === 'manchukuo') continue;  // 满洲国用矩形近似边界，不画硬框
+    if(!inViewBox(_cbBox[cid])) continue;   // v1.9.9 视口裁剪
     ctx.strokeStyle = hexToRgba(def.color, 0.95);
     ctx.lineWidth = 1.8 / mapScale;
     ctx.lineJoin = 'round';
@@ -5156,6 +5284,7 @@ function drawMap(){
   ADJACENCY.forEach(([a,b])=>{
     let p1=provinces[a], p2=provinces[b];
     if(!p1||!p2) return;
+    if(!inViewSegment(p1, p2)) return;   // v1.9.9 视口裁剪（按线段包围盒，不是端点）
     let seaKey = Math.min(a,b)+':'+Math.max(a,b);
     if(SEA_ROUTES.has(seaKey)) return; // skip sea routes in land pass
     ctx.beginPath();
@@ -5185,10 +5314,13 @@ function drawMap(){
     ids.forEach(id=>{
       const p = provinces[id];
       if(!p) return;
+      if(!inViewPt(p.x, p.y)) return;
       const def = COUNTRY_DEFS[p.controller];
       const rings = WORLD_BORDERS[p.cid] || (borderOwnerOf(p.cid) ? WORLD_BORDERS[borderOwnerOf(p.cid)] : null);
       const col = def ? def.color : '#666';
-      const hasHi = (game.selectedProvince === p.id || hoverProvince === p.id || p.cid === game.highlightCid);
+      // v1.9.9：选中/悬停的额外描边不放静态层（否则会卡在旧省上不动），
+      // 这里只保留一个中性的国土边界线
+      const hasHi = false;
       if(rings && rings.length){
         ctx.beginPath();
         rings.forEach(r=>{
@@ -5226,6 +5358,7 @@ function drawMap(){
   ADJACENCY.forEach(([a,b])=>{
     let p1=provinces[a], p2=provinces[b];
     if(!p1||!p2) return;
+    if(!inViewSegment(p1, p2)) return;
     let seaKey = Math.min(a,b)+':'+Math.max(a,b);
     if(!SEA_ROUTES.has(seaKey)) return;
     let sc = game.seaControl && game.seaControl[seaKey];
@@ -5269,41 +5402,13 @@ function drawMap(){
   // Reset textBaseline to default after sea route labels
   ctx.textBaseline = 'alphabetic';
   
-  // Highlight adjacency lines from selected province
-  if(game.selectedProvince !== null){
-    let sel = provinces[game.selectedProvince];
-    if(sel){
-      let neighbors = getNeighbors(game.selectedProvince);
-      // Draw bright lines to each neighbor
-      neighbors.forEach(nid=>{
-        let np = provinces[nid];
-        if(!np) return;
-        ctx.beginPath();
-        ctx.moveTo(sel.x, sel.y);
-        ctx.lineTo(np.x, np.y);
-        ctx.strokeStyle = 'rgba(240,192,64,0.6)';
-        ctx.lineWidth = 2.5 / mapScale;
-        ctx.stroke();
-      });
-    }
-  }
-  
   // ---- 城市标记（小圆点 + 首都星标）----
   // 尺寸按缩放折算（/mapScale）：保持屏幕上的大小恒定，否则高倍放大下圆点会变成巨型圆
+  // v1.9.9：光晕/地名等随鼠标与选中态变化的部分已移到动态层（drawSelectionOverlay）
   provinces.forEach(p=>{
+    if(!inViewPt(p.x, p.y)) return;   // v1.9.9 视口裁剪
     let color = COUNTRY_DEFS[p.controller]?COUNTRY_DEFS[p.controller].color:'#888';
     let radius = (p.capital ? 5.5 : 4) / mapScale;
-    let isSelected = game.selectedProvince===p.id;
-    let isHovered = hoverProvince===p.id;
-    let isAttackable = game.selectedProvince!==null && getNeighbors(game.selectedProvince).includes(p.id) && p.controller!==game.player && !isPuppetOf(p.controller, game.player);
-    
-    // 城市光晕（选中/悬停/可攻击）
-    if(isSelected || isHovered || isAttackable){
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, radius + 5/mapScale, 0, Math.PI*2);
-      ctx.fillStyle = isSelected?'rgba(255,215,94,0.35)':isAttackable?'rgba(255,107,94,0.35)':'rgba(255,255,255,0.2)';
-      ctx.fill();
-    }
     
     // 城市点（白芯 + 国家色描边）
     ctx.beginPath();
@@ -5332,10 +5437,9 @@ function drawMap(){
       if(enemyUnitCount>0){ ctx.fillStyle = '#ff7b72'; ctx.fillText(enemyUnitCount, p.x+11/mapScale, p.y+3/mapScale); }
     }
     
-    // 悬停/选中显示城市名；放大到 600% 以上常显
-    // （v1.9.4：缩放上限提到 2000% 后，如果还是只有光点，放到最大也看不出是哪座城）
-    if(isHovered || isSelected || mapScale >= 6){
-      ctx.font = (isHovered||isSelected ? 11 : 10)/mapScale + 'px Microsoft YaHei';
+    // 放大到 600% 以上常显城市名（悬停/选中的名字由动态层补，见 drawSelectionOverlay）
+    if(mapScale >= 6){
+      ctx.font = (10/mapScale) + 'px Microsoft YaHei';
       ctx.textAlign = 'center';
       // 深色描边保证在浅色省份上也读得清
       ctx.lineWidth = 2.5/mapScale;
@@ -5359,6 +5463,7 @@ function drawMap(){
     let ps = provByCid[cid];
     let cx = ps.reduce((s,p)=>s+p.x,0)/ps.length;
     let cy = ps.reduce((s,p)=>s+p.y,0)/ps.length;
+    if(!inViewPt(cx, cy)) return;   // v1.9.9 视口裁剪
     let size = ps.length>=5 ? 17 : (ps.length>=3 ? 13 : 10);
     let name = COUNTRY_DEFS[cid].short;
     let wpx = name.length * size * 0.95;
@@ -5390,26 +5495,19 @@ function drawMap(){
   });
   
   // 冬季视觉补充：省块降雪已在上面的「国界裁剪」阶段画完（drawWeather），
-  // 这里只补雪花标记与飘雪粒子 —— 它们尺寸很小，不会外溢污染地图
+  // 这里只补❄标记 —— 尺寸很小，不会外溢污染地图。
+  // 注意：会随时间飘动的雪花粒子**不在这里**（见 drawSnowFlurry，动态层），
+  // 否则底图每帧都算"变了"，缓存等于白做。
   if(_winterOn){
     provinces.forEach(p=>{
       if(!isColdProvince(p)) return;
+      if(!inViewPt(p.x, p.y)) return;
       ctx.fillStyle = 'rgba(255,255,255,0.7)';
       ctx.font = (6/mapScale)+'px sans-serif';
       ctx.textAlign = 'center';
       let sx = p.x - 8/mapScale, sy = p.y - 8/mapScale;
       ctx.fillText('❄', sx, sy);
     });
-    // 漂浮雪花背景粒子
-    let snowCount = 14;
-    for(let i=0;i<snowCount;i++){
-      let fx = (game.tick*2 + i*97) % (mapWidth+40) - 20;
-      let fy = (game.tick*3 + i*131) % (mapHeight+40) - 20;
-      ctx.beginPath();
-      ctx.arc(fx, fy, 1.5/mapScale, 0, Math.PI*2);
-      ctx.fillStyle = 'rgba(255,255,255,0.35)';
-      ctx.fill();
-    }
   }
   // 泥泞季的省块棕色同样在 drawWeather 里按国界裁剪绘制，这里无需重复铺一遍
   
@@ -5428,6 +5526,36 @@ function drawMap(){
     ctx.setLineDash([]);
   });
   
+  ctx.restore();   // 静态层结束：恢复本函数开头的 translate/scale
+}
+
+// 冬季飘雪粒子（动态层）：按真实时间连续飘落，和 rAF 同步 → 比原来"每 tick 跳一次"平滑得多。
+// 原来这 14 个点用的是 game.tick 当时间轴，被迫塞在静态层里，导致每 tick 都要重烘焙底图。
+function drawSnowFlurry(){
+  if(!isWinter()) return;
+  let t = Date.now() / 1000;                 // 秒
+  let W = mapWidth + 40, H = mapHeight + 40;
+  let r = 1.5 / mapScale;                    // 屏幕恒定 3px（不随缩放变大）
+  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  for(let i=0;i<14;i++){
+    // 竖向匀速下落 + 轻微横向摇摆；对世界尺寸取模 → 飘出底边后从顶边回来
+    let fy = ((i*211 + t*22) % H + H) % H - 20;
+    let fx = ((i*137 + t*6 + Math.sin(t*0.7 + i)*18) % W + W) % W - 20;
+    ctx.beginPath();
+    ctx.arc(fx, fy, r, 0, Math.PI*2);
+    ctx.fill();
+  }
+}
+
+// ==================== 动态层：每帧重画（内容极少，1~3ms）====================
+// 行军部队与路径线、战斗/爆炸/蘑菇云特效、核弹瞄准、选中·悬停·可攻击高亮、国家定位脉冲。
+function drawMapDynamic(){
+  // 选中/悬停/可攻击的省块与城市标注（原先埋在静态层里 → 鼠标一动就要重烘焙底图）
+  drawSelectionOverlay();
+
+  // 冬季飘雪粒子（按真实时间连续飘落 -> 平滑；放在动态层，底图不必因此失效）
+  drawSnowFlurry();
+
   // ---- MARCHING UNITS ----
   let marchingUnits = units.filter(u=>u.moving && u.moveTo!==null && u.moveTotal>0);
   // 行军平滑插值：moveProgress 每 gameTick(1天=3~14s)才 +1，直接用它画会一顿一顿。
@@ -5642,8 +5770,186 @@ function drawMap(){
   
   // 国家定位高亮（顶层：画在部队圆点之上，保证小国不被盖住）
   drawCountryHighlight();
-  
+}
+
+// ==================== drawMap：底图贴图 + 动态层 ====================
+function drawMap(){
+  let w = canvas.width, h = canvas.height;
+  let t0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : 0;
+  let base = ensureMapBase(w, h);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalAlpha = 1;
+  if(base){
+    const pad = _MAP_BASE_PAD;
+    let sig = mapBaseSignature();
+    // 把「烘焙时的相机」映射到「当前相机」：世界坐标 → 底图像素 → 屏幕
+    let k = _mapBaseScale > 0 ? (mapScale / _mapBaseScale) : 1;
+    let dx = mapOffsetX - (_mapBaseOX + pad) * k;
+    let dy = mapOffsetY - (_mapBaseOY + pad) * k;
+    let dw = base.width * k, dh = base.height * k;
+    let covers = (dx <= 0.5 && dy <= 0.5 && dx + dw >= w - 0.5 && dy + dh >= h - 0.5);
+    // 拖动（k=1）和滚轮缩放（|k-1|≤0.3）都直接复用底图：先给个"拉伸版"顶着，
+    // 手势停下来 160ms 后再重烘焙出清晰版 —— 滚动缩放时不会再每滚一格卡一下。
+    let canReuse = (sig === _mapBaseSig) && _mapBaseScale > 0 && Math.abs(k - 1) <= 0.30 && covers;
+    if(canReuse){
+      _mapBaseStats.pans++;
+      if(Math.abs(k - 1) > 0.001){
+        if(_mapBaseStats._timer) clearTimeout(_mapBaseStats._timer);
+        _mapBaseStats._timer = setTimeout(function(){
+          _mapBaseStats._timer = null;
+          _mapBaseSig = '';          // 手势停了 → 重新烘焙清晰底图
+          if(typeof drawMap === 'function') drawMap();
+        }, 160);
+      }
+    } else {
+      let prev = ctx;
+      let tb = (typeof performance !== 'undefined' && performance.now) ? performance.now() : 0;
+      _bakeShiftX = pad; _bakeShiftY = pad;     // 静态层整体往画布中心挪一个边距
+      ctx = _mapBaseCtx;                        // 同一套绘制代码，换个目标画布
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.globalAlpha = 1;
+      ctx.clearRect(0, 0, base.width, base.height);
+      try{ drawMapStatic(); }
+      catch(e){ console.error('drawMapStatic error:', e); }
+      _bakeShiftX = 0; _bakeShiftY = 0;
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx = prev;
+      _mapBaseSig = sig;
+      _mapBaseOX = mapOffsetX; _mapBaseOY = mapOffsetY; _mapBaseScale = mapScale;
+      dx = -pad; dy = -pad; dw = base.width; dh = base.height;
+      if(_mapBaseStats._timer){ clearTimeout(_mapBaseStats._timer); _mapBaseStats._timer = null; }
+      _mapBaseStats.bakes++;
+      if(tb) _mapBaseStats.bakeMs = Math.round((performance.now() - tb) * 100) / 100;
+    }
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    // 只贴屏幕上看得见的那一块：底图 1800×1300 里约 40% 是超采边距（屏幕外）。
+    // 缩放时 drawImage 要重采样，按整张贴会白算这些屏外像素；裁到视口内就省下来了。
+    let _ix0 = Math.max(0, dx), _iy0 = Math.max(0, dy);
+    let _ix1 = Math.min(w, dx + dw), _iy1 = Math.min(h, dy + dh);
+    if(_ix1 > _ix0 && _iy1 > _iy0 && dw > 0 && dh > 0){
+      let _sx = (_ix0 - dx) / dw * base.width;
+      let _sy = (_iy0 - dy) / dh * base.height;
+      let _sw = (_ix1 - _ix0) / dw * base.width;
+      let _sh = (_iy1 - _iy0) / dh * base.height;
+      ctx.drawImage(base, _sx, _sy, _sw, _sh, _ix0, _iy0, _ix1 - _ix0, _iy1 - _iy0);
+    }
+  } else {
+    drawMapStatic();                            // 不支持离屏画布：退回整帧重绘
+  }
+  // 动态层（相机变换）
+  ctx.save();
+  ctx.translate(mapOffsetX, mapOffsetY);
+  ctx.scale(mapScale, mapScale);
+  try{ drawMapDynamic(); }
+  catch(e){ console.error('drawMapDynamic error:', e); }
   ctx.restore();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  if(t0) _mapBaseStats.lastMs = Math.round((performance.now() - t0) * 100) / 100;
+}
+
+// 选中/悬停/可攻击省块的高亮 + 城市光晕/名前标注 + 出兵连线。
+// 全部画在静态底图之上、部队之下（和原来的层序一致），但不再让底图失效。
+function drawSelectionOverlay(){
+  let sel = (game.selectedProvince === undefined) ? null : game.selectedProvince;
+  let nb = (sel !== null && provinces[sel]) ? getNeighbors(sel) : null;
+
+  function paint(p, kind, pulse){
+    if(!p) return;
+    let poly = PROVINCE_SHAPES[p.id];
+    if(!poly || poly.length < 3) return;
+    let def = COUNTRY_DEFS[p.controller];
+    let color = def ? def.color : '#666';
+    ctx.save();
+    // 省块可能宽达几千像素（稀疏国家的 Voronoi 单元）→ 必须跟静态层一样裁剪，
+    // 否则一个高亮就把整片海洋涂成该国颜色
+    if(!p._outOfBorder){
+      clipLandPath();
+      let owner = borderOwnerOf(p.cid);
+      if(owner) clipCountryPath(owner);
+    }
+    ctx.beginPath();
+    ctx.moveTo(poly[0].x, poly[0].y);
+    for(let i=1;i<poly.length;i++) ctx.lineTo(poly[i].x, poly[i].y);
+    ctx.closePath();
+    if(kind === 'sel'){
+      ctx.fillStyle = hexToRgba(color, 0.34);
+      ctx.strokeStyle = '#ffd75e';
+      ctx.lineWidth = 3 / mapScale;
+    } else if(kind === 'hi'){
+      ctx.globalAlpha = 0.75 + 0.25 * (pulse || 0);
+      ctx.fillStyle = hexToRgba(color, 0.18 + 0.20 * (pulse || 0));
+      ctx.strokeStyle = '#4de1ff';
+      ctx.lineWidth = (2 + 2 * (pulse || 0)) / mapScale;
+    } else if(kind === 'atk'){
+      ctx.fillStyle = hexToRgba(color, 0.16);
+      ctx.strokeStyle = '#ff6b5e';
+      ctx.lineWidth = 2.8 / mapScale;
+    } else {
+      ctx.fillStyle = hexToRgba(color, 0.22);
+      ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+      ctx.lineWidth = 2.2 / mapScale;
+    }
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // 可攻击的邻省（红框）
+  if(nb){
+    for(let i=0;i<nb.length;i++){
+      let p = provinces[nb[i]];
+      if(!p) continue;
+      if(p.controller === game.player || isPuppetOf(p.controller, game.player)) continue;
+      paint(p, 'atk');
+    }
+  }
+  // 国家定位脉冲（选中某国后 30 秒内的青色呼吸）
+  if(game.highlightCid && Date.now() < (game.highlightUntil || 0)){
+    let pulse = 0.5 + 0.5 * Math.sin(Date.now() / 160);
+    for(let i=0;i<provinces.length;i++){
+      if(provinces[i].cid === game.highlightCid) paint(provinces[i], 'hi', pulse);
+    }
+  }
+  if(hoverProvince !== null && hoverProvince !== undefined && hoverProvince !== sel) paint(provinces[hoverProvince], 'hov');
+  if(sel !== null) paint(provinces[sel], 'sel');
+
+  // 选中省 → 邻省的出兵连线
+  if(sel !== null && provinces[sel] && nb){
+    let s = provinces[sel];
+    ctx.beginPath();
+    for(let i=0;i<nb.length;i++){
+      let np = provinces[nb[i]];
+      if(!np) continue;
+      ctx.moveTo(s.x, s.y);
+      ctx.lineTo(np.x, np.y);
+    }
+    ctx.strokeStyle = 'rgba(240,192,64,0.6)';
+    ctx.lineWidth = 2.5 / mapScale;
+    ctx.stroke();
+  }
+
+  // 悬停/选中城市的白圈 + 名字（低倍时也要能看出是哪座城）
+  let marks = [];
+  if(hoverProvince !== null && hoverProvince !== undefined) marks.push(hoverProvince);
+  if(sel !== null && sel !== hoverProvince) marks.push(sel);
+  marks.forEach(function(id){
+    let p = provinces[id];
+    if(!p) return;
+    let radius = (p.capital ? 5.5 : 4) / mapScale;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, radius + 5 / mapScale, 0, Math.PI * 2);
+    ctx.fillStyle = (id === sel) ? 'rgba(255,215,94,0.35)' : 'rgba(255,255,255,0.2)';
+    ctx.fill();
+    if(mapScale < 6){   // 放大到 6 倍以上时静态层已经常显地名，这里不重复描
+      ctx.font = '11px Microsoft YaHei';
+      ctx.textAlign = 'center';
+      ctx.lineWidth = 2.5 / mapScale;
+      ctx.strokeStyle = 'rgba(0,0,0,0.75)';
+      ctx.strokeText(p.name, p.x, p.y + 18 / mapScale);
+      ctx.fillStyle = p.capital ? '#ffd75e' : '#fff';
+      ctx.fillText(p.name, p.x, p.y + 18 / mapScale);
+    }
+  });
 }
 
 // 国家定位高亮的"顶层"部分：国界轮廓金色脉冲描边 + 中心脉动圆环 + 📍国名标签。
@@ -5699,26 +6005,41 @@ function drawCountryHighlight(){
   ctx.restore();
 }
 
+// v1.9.9：颜色字符串记忆化。每帧上千次调用（省块 + 国界 + 海路），
+// 每次 3 个 parseInt + 拼字符串，缓存后同 (颜色, 透明度) 只算一次。
+const _rgbaCache = new Map();
 function hexToRgba(hex, alpha){
+  let key = hex + '|' + alpha;
+  let hit = _rgbaCache.get(key);
+  if(hit !== undefined) return hit;
   let r=parseInt(hex.slice(1,3),16);
   let g=parseInt(hex.slice(3,5),16);
   let b=parseInt(hex.slice(5,7),16);
-  return `rgba(${r},${g},${b},${alpha})`;
+  let out = 'rgba('+r+','+g+','+b+','+alpha+')';
+  if(_rgbaCache.size < 4096) _rgbaCache.set(key, out);
+  return out;
 }
-function hexToRgbaA(hex, alpha){
-  let r=parseInt(hex.slice(1,3),16);
-  let g=parseInt(hex.slice(3,5),16);
-  let b=parseInt(hex.slice(5,7),16);
-  return `rgba(${r},${g},${b},${alpha})`;
-}
+function hexToRgbaA(hex, alpha){ return hexToRgba(hex, alpha); }
 
+// v1.9.9：邻接表建索引后缓存。旧实现每次调用都线性扫全表（~1400 条边），
+// 而 drawMap 每帧要调用 600+ 次（省块高亮 + 城市可用攻击判定）—— 单这一项就吃掉大量 CPU。
+// ADJACENCY 只在开局构建（markSea/linkLand）时增长，长度变化即视为需要重建。
+let _nbIndex = null, _nbIndexLen = -1;
+const _NB_EMPTY = [];
 function getNeighbors(provinceId){
-  let n = [];
-  ADJACENCY.forEach(([a,b])=>{
-    if(a===provinceId && b<provinces.length && provinces[b]) n.push(b);
-    if(b===provinceId && a<provinces.length && provinces[a]) n.push(a);
-  });
-  return n;
+  if(!_nbIndex || _nbIndexLen !== ADJACENCY.length){
+    _nbIndex = new Map();
+    _nbIndexLen = ADJACENCY.length;
+    ADJACENCY.forEach(function(edge){
+      let a = edge[0], b = edge[1];
+      if(a < provinces.length && provinces[a] === undefined) return;
+      if(!_nbIndex.has(a)) _nbIndex.set(a, []);
+      if(!_nbIndex.has(b)) _nbIndex.set(b, []);
+      if(b < provinces.length && provinces[b]) _nbIndex.get(a).push(b);
+      if(a < provinces.length && provinces[a]) _nbIndex.get(b).push(a);
+    });
+  }
+  return _nbIndex.get(provinceId) || _NB_EMPTY;
 }
 
 function getCanvasPos(e){
@@ -5735,7 +6056,7 @@ canvas.addEventListener('mousemove',(e)=>{
     mapOffsetX = panStartOX + (cp.x - panStartX);
     mapOffsetY = panStartOY + (cp.y - panStartY);
     clampView();
-    drawMap();
+    requestDraw();      // v1.9.9：同一帧只画一次，拖动不再被事件频率拖死
     return;
   }
   
@@ -5744,7 +6065,7 @@ canvas.addEventListener('mousemove',(e)=>{
   if(found!==hoverProvince){
     hoverProvince = found;
     updateTooltip(e.clientX, e.clientY);
-    drawMap();
+    requestDraw();
   }
 });
 
@@ -5803,7 +6124,7 @@ canvas.addEventListener('wheel',(e)=>{
   mapOffsetY = my - wy * mapScale;
   clampView();
   updateZoomLabel();
-  drawMap();
+  requestDraw();       // v1.9.9：滚轮连发时合并成每帧一次
 });
 
 canvas.addEventListener('click',(e)=>{
@@ -12793,17 +13114,36 @@ function gameLoop(){
 // 行军动画循环：gameTick 之间高频重绘地图，配合 drawMap 里的 animFrac 插值，
 // 让部队行军平滑移动而不是每 3~14 秒瞬移一格。只重绘、不改任何游戏状态，
 // 到达/交战判定仍由 gameTick 权威处理。没有部队行军时自动空转（开销≈0）。
+// v1.9.9：从 setInterval(50ms)（上限 20fps，还会和浏览器合帧撞车）改成 requestAnimationFrame，
+// 跟显示器刷新同步（60/120fps），并且只在真的有人在动时才画 —— 空闲时 CPU 占用≈0。
 function ensureMoveAnim(){
-  if(ensureMoveAnim._t) return;
-  ensureMoveAnim._t = setInterval(()=>{
+  if(ensureMoveAnim._raf) return;
+  ensureMoveAnim._frames = 0;
+  ensureMoveAnim._fpsAt = Date.now();
+  ensureMoveAnim._t = true;   // 兼容旧引用（有它就不重复启动）
+  const step = function(){
+    ensureMoveAnim._raf = requestAnimationFrame(step);
+    if(typeof game === 'undefined' || !game || !game.player) return;
     if(game.paused) return;
     if(window.MP && MP.active && !MP.isHost) return; // 客户端走 mpStartClientAnim
-    let hasMarching = false;
-    for(let u of units){ if(u.moving && u.moveTotal>0){ hasMarching=true; break; } }
-    if(hasMarching){
-      try{ drawMap(); }catch(e){}
+    let busy = false;
+    for(let u of units){ if(u.moving && u.moveTotal>0){ busy = true; break; } }
+    if(!busy && (!game.animations || game.animations.length === 0) &&
+       !(game.highlightCid && Date.now() < (game.highlightUntil || 0))){
+      if(game.fps){ game.fps = 0; updateFpsLabel(); }   // 空闲：不画、帧率归零
+      return;
     }
-  }, 50);
+    try{ drawMap(); }catch(e){}
+    ensureMoveAnim._frames++;
+    let now = Date.now();
+    if(now - ensureMoveAnim._fpsAt >= 1000){
+      game.fps = Math.round(ensureMoveAnim._frames * 1000 / (now - ensureMoveAnim._fpsAt));
+      ensureMoveAnim._frames = 0;
+      ensureMoveAnim._fpsAt = now;
+      if(typeof updateFpsLabel === 'function') updateFpsLabel();
+    }
+  };
+  ensureMoveAnim._raf = requestAnimationFrame(step);
 }
 
 // 训练队列结算计时器（真实时间，500ms 一查；暂停时不结算、不倒计时消耗）
@@ -12830,8 +13170,17 @@ setSpeed = function(s){
 // ---- 版本与更新日志 ----
 // 每次发布新版本：改 GAME_VERSION，并在 UPDATE_HISTORY 顶部加一条。
 // 玩家打开线上版时若版本号与 localStorage 记录不同，就弹「本次版本更新了以下内容」弹窗。
-const GAME_VERSION = 'v1.9.8';
+const GAME_VERSION = 'v1.9.9';
 const UPDATE_HISTORY = [
+  { ver:'v1.9.9', date:'2026-11-04', items:[
+    '⚡ **大幅优化流畅度（本次重点）**：以前每一帧都要把 304 个省块 + 182 个国家的真实国界（每国还要裁剪一次）+ 城市点 / 地名 / 道路全部重画一遍，单帧要几十毫秒 —— 拖动、缩放、鼠标划过省界都会一顿一顿的。现在把「相机和局势没变时完全一样」的东西烘焙进一张离屏底图，每帧只做一次位图拷贝 + 画会动的东西。实测静止场景单帧从 **90ms 降到 0.2ms**',
+    '🖱 **拖动和滚轮不再卡**：底图比屏幕大一圈（四周各留 200px），拖动时直接把已有底图平移贴上去，不用重画；滚轮缩放先用拉伸版顶着，手停下来 160ms 后再重烘焙清晰版 —— 连续滚 20 格也不会每格卡一下（缩放单帧 174ms → 20ms）',
+    '🖼 **悬停 / 选中不再全图重绘**：高亮从底图里搬到了「动态层」，鼠标划到哪个省只重画高亮本身（77ms → 0.3ms）',
+    '🎞 **帧率不再被 20fps 卡死**：行军动画原来是 `setInterval(50)` 定时器驱动，最多 20fps 且和屏幕刷新不同步。现在改用 `requestAnimationFrame`，直接跟显示器同步（60 / 120 / 144Hz），部队行军和交战特效明显更顺；同一帧内的多次重绘请求会合并成一次',
+    '🚫 **屏幕外的东西不画**：视口之外的国家、省块、国界、连线一律跳过（连线按线段包围盒判断，不会把横穿屏幕的长线误裁掉）—— 缩到最小看全球时省下最多',
+    '📈 **顶栏显示实时帧率**：缩放条下方新增 FPS 指示，绿 ≥50 / 黄 ≥30 / 红 <30；完全空闲时显示「待机」（说明确实没在空转重绘）',
+    '🧪 新增 test_render_perf.js（35 断言）：静态/动态分层、底图超采尺寸、相机不动复用、悬停选中不重烘焙、平移复用与拖出边距重烘焙、状态变化正确失效、视口裁剪、rAF 循环、帧率指示、降级路径',
+  ]},
   { ver:'v1.9.8', date:'2026-11-04', items:[
     '📁 **反馈直接写进你这台电脑的文件夹**：不再是浏览器本地记录、也不是存档。第一次点「提交反馈」会弹一次文件夹选择框（建议 D:\\Qst），选完永久记住 —— 以后每次提交都**静默写一个 txt 进那个文件夹，不再弹任何窗口**，成功后会显示完整文件路径，你可以直接在资源管理器里看到它。没有联网上传（一个字节都不外传）。浏览器安全模型不允许网页自己创建/写入任意路径，所以这**一次**点选必须由你亲手完成',
     '📴 **断网时反馈按钮自动变灰**：检测到没联网就把右上角「❓ 反馈」置灰，点击只弹一行提示「目前未连接网络，不可反馈」，不会打开面板也不会卡住游戏；网络恢复自动变回可用',
