@@ -24,6 +24,11 @@ body{background:#0d1117;font-family:'Microsoft YaHei',sans-serif;overflow:hidden
 #topbar .pts{font-size:13px;color:#58a6ff;margin-left:12px;white-space:nowrap}
 /* v1.9.7 反馈按钮：固定钉在顶栏最右侧，不参与 flex 排布，窗口再窄也不会被挤走 */
 #btn-feedback{position:absolute;right:10px;top:8px;height:26px;z-index:60;white-space:nowrap}
+/* v1.9.8 断网时反馈按钮置灰不可点 */
+#btn-feedback.offline{background:#161b22 !important;border-color:#30363d !important;color:#6e7681 !important;cursor:not-allowed;filter:grayscale(1);opacity:.6}
+/* 轻量浮动提示（不用原生 alert，避免阻塞游戏循环） */
+#float-tip{position:fixed;left:50%;top:64px;transform:translateX(-50%) translateY(-8px);background:#161b22;border:1px solid #30363d;border-radius:8px;padding:9px 18px;font-size:13px;color:#c9d1d9;z-index:12000;opacity:0;transition:opacity .18s,transform .18s;pointer-events:none;box-shadow:0 6px 24px rgba(0,0,0,.5);max-width:80vw;text-align:center}
+#float-tip.show{opacity:1;transform:translateX(-50%) translateY(0)}
 #canvas-wrap{flex:1;position:relative;overflow:hidden;cursor:grab}
 #canvas-wrap.panning{cursor:grabbing}
 #zoom-controls{position:absolute;right:12px;top:12px;display:flex;flex-direction:column;gap:4px;z-index:50}
@@ -322,6 +327,30 @@ const COUNTRY_DEFS = {
   dutchindies:{id:'dutchindies',name:'荷属东印度',short:'荷属东印度',_origName:'东印度群岛',_origShort:'东印度',_regime:'colony',color:'#d4903c',neutral:true,puppetOf:'netherlands',leader:'博尼法西乌斯·科尼利斯',flag:'🇮🇩',aggression:10},
   // 英属马来亚：1941-42年日军南进首要目标（橡胶/锡矿 + 新加坡海军基地）
   malaya:{id:'malaya',name:'英属马来亚',short:'英属马来亚',_origName:'马来亚联合邦',_origShort:'马来亚',_regime:'colony',color:'#9cc45c',allies:true,puppetOf:'uk',leader:'珊顿·托马斯',flag:'🇲🇾',aggression:10},
+  // ---- v1.9.8 补齐小国 / 殖民地（24 个）----
+  burma:{id:'burma',name:'英属缅甸',short:'英属缅甸',_origName:'缅甸',_origShort:'缅甸',_regime:'colony',color:'#b8a04a',puppetOf:'uk',allies:true,leader:'阿奇博尔德·科克伦',flag:'🇲🇲',aggression:25},
+  bhutan:{id:'bhutan',name:'不丹王国',short:'不丹',color:'#c9a227',neutral:true,leader:'吉格梅·旺楚克',flag:'🇧🇹',aggression:15},
+  sikkim:{id:'sikkim',name:'锡金王国',short:'锡金',_origName:'锡金王国',_origShort:'锡金',_regime:'protector',color:'#d4b84a',puppetOf:'uk',allies:true,leader:'塔希·纳姆加尔',flag:'🏴',aggression:25},
+  maldives:{id:'maldives',name:'英属马尔代夫',short:'马尔代夫',_origName:'马尔代夫苏丹国',_origShort:'马尔代夫',_regime:'protector',color:'#4a9ec4',puppetOf:'uk',allies:true,leader:'穆罕默德·沙姆苏丁',flag:'🇲🇻',aggression:25},
+  sarawak:{id:'sarawak',name:'沙捞越王国',short:'沙捞越',_origName:'沙捞越王国',_origShort:'沙捞越',_regime:'protector',color:'#8c9c4a',puppetOf:'uk',neutral:true,leader:'查尔斯·维纳·布鲁克',flag:'🏴',aggression:15},
+  northborneo:{id:'northborneo',name:'英属北婆罗洲',short:'北婆罗洲',_origName:'北婆罗洲',_origShort:'北婆罗洲',_regime:'colony',color:'#a06a4a',puppetOf:'uk',allies:true,leader:'特许公司总督',flag:'🏴',aggression:25},
+  macau:{id:'macau',name:'葡属澳门',short:'澳门',_origName:'澳门',_origShort:'澳门',_regime:'colony',color:'#3c8a6e',puppetOf:'portugal',neutral:true,leader:'澳门总督府',flag:'🇲🇴',aggression:15},
+  andorra:{id:'andorra',name:'安道尔公国',short:'安道尔',color:'#d4a444',neutral:true,leader:'共治亲王',flag:'🇦🇩',aggression:15},
+  monaco:{id:'monaco',name:'摩纳哥公国',short:'摩纳哥',color:'#d4574e',neutral:true,leader:'路易二世',flag:'🇲🇨',aggression:15},
+  sanmarino:{id:'sanmarino',name:'圣马力诺共和国',short:'圣马力诺',color:'#7a9cbf',neutral:true,leader:'执政官二人',flag:'🇸🇲',aggression:15},
+  liechtenstein:{id:'liechtenstein',name:'列支敦士登公国',short:'列支敦士登',color:'#c96a6a',neutral:true,leader:'弗朗茨一世',flag:'🇱🇮',aggression:15},
+  danzig:{id:'danzig',name:'但泽自由市',short:'但泽',color:'#9c8c5a',neutral:true,leader:'国联高级专员',flag:'🏴',aggression:15},
+  greenland:{id:'greenland',name:'丹属格陵兰',short:'格陵兰',_origName:'格陵兰',_origShort:'格陵兰',_regime:'colony',color:'#6a8c9c',puppetOf:'denmark',neutral:true,leader:'格陵兰总督',flag:'🇬🇱',aggression:15},
+  newfoundland:{id:'newfoundland',name:'纽芬兰自治领',short:'纽芬兰',_origName:'纽芬兰',_origShort:'纽芬兰',_regime:'colony',color:'#bb6b6b',puppetOf:'uk',neutral:true,leader:'委任政府主席',flag:'🏴',aggression:15},
+  puertorico:{id:'puertorico',name:'美属波多黎各',short:'波多黎各',_origName:'波多黎各',_origShort:'波多黎各',_regime:'colony',color:'#56b0c4',puppetOf:'usa',allies:true,leader:'波多黎各总督',flag:'🇵🇷',aggression:25},
+  bermuda:{id:'bermuda',name:'英属百慕大',short:'百慕大',_origName:'百慕大',_origShort:'百慕大',_regime:'colony',color:'#c94c8c',puppetOf:'uk',allies:true,leader:'百慕大总督',flag:'🇧🇲',aggression:25},
+  tonga:{id:'tonga',name:'汤加王国',short:'汤加',_origName:'汤加王国',_origShort:'汤加',_regime:'protector',color:'#c9b03c',puppetOf:'uk',neutral:true,leader:'萨洛特·图普三世',flag:'🇹🇴',aggression:15},
+  samoa:{id:'samoa',name:'西萨摩亚',short:'西萨摩亚',_origName:'西萨摩亚',_origShort:'西萨摩亚',_regime:'protector',color:'#4a8c9c',puppetOf:'newzealand',neutral:true,leader:'新西兰行政官',flag:'🇼🇸',aggression:15},
+  nauru:{id:'nauru',name:'瑙鲁',short:'瑙鲁',_origName:'瑙鲁',_origShort:'瑙鲁',_regime:'protector',color:'#8c9c4a',puppetOf:'australia',neutral:true,leader:'瑙鲁行政官',flag:'🇳🇷',aggression:15},
+  papuanewguinea:{id:'papuanewguinea',name:'澳属巴布亚',short:'巴布亚',_origName:'巴布亚新几内亚',_origShort:'巴布亚',_regime:'colony',color:'#4c8c4c',puppetOf:'australia',allies:true,leader:'巴布亚行政官',flag:'🇵🇬',aggression:25},
+  seychelles:{id:'seychelles',name:'英属塞舌尔',short:'塞舌尔',_origName:'塞舌尔',_origShort:'塞舌尔',_regime:'colony',color:'#4a9e5f',puppetOf:'uk',allies:true,leader:'塞舌尔总督',flag:'🇸🇨',aggression:25},
+  saintelena:{id:'saintelena',name:'英属圣赫勒拿',short:'圣赫勒拿',_origName:'圣赫勒拿',_origShort:'圣赫勒拿',_regime:'colony',color:'#6a8c4a',puppetOf:'uk',allies:true,leader:'圣赫勒拿总督',flag:'🇸🇭',aggression:25},
+  aden:{id:'aden',name:'英属亚丁',short:'亚丁',_origName:'亚丁',_origShort:'亚丁',_regime:'colony',color:'#c07850',puppetOf:'uk',allies:true,leader:'亚丁总督',flag:'🏴',aggression:25},
   // 地方叛军：战争支持率跌破40%时由内乱生成的隐藏势力（不可被选择，平时不存在）
   rebels:{id:'rebels',name:'地方叛军',short:'叛军',color:'#6b3f2a',neutral:true,leader:'叛乱首领',flag:'🏴',aggression:0,hidden:true},
   palestine:{id:'palestine',name:'英属巴勒斯坦',short:'巴勒斯坦',puppetOf:'uk',_origName:'巴勒斯坦',_origShort:'巴勒斯坦',_regime:'colony',allies:true,color:'#c23d3d',leader:'总督府',flag:'🏴',aggression:10},
@@ -827,6 +856,18 @@ const FOCUS_GENERIC = {name:'国家发展',branches:[
     {id:'gen_ration',name:'配给制',icon:'🍞',days:10,req:['gen_warpre'],desc:'勒紧裤腰带支援前线。',effects:{res:{man:30},buff:{prod:10}}},
     {id:'gen_laststand',name:'全民抗战',icon:'🔥',days:21,req:['gen_ration'],desc:'焦土政策：寸土必争！',effects:{buff:{def:20,ws:10}}},
   ]},
+  // v1.9.8 反抗合并：小国面临被"国策和平吞并"时的自救线
+  // 前置「反抗铺设」3 天（稳定度 -20），之后分三条线：禁止吞并 / 国际申诉 / 武装抵抗
+  {name:'反抗合并',nodes:[
+    {id:'res_network',name:'反抗铺设',icon:'🕸️',days:3,req:[],need:{annexThreat:true},
+     desc:'秘密铺设地下抵抗网络：3 天完成，代价是镇压与动荡让稳定度 -20，但从此有了拒绝合并的底气。',effects:{buff:{stab:-20}}},
+    {id:'res_ban',name:'禁止吞并',icon:'🚫',days:10,req:['res_network'],need:{annexThreat:true},
+     desc:'国会通过《禁止吞并法》：从此任何"国策和平合并"都会失败（战争打输了另说）。',effects:{noAnnex:true}},
+    {id:'res_appeal',name:'国际申诉',icon:'🕊️',days:10,req:['res_network'],need:{annexThreat:true},
+     desc:'向国联与列强递交抗议书：战争支持 +10，各大国关系改善，吞并方要付出外交代价。',effects:{appeal:true,buff:{ws:10}}},
+    {id:'res_arms',name:'武装抵抗',icon:'🔫',days:14,req:['res_network'],need:{annexThreat:true},
+     desc:'全民发枪、山区游击：防御 +15、人力 +30，入侵者将陷入泥潭。',effects:{buff:{def:15},res:{man:30}}},
+  ]},
 ]};
 function getFocusTree(cid){ return FOCUS_TREES[cid] || FOCUS_GENERIC; }
 
@@ -841,7 +882,12 @@ const DIFFICULTY = {
   austria:4, czechoslovakia:4, albania:4, iraq:4, iran:4, lithuania:4, latvia:4, estonia:4,
   switzerland:4, ireland:4, portugal:4,
   poland:5, egypt:5, india:5, manchukuo:5, mongolia:5,
-  ethiopia:5, philippines:5, indochina:5, dutchindies:5
+  ethiopia:5, philippines:5, indochina:5, dutchindies:5,
+  // v1.9.8 新增小国（远处海岛安全但无力，夹在战线上的极小国最惨）
+  burma:5, bhutan:5, sikkim:5, maldives:4, sarawak:5, northborneo:5, macau:5,
+  andorra:5, monaco:5, sanmarino:5, liechtenstein:5, danzig:5,
+  greenland:4, newfoundland:4, puertorico:5, bermuda:4, tonga:4, samoa:4, nauru:4,
+  papuanewguinea:5, seychelles:4, saintelena:4, aden:5
 };
 const DIFF_LABEL = {1:'简单',2:'较简单',3:'中等',4:'较难',5:'极难'};
 const DIFF_COLOR = {1:'#7ee787',2:'#7ee787',3:'#f0c040',4:'#ff9d4d',5:'#ff7b72'};
@@ -894,7 +940,30 @@ const DIFF_TIPS = {
   latvia:'波罗的海小国，苏联觊觎',
   estonia:'波罗的海小国，苏联觊觎',
   indochina:'法国殖民地，日本虎视眈眈',
-  dutchindies:'石油富庶的荷兰殖民地，日本必夺'
+  dutchindies:'石油富庶的荷兰殖民地，日本必夺',
+  burma:'英属缅甸，滇缅公路咽喉，日军南进必取',
+  bhutan:'喜马拉雅山国，印度保护下的世外之地',
+  sikkim:'锡金王国，夹在印度与西藏之间的弹丸之地',
+  maldives:'印度洋珊瑚岛国，英国保护，无兵可守',
+  sarawak:'砂拉越王国（布鲁克王朝），婆罗洲上的白人拉者',
+  northborneo:'英属北婆罗洲，石油与丛林',
+  macau:'葡萄牙远东据点，夹在华南与香港之间',
+  andorra:'比利牛斯山谷小国，法国与西班牙之间的一枚棋子',
+  monaco:'地中海赌城，靠法国保护过日子',
+  sanmarino:'世界最古老共和国，被意大利完全包围',
+  liechtenstein:'阿尔卑斯袖珍国，紧贴德国与瑞士',
+  danzig:'但泽自由市，德国下一个目标，开战即亡',
+  greenland:'丹麦属地，冰盖与极夜，谁都不来打你',
+  newfoundland:'纽芬兰，英国最古老的海外殖民地，隔着大西洋',
+  puertorico:'美国属地，加勒比海上的哨站',
+  bermuda:'百慕大，英国海军基地，孤悬大西洋',
+  tonga:'太平洋岛国，英国保护下的王国',
+  samoa:'西萨摩亚，新西兰委任统治地',
+  nauru:'瑙鲁，太平洋上的磷矿小岛',
+  papuanewguinea:'巴布亚新几内亚，澳属委任地，日军南进目标',
+  seychelles:'印度洋群岛，英国殖民地',
+  saintelena:'圣赫勒拿，南大西洋孤岛',
+  aden:'亚丁，英国在红海的战略港口'
 };
 function starsHtml(n){
   let s='';
@@ -1074,11 +1143,11 @@ const PROVINCE_DEFS = [
 [120,'india','卡拉奇',900,216,'plains',0,1,0,0,0,3],
 [121,'india','拉合尔',927,198,'plains',0,1,0,0,0,3],
 [122,'india','达卡',975,240,'plains',0,1,0,0,0,3],
-[123,'india','仰光',999,249,'plains',0,1,0,0,0,3],
-[124,'australia','莫尔兹比港',1181,359,'plains',0,1,0,0,0,1],
+[123,'burma','仰光',999,249,'plains',1,1,0,0,0,3],
+[124,'papuanewguinea','莫尔兹比港',1181,359,'plains',1,1,0,0,0,1],
 [125,'australia','拉包尔',1199,340,'plains',0,1,0,0,0,1],
-[126,'denmark','努克',462,93,'plains',0,1,0,0,0,1],
-[127,'usa','圣胡安',411,258,'plains',0,0,0,0,0,1],
+[126,'greenland','努克',462,93,'plains',1,1,0,0,0,1],
+[127,'puertorico','圣胡安',411,258,'plains',1,0,0,0,0,1],
 [128,'palestine','巴勒斯坦',777,213,'plains',1,1,0,0,0,1],
 [129,'argentina','布宜诺斯艾利斯',414,453,'plains',1,1,0,0,0,4],
 [130,'argentina','门多萨',405,522,'plains',0,1,0,0,0,4],
@@ -1233,12 +1302,31 @@ const PROVINCE_DEFS = [
 [277,'germany','斯图加特',682,150,'hills',0,1,1,0,0,2],
 [278,'italy','威尼斯',694,152,'plains',0,1,0,0,0,2],
 [279,'italy','热那亚',682,156,'hills',0,1,0,0,0,2],
-[280,'poland','但泽',717,126,'plains',0,1,0,0,0,2],
+[280,'danzig','但泽',717,126,'plains',1,1,0,0,0,2],
 [281,'turkey','埃尔祖鲁姆',770,171,'hills',0,1,0,0,0,2],
 [282,'india','加尔各答',945,235,'urban',0,2,1,1,0,4],
 [283,'canada','蒙特利尔',322,152,'urban',0,1,0,0,0,2],
 [284,'brazil','萨尔瓦多',469,302,'plains',0,1,0,0,0,2],
 [285,'australia','珀斯',1162,440,'plains',0,1,0,0,0,2],
+// ---- v1.9.8 小国省份 ----
+[286,'bhutan','廷布',973.7,225.8,'mountain',1,0,0,0,0,1],
+[287,'sikkim','甘托克',968.0,227.5,'mountain',1,0,0,0,0,1],
+[288,'maldives','马累',915.5,309.9,'plains',1,0,0,0,0,1],
+[289,'sarawak','古晋',1047.0,318.5,'plains',1,0,0,0,1,2],
+[290,'northborneo','亚庇',1070.0,302.5,'plains',1,0,0,0,0,1],
+[291,'macau','澳门',1056.5,247.5,'urban',1,0,0,0,0,1],
+[292,'andorra','安道尔城',656.0,170.0,'mountain',1,0,0,0,0,1],
+[293,'monaco','摩纳哥',677.5,166.0,'urban',1,0,0,0,0,1],
+[294,'sanmarino','圣马力诺',695.0,166.3,'hills',1,0,0,0,0,1],
+[295,'liechtenstein','瓦杜兹',685.5,153.5,'mountain',1,0,0,0,1,1],
+[296,'newfoundland','圣约翰斯',459.7,153.3,'hills',1,1,0,0,0,2],
+[297,'bermuda','汉密尔顿',416.1,208.4,'plains',1,0,0,0,0,1],
+[298,'tonga','努库阿洛法',1296.0,401.5,'plains',1,0,0,0,0,1],
+[299,'samoa','阿皮亚',1291.0,376.0,'plains',1,0,0,0,0,1],
+[300,'nauru','亚伦',1252.8,326.9,'plains',1,0,0,0,0,1],
+[301,'seychelles','维多利亚',850.2,341.7,'plains',1,0,0,0,0,1],
+[302,'saintelena','詹姆斯敦',629.3,382.6,'hills',1,0,0,0,0,1],
+[303,'aden','亚丁',813.0,277.5,'plains',1,1,0,0,0,2],
 ];
 
 // Province adjacency: province pairs that border each other
@@ -1925,6 +2013,8 @@ const ADJACENCY = [
 [284,88],
 // 澳大利亚
 [285,84],
+// ---- v1.9.8 小国邻接 ----
+[123,83],[123,82],[286,122],[287,122],[287,157],[115,114],[289,218],[290,218],[291,38],[291,220],[291,256],[292,50],[292,275],[292,13],[293,19],[293,17],[293,11],[294,16],[294,96],[294,17],[295,279],[295,277],[295,96],[280,4],[280,48],[280,46],[127,240],[127,150],[298,221],[299,221],[303,190],[303,154],[303,171]
 ];
 
 // Sea routes — cross-ocean adjacency requiring naval capability
@@ -2133,6 +2223,8 @@ const SEA_ROUTE_PAIRS_V2 = [
   [57,73],[57,27],[57,77],[58,71],[58,72],[56,27],
   // 波斯湾 / 中东
   [107,81],[107,113],[106,81],[106,103],[106,71],[79,102],
+  // v1.9.8 小国海路
+  [288,219],[126,265],[296,126],[297,265],[300,222],[124,241],[301,224],[302,229]
 ];
 SEA_ROUTE_PAIRS_V2.forEach(([a,b])=>markSea(a,b));
 
@@ -2803,6 +2895,30 @@ const STARTING_ARMY = {
   mongolia:       {infantry:2, garrison:1},
   philippines:    {infantry:1, garrison:1},
   dutchindies:    {infantry:2, garrison:1},
+  // ---- v1.9.8 新增小国 ----
+  maldives: {garrison:1, destroyer:1},
+  greenland: {garrison:1, destroyer:1},
+  newfoundland: {garrison:1, destroyer:1},
+  bermuda: {garrison:1, destroyer:1},
+  tonga: {garrison:1, destroyer:1},
+  samoa: {garrison:1, destroyer:1},
+  nauru: {garrison:1, destroyer:1},
+  seychelles: {garrison:1, destroyer:1},
+  saintelena: {garrison:1, destroyer:1},
+  puertorico: {garrison:1, destroyer:1},
+  papuanewguinea: {garrison:1, destroyer:1},
+  macau: {garrison:1, destroyer:1},
+  burma: {infantry:2, garrison:1},   // 英属缅甸陆军 + 仰光守备
+  bhutan: {garrison:1},
+  sikkim: {garrison:1},
+  sarawak: {garrison:1},
+  northborneo: {garrison:1},
+  andorra: {garrison:1},
+  monaco: {garrison:1},
+  sanmarino: {garrison:1},
+  liechtenstein: {garrison:1},
+  danzig: {garrison:1},
+  aden: {garrison:1},
 };
 // 直接入列：不检查也不扣除人力/装备（发放的是开局既有的常备军，
 // 不是新征召的部队，走 createUnit 会因开局资源不足而静默失败）
@@ -3160,10 +3276,39 @@ function getCombatBonus(cid, skillId){
 }
 
 // ==================== 国策树：核心逻辑 ====================
+// v1.9.8：判断某国是否"面临和平吞并威胁"
+//   ① 本国很小（≤2 省）—— 现实里这类小国最容易被大国通过国策直接合并
+//   ② 有别的国家的国策树里把本国列为 annex 目标（且该国还没吞并掉自己）
+function isAnnexThreatened(cid){
+  let c = countries[cid];
+  if(!c || c.eliminated || cid==='rebels') return false;
+  // 同一 tick 内复用缓存（AI 每轮会问很多次，别每次全表扫描国策树）
+  if(game._annexThreatTick !== game.tick || !game._annexThreatSet){
+    game._annexThreatTick = game.tick;
+    let set = {};
+    let cnt = {};
+    provinces.forEach(p=>{ cnt[p.controller] = (cnt[p.controller]||0)+1; });
+    for(let k in cnt){ if(cnt[k] <= 2) set[k] = true; }
+    for(let other in countries){
+      let oc = countries[other];
+      if(!oc || oc.eliminated) continue;
+      let tree = getFocusTree(other);
+      for(let b of (tree.branches||[])){
+        for(let n of (b.nodes||[])){
+          if(!n.effects || !n.effects.annex) continue;
+          let targets = Array.isArray(n.effects.annex) ? n.effects.annex : [n.effects.annex];
+          targets.forEach(t=>{ if(t && t!==other) set[t] = true; });
+        }
+      }
+    }
+    game._annexThreatSet = set;
+  }
+  return !!game._annexThreatSet[cid];
+}
 // 检查节点是否满足前置与附加条件
 function focusNodeState(cid, node){
   let c = countries[cid];
-  if(!c) return 'locked';
+  if(!c || !node) return 'locked';
   if(c.focusDone && c.focusDone[node.id]) return 'done';
   if(c.focus && c.focus.nodeId===node.id) return 'active';
   if(node.req && !node.req.every(r=>c.focusDone[r])) return 'locked';
@@ -3173,6 +3318,10 @@ function focusNodeState(cid, node){
   }
   // 附加条件：need.year = 历史年份门槛（如诺曼底1944、巴巴罗萨1941），未到年份锁定
   if(node.need && node.need.year && game.date.year < node.need.year) return 'locked';
+  // 附加条件：need.annexThreat = 只有"可能被和平吞并的小国"才能点（v1.9.8 反抗合并线）
+  if(node.need && node.need.annexThreat && !isAnnexThreatened(cid)) return 'locked';
+  // 附加条件：need.annexedOnly = 已经点过 noAnnex 的国家不再需要反抗线
+  if(node.need && node.need.notAnnexed && c._noAnnex) return 'done';
   // 宣战类节点：目标已灭亡/已交战则视为已完成
   if(node.effects && (node.effects.war || node.effects.war2)){
     for(let wk of ['war','war2']){
@@ -3201,6 +3350,26 @@ function startFocus(cid, nodeId){
   c.focus = {nodeId:nodeId, progress:0};
   if(cid===game.player) addLog('🎯','开始推行国策：'+node.icon+' '+node.name+'（'+node.days+'天）');
   return true;
+}
+// v1.9.8：AI 选国策
+// ① 面临和平吞并威胁的小国 → 优先点「反抗合并」线（反抗铺设 → 禁止吞并 → 武装抵抗）
+// ② 其余按国策树分支顺序挑第一个可点的（走历史路线）
+function aiPickFocusNode(cid){
+  let c = countries[cid];
+  if(!c || c.eliminated) return null;
+  if(isAnnexThreatened(cid) && !c._noAnnex){
+    for(let id of ['res_network','res_ban','res_appeal','res_arms']){
+      let n = findFocusNode(cid, id);
+      if(n && focusNodeState(cid, n)==='available') return n;
+    }
+  }
+  let tree = getFocusTree(cid);
+  for(let branch of tree.branches){
+    for(let node of branch.nodes){
+      if(focusNodeState(cid, node)==='available') return node;
+    }
+  }
+  return null;
 }
 // 每日推进（gameTick 调用，AI 与玩家都走这里）
 function advanceFocus(){
@@ -3244,6 +3413,15 @@ function applyFocusEffects(cid, node){
     for(let t of targets){
       let tc = countries[t];
       if(!tc || tc.eliminated) continue;
+      // v1.9.8：对方点过「禁止吞并」国策 → 和平吞并直接失败（战争吞并不受影响）
+      if(tc._noAnnex){
+        addLog('🚫', (COUNTRY_DEFS[cid]?COUNTRY_DEFS[cid].short:cid) + ' 试图合并 ' + (COUNTRY_DEFS[t]?COUNTRY_DEFS[t].short:t) + '，但对方以《禁止吞并法》顽强抗拒，合并失败！');
+        if(game.relations[cid] && game.relations[cid][t] !== undefined){
+          game.relations[cid][t] = Math.max(-100, (game.relations[cid][t]||0) - 25);
+        }
+        if(t===game.player) addLog('🚫','✅ 你的「禁止吞并」国策生效：'+COUNTRY_DEFS[cid].short+' 的合并企图被挫败！');
+        continue;
+      }
       let provs = provinces.filter(p=>p.controller===t);
       provs.forEach(p=>{ p.controller = cid; });
       // 接收其资源储备的一部分
@@ -3306,6 +3484,26 @@ function applyFocusEffects(cid, node){
     let cur = game.relations[cid][e.rel.t]||0;
     game.relations[cid][e.rel.t] = Math.max(-100, Math.min(100, cur + e.rel.d));
     if(game.relations[e.rel.t]) game.relations[e.rel.t][cid] = Math.max(-100, Math.min(100, (game.relations[e.rel.t][cid]||0) + Math.floor(e.rel.d/2)));
+  }
+  // v1.9.8：禁止吞并 —— 永久免疫"国策和平吞并"（战争打输了照样会被吞）
+  if(e.noAnnex){
+    c._noAnnex = true;
+    addLog('🚫', (COUNTRY_DEFS[cid]?COUNTRY_DEFS[cid].short:cid) + ' 通过《禁止吞并法》：任何和平合并企图都将被拒绝');
+  }
+  // v1.9.8：国际申诉 —— 列强关系改善，吞并方外交代价上升
+  if(e.appeal){
+    const MAJORS = ['uk','france','usa','ussr','germany','italy','japan'];
+    MAJORS.forEach(function(m){
+      if(m===cid || !countries[m] || countries[m].eliminated) return;
+      if(game.relations[cid] && game.relations[cid][m] !== undefined){
+        game.relations[cid][m] = Math.max(-100, Math.min(100, (game.relations[cid][m]||0) + 18));
+      }
+      if(game.relations[m] && game.relations[m][cid] !== undefined){
+        game.relations[m][cid] = Math.max(-100, Math.min(100, (game.relations[m][cid]||0) + 10));
+      }
+    });
+    c.warSupport = Math.max(0, Math.min(100, (c.warSupport||0) + 10));
+    addLog('🕊️', (COUNTRY_DEFS[cid]?COUNTRY_DEFS[cid].short:cid) + ' 向国联递交抗议书，列强对吞并行为表示关切');
   }
   // 互不侵犯条约（双方生效，12个月=360天）
   if(e.pact && countries[e.pact] && !countries[e.pact].eliminated){
@@ -4150,6 +4348,30 @@ WORLD_BORDERS.uk=WORLD_BORDERS.uk.concat([[640,139,631,138,635,136,635,134,633,1
 WORLD_BORDERS.usa=WORLD_BORDERS.usa.concat([[411,258,413,259,412,260,407,260,407,258,411,258]]);
 WORLD_BORDERS.ussr=WORLD_BORDERS.ussr.concat([[1122,172,1121,171,1124,168,1123,163,1126,161,1131,162,1136,151,1123,153,1121,149,1111,145,1105,135,1096,132,1084,134,1086,137,1081,144,1076,146,1063,143,1050,148,1042,147,1035,143,1023,144,1019,142,1019,140,1007,137,1003,141,1005,144,1002,145,983,141,966,148,963,145,958,146,951,141,944,142,942,140,939,142,931,133,926,130,927,128,915,132,916,130,907,129,905,125,899,125,885,129,871,130,871,133,874,134,870,134,870,136,867,137,872,140,870,142,865,143,859,141,851,142,847,141,847,143,843,139,833,138,826,142,826,145,821,143,819,150,821,153,824,153,827,156,825,157,828,158,821,160,819,164,821,168,822,167,821,170,825,174,822,176,815,171,794,168,782,162,789,159,786,157,792,155,788,154,794,152,795,146,785,143,779,143,778,141,774,140,774,138,772,136,765,137,763,134,768,132,761,127,762,124,752,123,750,120,749,113,751,109,759,108,750,106,764,98,758,95,760,94,757,90,759,87,755,83,758,81,754,79,753,76,765,72,771,74,770,76,779,75,798,80,799,84,790,86,765,82,775,87,774,89,777,92,785,95,787,94,782,91,783,90,794,92,796,91,794,88,802,85,809,87,810,83,808,82,810,79,806,77,816,78,819,80,812,82,818,84,822,83,826,80,844,76,847,76,842,78,863,76,863,78,866,78,870,76,867,74,870,73,897,78,900,76,892,74,893,70,891,68,897,66,901,62,908,62,913,63,910,67,913,69,912,76,916,78,908,84,899,84,910,86,920,80,919,78,921,76,926,76,929,78,929,80,935,81,930,80,932,79,930,76,916,75,916,73,918,70,914,67,921,64,920,62,923,63,922,67,923,68,935,69,925,65,932,65,930,64,933,64,950,66,947,70,950,69,949,71,950,72,952,70,950,68,952,66,942,63,941,59,964,58,960,60,963,61,960,60,966,58,961,57,965,56,960,55,964,55,966,54,964,54,987,50,1006,50,1009,51,1010,50,1007,49,1017,49,1014,49,1015,47,1026,44,1033,46,1026,47,1038,47,1034,49,1051,48,1061,51,1060,52,1056,51,1061,53,1058,54,1030,62,1050,59,1046,59,1048,58,1058,58,1060,60,1059,62,1060,63,1059,62,1062,59,1078,59,1082,61,1092,62,1096,61,1096,59,1100,59,1116,61,1114,62,1117,62,1114,63,1117,65,1111,64,1123,70,1129,65,1133,67,1141,66,1148,68,1149,66,1156,67,1153,65,1156,64,1152,64,1159,63,1158,62,1178,63,1171,64,1180,64,1174,66,1182,64,1190,64,1192,65,1188,66,1201,69,1223,69,1227,70,1227,73,1231,74,1233,76,1231,78,1233,74,1239,73,1256,73,1262,77,1266,76,1267,75,1264,74,1266,72,1296,74,1300,76,1300,90,1295,92,1289,90,1280,91,1291,91,1298,99,1297,100,1289,98,1274,103,1265,108,1261,106,1250,109,1251,107,1246,109,1241,108,1235,115,1239,116,1238,118,1240,122,1235,122,1234,125,1235,127,1228,129,1228,133,1222,133,1221,138,1216,141,1212,126,1213,120,1216,116,1222,116,1235,107,1241,105,1243,100,1247,99,1240,99,1239,103,1228,106,1229,105,1227,105,1229,101,1217,102,1207,109,1210,111,1196,112,1199,111,1190,109,1187,111,1167,111,1159,114,1138,127,1144,128,1144,131,1147,129,1146,132,1150,130,1150,132,1151,129,1155,129,1161,133,1159,133,1161,137,1157,142,1156,150,1138,168,1131,171,1126,169,1122,172],[821,33,826,34,812,34,821,33],[832,33,837,34,827,36,818,35,832,33],[895,50,872,53,861,56,855,60,844,59,853,56,851,56,854,54,852,54,871,50,894,47,899,48,895,50],[850,60,854,61,850,65,858,70,844,69,846,68,843,67,836,66,842,61,850,60],[999,32,1003,33,1001,34,1001,35,981,35,987,32,999,32],[1003,36,1004,36,1003,37,1011,37,1008,39,1011,40,1009,40,986,38,1003,36],[1022,39,1020,40,1025,39,1030,42,1009,43,1017,38,1022,39],[1156,51,1159,52,1161,50,1175,52,1170,54,1164,52,1167,54,1152,55,1145,53,1146,51,1151,50,1156,51],[1180,53,1195,54,1186,55,1178,53,1180,53],[1166,129,1167,137,1173,149,1170,147,1167,147,1165,153,1168,158,1168,159,1165,156,1163,159,1164,140,1162,136,1162,132,1165,132,1164,129,1166,129],[0,67,9,68,2,69,0,69,0,67],[862,32,857,32,862,32],[832,75,827,77,824,76,827,74,832,75],[879,34,876,33,882,32,886,33,879,34],[859,36,856,34,864,35,859,36],[874,33,864,34,874,33],[843,35,839,35,843,35],[856,35,851,36,856,35],[859,31,861,31,857,32,850,31,859,31],[848,32,858,33,847,33,845,33,848,32],[985,37,979,36,989,36,985,37],[1159,58,1156,57,1159,58],[1163,58,1168,61,1154,60,1163,58],[1148,126,1146,127,1148,126],[1261,74,1256,73,1261,74],[1241,113,1244,111,1241,113],[1213,143,1210,143,1214,142,1213,143],[1187,161,1180,165,1184,161,1187,161],[1059,56,1053,57,1059,56],[905,61,902,61,904,60,909,61,905,61],[930,64,928,64,931,63,933,63,930,64],[937,62,934,62,937,62],[868,72,865,73,861,71,868,72],[726,125,725,127,731,126,732,129,721,128,726,125],[771,159,782,161,772,165,771,162,767,161,771,159],[906,172,897,178,895,176,891,176,890,173,888,173,889,170,884,167,874,168,861,160,852,163,852,176,845,172,840,174,840,171,835,169,831,164,836,164,834,163,836,161,842,161,841,160,842,156,835,155,828,158,825,157,827,156,824,153,821,153,819,150,819,146,822,143,826,145,826,142,833,138,843,139,847,143,847,141,851,142,859,141,865,143,870,142,872,140,867,137,870,136,870,134,874,134,871,133,871,130,885,129,899,125,905,125,907,129,916,130,915,132,927,128,926,130,931,133,939,142,942,140,944,142,951,141,958,146,963,145,965,148,960,150,959,155,950,155,948,162,938,163,941,164,942,169,940,173,936,171,918,169,916,170,915,172,909,170,906,172],[906,172,904,175,908,177,909,175,914,178,909,180,905,180,904,177,900,178,897,182,893,182,897,187,895,191,890,190,890,188,880,184,876,181,874,177,867,176,867,173,862,171,860,171,861,172,856,174,856,176,852,176,852,163,861,160,874,168,884,167,889,170,888,173,890,173,891,176,895,176,897,178,906,172],[788,155,777,157,776,160,765,158,764,157,768,157,765,155,765,157,761,157,757,160,757,162,754,162,752,161,755,157,759,157,755,152,749,150,740,153,733,152,730,150,737,143,735,139,738,138,760,140,762,137,772,136,774,138,774,140,778,141,779,143,785,143,795,146,794,152,789,153,788,155],[765,137,761,138,760,140,743,137,735,139,734,136,736,134,735,130,743,129,743,127,747,125,746,124,752,122,762,124,761,127,768,132,763,134,765,137],[807,177,800,175,800,171,794,168,815,172,818,177,814,175,807,177],[812,182,808,180,807,177,813,176,815,177,816,180,815,181,818,182,818,185,812,182],[812,182,815,182,817,185,812,182],[826,186,823,185,823,182,818,185,818,182,815,181,816,180,813,176,818,177,818,174,823,176,826,174,832,180,829,180,826,186],[746,151,755,152,759,157,755,157,752,161,751,155,746,151],[852,176,856,176,856,174,861,172,860,171,862,171,867,173,867,176,874,177,876,181,880,184,890,188,890,190,884,191,883,194,875,198,871,196,871,193,857,187,845,190,845,184,842,183,843,181,842,181,840,179,841,177,845,178,848,177,844,173,841,173,841,176,840,174,845,172,852,176],[906,180,914,178,909,175,908,177,903,175,908,171,915,172,916,170,918,169,936,171,940,173,928,177,926,179,920,179,916,182,900,182,901,180,906,180],[895,191,897,187,893,182,897,182,900,178,904,177,905,178,904,179,906,180,901,180,900,182,916,183,917,186,920,186,921,190,915,190,909,192,908,188,906,186,900,191,895,191]]);
 WORLD_BORDERS.yugoslavia=WORLD_BORDERS.yugoslavia.concat([[732,165,731,167,733,169,731,172,728,172,729,171,725,169,723,170,719,168,721,166,719,163,720,162,718,159,723,158,727,163,732,164,732,165],[719,168,717,171,714,170,707,162,720,163,719,168],[699,161,705,161,709,157,714,160,718,159,720,162,707,162,713,170,708,168,703,161,700,163,699,161],[710,157,705,161,699,161,698,158,708,156,710,157],[719,168,723,170,720,174,717,171,719,168],[728,172,732,173,733,176,725,177,724,174,728,172],[723,170,725,169,729,171,724,174,722,171,723,170]]);
+// ---- v1.9.8 小国国界 ----
+WORLD_BORDERS.burma=[[1011.6,251.6,1009.2,251.5,1007.2,253.6,1003.9,253.7,1003,257.9,1001.6,258.1,1006.3,266,1007.1,266,1004.6,270.9,1008,275.5,1008,277.9,1009.7,282.5,1005.9,288.8,1005.6,286.5,1007.1,282.7,1006.2,282.6,1006,277.5,1004.8,274.7,1004.3,275.5,1003.2,271.3,1002.4,267.2,1002.9,265.2,1001.6,265.3,999.7,262.2,999.4,264.7,998.2,265.4,997.3,264.4,997.8,265.6,994.5,268.2,994.3,266.9,993.7,267.9,992.8,267.9,992.7,266.6,991.8,267.6,992,265.4,990.3,267.2,991.6,261.6,989.6,255.4,989.2,256.7,987.6,255.1,988.8,255.5,989.4,254.8,988.4,253.1,986.7,252.5,986.3,253.3,986.1,251.4,985.1,252,982.9,248.1,984.4,248.2,984.3,245.6,986.4,244.7,987,238.1,989.9,238.8,992,234.5,991.5,233.6,993.5,231,993.5,229,997.4,226.6,1000.6,227.1,999.8,225.4,1002.4,222,1004.2,223.4,1005,225.5,1006.2,225.4,1006.6,228.6,1006.3,231.6,1003.2,233.8,1002.4,235.5,1002.3,238.7,1006.9,237.9,1007,241.3,1009.3,242.1,1008.2,245.1,1010.8,245.5,1011.9,247.5,1015.2,246.5,1011.6,251.6]];
+WORLD_BORDERS.bhutan=[[980.9,224.8,980.8,225.5,982.5,226.5,982.2,228,974.2,228.6,970.4,226.9,974.9,222.8,979.6,223.6,980.9,224.8]];
+WORLD_BORDERS.sikkim=[[965.7,225.2,970.3,225.2,970.3,229.8,965.7,229.8]];
+WORLD_BORDERS.maldives=[[913.1,307.6,917.8,307.6,917.8,312.3,913.1,312.3]];
+WORLD_BORDERS.sarawak=[[1044.7,316.2,1049.3,316.2,1049.3,320.8,1044.7,320.8]];
+WORLD_BORDERS.northborneo=[[1067.7,300.2,1072.3,300.2,1072.3,304.8,1067.7,304.8]];
+WORLD_BORDERS.macau=[[1054.2,245.2,1058.8,245.2,1058.8,249.8,1054.2,249.8]];
+WORLD_BORDERS.andorra=[[653.7,167.7,658.3,167.7,658.3,172.3,653.7,172.3]];
+WORLD_BORDERS.monaco=[[675.2,163.7,679.8,163.7,679.8,168.3,675.2,168.3]];
+WORLD_BORDERS.sanmarino=[[692.6,164,697.3,164,697.3,168.7,692.6,168.7]];
+WORLD_BORDERS.liechtenstein=[[683.2,151.2,687.8,151.2,687.8,155.8,683.2,155.8]];
+WORLD_BORDERS.danzig=[[715,126.4,719.7,126.4,719.7,131.1,715,131.1]];
+WORLD_BORDERS.greenland=[[541.8,23.2,556.8,24.3,534.3,25.3,559.3,24.7,561.6,25.7,571.7,26.4,566.5,27.7,542.1,28.7,559.2,28.9,562.3,30,572.9,28.6,573.7,29.1,573.3,30.3,566.5,33.3,579.1,30.2,587,31.1,591.8,29.7,598.6,29.6,608.7,30.8,597.8,32.5,598.6,33,597.6,33.4,589.5,34,592.5,34.6,590.5,35.2,579.8,35.2,577.2,36.1,577.5,36.9,580.1,37.1,579.9,38.5,581.4,39.1,573.7,41,574.3,41.3,571.5,44.4,574.7,43.6,579.6,44.4,575.3,44.7,576.1,45.3,583.4,46,583.8,47.2,568.4,48.1,572.4,49.6,578.3,50.1,579.9,52.4,579.5,53.5,569.7,53.7,574.2,53.9,574.7,55.5,577.8,54.3,580.4,56.5,573.7,57.4,570.7,56.9,571.4,56,570.6,55.7,569.3,57.5,576.5,58.3,575.5,59.7,569.3,60.4,557.8,58.3,560.5,59.5,555.9,60.5,551.5,59.8,554.2,60.5,550.5,60.9,562.9,59.9,570.4,61.7,569.5,64.6,563.1,63.2,561.1,61.3,553.7,62.4,560.4,61.7,561,62.9,559.3,63.7,561.3,63.5,570.7,65.9,568.8,67.2,571.4,66.9,572.3,70.3,569.2,70.6,569,69.1,568.1,70.6,565.8,70.6,563.4,69.9,561.3,67.8,552.2,66.3,556.7,66.9,557,67.9,547.4,68.6,548.9,69,548.6,69.7,545,70.6,553.9,70.5,550.5,71.8,551.1,72.3,557.8,70.9,569.5,72.1,563.8,73.2,564.3,73.7,562.3,73.7,554.4,77,538.1,79.2,533.3,77.9,533.9,79.5,530.3,80.8,524.9,85.1,522.9,85.8,520.5,85.1,521.3,86.2,513.7,88.1,512.8,87.7,515.4,85.6,512.2,85.3,513.7,85.7,512.3,87,510.9,86.6,512,87.7,504.9,88.3,506.8,89.2,501.6,90.2,504.9,92.2,502.7,93.1,499.8,92.8,503.3,93.4,503.6,94.9,500.5,97.3,497.7,96.7,499.6,97.6,498.7,98.5,494.9,98.5,497.8,99.1,497.2,100.6,497.9,101.6,496.2,102.1,497.1,102.5,494.6,106.4,491.4,106.2,494,106.9,494.3,108.1,491.3,108.2,492.3,108.8,491.4,109,489.6,108.6,490.3,107.3,488.9,108.3,486.1,107.6,488.4,105.9,486.1,106.7,483.7,106.1,484.4,103.9,480.7,105.4,476,105.6,477.5,104.7,475.3,104.7,472,102.6,471.7,101.5,473.7,100.8,470.8,101.1,471.1,100.3,468.3,99.4,470.2,97.3,468,98.1,464.1,95.2,463.9,93.9,468.5,93.1,463.3,93.1,467,91.4,469.4,92.3,469,91.3,466,89.6,466.8,91,464.9,91.1,462.5,93.1,460.3,89.1,465.5,87.5,460.2,88.6,457.9,88.1,458.2,86.7,457.2,86.5,465,83.5,456.4,86.1,457.1,84.3,460.8,83.5,456.1,83.1,455.7,81.5,460.4,80.3,467.2,81.2,465.2,80.5,466,80.1,461,80,456,81.1,458.1,78.7,463.7,79.2,465.2,78.1,457.2,78.4,458.5,77.2,465.4,77.3,466.5,76.6,464.9,76.8,465.5,75.4,468.4,75.2,465.6,75.1,468.3,72.1,461.3,72,453.1,69.7,459.3,69.5,467,70.8,463,68.6,465.8,68.6,458.6,68,459,67,463,66.1,457,66.5,458.1,65.7,456.1,64.4,456.3,63.7,455.3,63.8,456.9,65.5,454.9,66.2,455.1,67,449.2,66.6,450.2,64.6,452,63.6,449.3,64.4,450.3,63.7,449.2,63.4,451.7,62.9,452.3,61.8,449,61.4,450.4,60.2,447.4,59.4,448.4,58.6,447,57.3,443.3,57.3,446.9,55.9,438.5,52.9,439.7,52.3,438.7,51.7,421.5,49.3,408.1,49.8,408.7,50.7,403.3,50.2,399.1,49.1,404,48.2,398.4,47.9,397.6,47.6,398.3,47,395,47.6,393,46.7,404,45.6,410.3,45.9,410.6,44.9,399.6,45.3,395.3,44.4,396.8,43.9,392.6,44,387,42.6,391.3,41.1,412.3,39.1,416,36.1,418.2,35.8,408.6,35.8,407.3,35.3,408.1,34.6,417,32.5,422.4,32.9,421.6,32.2,422.5,31.8,428.1,32,429.4,31.1,429,29.8,431.8,29.2,445.6,31.2,436,28.9,453,27.6,456.2,28.3,456.6,30.1,458.5,29.4,458.5,27.7,466.2,29.3,471.1,29.2,466.1,27.5,469.3,27.2,488.5,29.7,489.9,27.2,485.5,26.2,500.6,26.2,483.4,25.8,482.2,25.5,483.3,25,494.7,24.3,500.9,24.9,504.3,24.1,512.2,25.3,513,24.7,510.1,23.9,513.8,23.5,541.8,23.2],[459.6,72.4,462.6,73.7,456.5,74.9,454.3,74.4,455.6,73.9,451.7,73.3,452.2,72.4,453.8,72.4,452,71.7,453.7,71.1,459.6,72.4],[465.8,73.8,464.6,72.7,467,72.8,465.8,73.8],[456.7,68.5,455.1,68.1,456.5,67.5,456.7,68.5],[451.3,62.1,449.3,63,447,62.4,451.3,62.1],[391.2,45.8,388.2,45.6,391.2,45.8],[488,28.6,479,26.7,487.8,27.2,488,28.6],[558.2,68.9,558.3,69.9,555.3,70.6,548.8,70.5,550.3,68.9,558.2,68.9],[582.6,29.4,579.2,28.6,582.6,29.4],[586.4,36.7,580.9,36.6,585.1,35.9,586.9,36,586.4,36.7],[581.4,43.4,580.2,42.1,581.6,41.8,581.4,43.4],[582.9,50.4,581.1,49,581.2,48,582.4,48.2,582.9,50.4],[585,52.7,587.2,54,581.8,53.9,581.9,53,585,52.7],[585.2,44.6,584.4,44.4,586.1,43.8,585.2,44.6]];
+WORLD_BORDERS.newfoundland=[[457.3,150.9,462,150.9,462,155.6,457.3,155.6]];
+WORLD_BORDERS.puertorico=[[408.7,256,413.8,256,413.8,261.1,408.7,261.1]];
+WORLD_BORDERS.bermuda=[[413.7,206,418.4,206,418.4,210.7,413.7,210.7]];
+WORLD_BORDERS.tonga=[[1293.7,399.2,1298.3,399.2,1298.3,403.8,1293.7,403.8]];
+WORLD_BORDERS.samoa=[[1288.7,373.7,1293.3,373.7,1293.3,378.3,1288.7,378.3]];
+WORLD_BORDERS.nauru=[[1250.5,324.6,1255.1,324.6,1255.1,329.2,1250.5,329.2]];
+WORLD_BORDERS.papuanewguinea=[[1202.4,342.2,1199.9,337.9,1194.4,334.9,1194.6,334.3,1202.6,339.8,1202.4,342.2],[1198.6,340.5,1200.4,340.7,1200.2,342.4,1198.8,343.3,1199.2,344.7,1197.1,345.1,1193.4,347.6,1190.4,347.7,1185.7,345.5,1186,344.8,1191.1,344.9,1192,343.1,1192.3,344.9,1194.3,344.9,1197.7,342.6,1197.4,340.2,1198.6,340.5],[1159.1,357.9,1159.5,334.4,1171.7,338.8,1176.4,342.4,1176.3,344.5,1182.9,346.9,1183.9,349.1,1180.7,349.7,1181.5,351.6,1184.9,354.3,1186.5,357.7,1188.8,357.6,1189,359.3,1191.7,360,1190.8,360.4,1191.2,361.2,1194.7,362,1193.3,362.2,1194,363,1192.8,363.5,1190.8,362.4,1183.6,361.4,1177.3,354.2,1168.8,351.9,1169.8,353.7,1168.3,353.9,1168.6,354.6,1163.5,354.6,1166.8,355.6,1167.7,357.4,1165.1,358.7,1159.1,357.9],[1181.1,332.1,1182.4,332.3,1181.6,332.9,1179.2,333,1181.1,332.1],[1193.2,334.6,1191.5,333.9,1192.5,333.6,1193.2,334.6],[1193.6,358.7,1194.9,359.9,1193.2,359.8,1193.6,358.7],[1213.2,349.1,1211,349.3,1208.9,346.4,1208.7,344.7,1213.2,349.1]];
+WORLD_BORDERS.seychelles=[[847.9,339.4,852.6,339.4,852.6,344,847.9,344]];
+WORLD_BORDERS.saintelena=[[627,380.3,631.7,380.3,631.7,385,627,385]];
+WORLD_BORDERS.aden=[[810.7,275.2,815.3,275.2,815.3,279.8,810.7,279.8]];
 // manchukuo 与 china 共用中国国界（见 borderOwnerOf）：两者一起做 Voronoi，满洲国自然占东北
 
 const PROVINCE_SHAPES = {};   // pid -> [{x,y},...] 省份拼图块多边形
@@ -4945,6 +5167,60 @@ function drawMap(){
     ctx.stroke();
   });
   ctx.restore(); // 结束真实海岸线裁剪（海路、城市点等叠加层恢复全域）
+
+  // ★ 微小岛屿国土补画（v1.9.8）：世界陆地掩膜是 Natural Earth 110m 精度，瑙鲁/汤加/西萨摩亚/
+  //   塞舌尔/关岛/百慕大/澳门/但泽这类弹丸之地根本不在掩膜里 —— 省块被上面那道 land clip
+  //   整块裁掉，结果地图上只剩一个城市名字悬在空海上（"有名字没国土"）。
+  //   这里对「单省国家 + 省中心不在陆地」的情况，在省中心补一小块国土圆点，颜色跟控制国走。
+  (function drawIsletTerritory(){
+    if(!window.__isletProvIds){
+      const cnt = {};
+      PROVINCE_DEFS.forEach(d=>{ cnt[d[1]] = (cnt[d[1]]||0)+1; });
+      window.__isletProvIds = provinces.filter(p=>cnt[p.cid]===1 && !pointInLand(p.x,p.y)).map(p=>p.id);
+    }
+    const ids = window.__isletProvIds;
+    if(!ids || !ids.length) return;
+    // 直接按该国真实国界环补画（微国就是 4~5px 的小方框，放大到 2000% 也还是本国领土形状），
+    // 而不是画一个固定半径的圆 —— 圆在低倍是看不见的噪点、在高倍又是个莫名其妙的大球。
+    ids.forEach(id=>{
+      const p = provinces[id];
+      if(!p) return;
+      const def = COUNTRY_DEFS[p.controller];
+      const rings = WORLD_BORDERS[p.cid] || (borderOwnerOf(p.cid) ? WORLD_BORDERS[borderOwnerOf(p.cid)] : null);
+      const col = def ? def.color : '#666';
+      const hasHi = (game.selectedProvince === p.id || hoverProvince === p.id || p.cid === game.highlightCid);
+      if(rings && rings.length){
+        ctx.beginPath();
+        rings.forEach(r=>{
+          if(!r || r.length<6) return;
+          ctx.moveTo(r[0], r[1]);
+          for(let i=2;i+1<r.length;i+=2) ctx.lineTo(r[i], r[i+1]);
+          ctx.closePath();
+        });
+        ctx.fillStyle = col;
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(4,9,16,0.8)';
+        ctx.lineWidth = 1.0 / mapScale;
+        ctx.stroke();
+        if(hasHi){
+          ctx.strokeStyle = (p.cid===game.highlightCid) ? '#4de1ff' : '#ffffff';
+          ctx.lineWidth = 1.6 / mapScale;
+          ctx.stroke();
+        }
+      } else {
+        // 兜底：没有国界环的微国画一个「屏幕 3px」的小点（半径必须 /mapScale，不能加固定下限，
+        // 否则放大 8 倍时屏幕半径会跟着涨到 24px —— test_no_blocking_dialog 的缩放不变量会红）
+        const r = 3.0 / mapScale;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, r, 0, Math.PI*2);
+        ctx.fillStyle = col;
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(4,9,16,0.8)';
+        ctx.lineWidth = 1.0 / mapScale;
+        ctx.stroke();
+      }
+    });
+  })();
 
   // SECOND PASS: draw sea routes — thicker, styled, with sea-control coloring
   ADJACENCY.forEach(([a,b])=>{
@@ -8396,17 +8672,11 @@ function runAI(){
     if(!c._origProvCount || c._origProvCount < myProvs.length) c._origProvCount = myProvs.length;
     
     let agg = c.aggression || 50;
-    // ---- AI 国策：无进行中国策时，按树顺序挑一个可点的开始（走历史路线） ----
+    // ---- AI 国策：无进行中国策时挑一个可点的开始（v1.9.8：改用 aiPickFocusNode，
+    //      被和平吞并威胁的小国会优先点「反抗合并」线）----
     if(!c.focus && Math.random()<0.5){
-      let tree = getFocusTree(cid);
-      outer: for(let branch of tree.branches){
-        for(let node of branch.nodes){
-          if(focusNodeState(cid,node)==='available'){
-            startFocus(cid, node.id);
-            break outer;
-          }
-        }
-      }
+      let pick = aiPickFocusNode(cid);
+      if(pick) startFocus(cid, pick.id);
     }
 
     // Aggressive nations think faster (shorter timer)
@@ -10607,8 +10877,8 @@ const GUIDE_STEPS = [
       + '<span style="color:#58a6ff">✅ 军事</span> 科研 · 海军 · 空军 · 护航跨海 · 两栖登陆<br>'
       + '<span style="color:#d29922">✅ 外交</span> 同盟号召 · 保证独立 · 扶植傀儡 · 战争经济学<br><br>'
       + '<strong>现在你可以选择任意国家开始真正的征服之旅！</strong><br>'
-      + '<span class="g-tip">提示：159 个国家全部有完整的攻击路线、开局部队和外交能力——'
-      + '包括新西兰、爱尔兰、菲律宾这些纯岛国，以及埃塞俄比亚、蒙古这些内陆国。选谁都不会卡死。</span>',
+      + '<span class="g-tip">提示：182 个国家全部有完整的攻击路线、开局部队和外交能力——'
+      + '包括新西兰、爱尔兰、汤加、瑙鲁这些小岛国，以及埃塞俄比亚、蒙古、不丹这些内陆国；连安道尔、摩纳哥、但泽这种弹丸小国都能玩，选谁都不会卡死。</span>',
     check:()=>true,
     highlight:null,
     uiHighlight:null,
@@ -11191,6 +11461,7 @@ function doLoadFromSlot(slot){
       c.focus = sc.focus || null;
       c.focusDone = sc.focusDone || {};
       c.focusBonus = sc.focusBonus || {atk:0,def:0,prod:0};
+      c._noAnnex = !!sc._noAnnex;
       c.pacts = sc.pacts || {};
     }
     countries[save.player].isAI = false;
@@ -11325,6 +11596,7 @@ function buildSaveData(){
       focus: c.focus ? {...c.focus} : null,
       focusDone: {...(c.focusDone||{})},
       focusBonus: {...(c.focusBonus||{atk:0,def:0,prod:0})},
+      _noAnnex: !!c._noAnnex,
       pacts: {...(c.pacts||{})}
     };
   }
@@ -12329,6 +12601,7 @@ function mpApplySnapshot(save){
       c.focus = sc.focus || null;
       c.focusDone = sc.focusDone || {};
       c.focusBonus = sc.focusBonus || {atk:0,def:0,prod:0};
+      c._noAnnex = !!sc._noAnnex;
       c.pacts = sc.pacts || {};
       c.isAI = true;
     }
@@ -12557,8 +12830,17 @@ setSpeed = function(s){
 // ---- 版本与更新日志 ----
 // 每次发布新版本：改 GAME_VERSION，并在 UPDATE_HISTORY 顶部加一条。
 // 玩家打开线上版时若版本号与 localStorage 记录不同，就弹「本次版本更新了以下内容」弹窗。
-const GAME_VERSION = 'v1.9.7';
+const GAME_VERSION = 'v1.9.8';
 const UPDATE_HISTORY = [
+  { ver:'v1.9.8', date:'2026-11-04', items:[
+    '📁 **反馈改成直接存到你电脑上**：不再只存在浏览器里。点「反馈」面板里的「选择保存文件夹」（比如 D:\\Qst）授权一次，之后每次提交都会**静默写入那个文件夹**里的 txt（浏览器会记住这个目录，不用每次再选）。浏览器出于安全不允许网页自己新建文件夹，所以这一次授权必须由你亲手点',
+    '📴 **断网时反馈按钮自动变灰**：检测到没联网就把右上角「❓ 反馈」置灰，点击只弹一行提示「目前未连接网络，不可反馈」，不会打开面板也不会卡住游戏；网络恢复自动变回可用',
+    '🌍 **补齐 23 个小国**：缅甸、不丹、锡金、马尔代夫、砂拉越、北婆罗洲、澳门、安道尔、摩纳哥、圣马力诺、列支敦士登、但泽自由市、格陵兰、纽芬兰、波多黎各、百慕大、汤加、西萨摩亚、瑙鲁、巴布亚新几内亚、塞舌尔、圣赫勒拿、亚丁 —— 全部带真实国界轮廓、首都、资源、初始部队与陆/海路（纯岛国配驱逐舰），国家总数 159 → 182',
+    '🛡️ **新增国策线「反抗合并」**：只对「要被吞并的小国」开放 —— ①反抗铺设（3 天，稳定度 -20）②禁止吞并（通过后对方再想靠国策和平吞并你会直接失败）③国际申诉（七大列强关系 +18，战争支持 +10）④武装抵抗（防御 +15，人力 +30）',
+    '🏝️ **修掉"小岛只有名字、没有国土"**：世界陆地掩膜是 110m 精度，瑙鲁/汤加/西萨摩亚/塞舌尔/关岛/百慕大/澳门/但泽这些弹丸之地压根不在掩膜里，省块被陆地裁剪整块吃掉了。现在会给「单省小国 + 省会不在陆地」的情况按真实国界补画国土',
+    '🤖 **AI 会自己点国策了**：以前 AI 只会瞎点第一条，现在小国被吞并威胁时会优先走「反抗铺设 → 禁止吞并」，大国照旧按自己的国策树推进',
+    '🧪 新增 test_anti_annex_focus.js（29 断言）/ test_islet_render.js（15 断言），test_disclaimer_feedback.js 扩到 46 断言（断网置灰/选目录后静默写文件）；省份总数 286 → 304',
+  ]},
   { ver:'v1.9.7', date:'2026-11-04', items:[
     '⚠️ **进入游戏前新增免责声明**：每次打开游戏都会先弹出完整声明页（必须点「我已阅读并同意」才能开始）——说明本作为架空历史虚构推演、坚决反对法西斯主义/军国主义/纳粹主义与一切极端主义、地图与阵营仅为历史格局的简化模拟、坚持一个中国原则、未成年人须知与健康游戏忠告',
     '❓ **右上角新增「反馈」按钮**：点击后游戏自动暂停（冻结），弹出反馈面板；提交后自动恢复原来的暂停状态。反馈会存入浏览器本地记录（保留最近 50 条），并导出为 txt 文件——优先弹出系统"另存为"窗口（可选 D:\\Qst 文件夹），不支持时自动下载到浏览器下载目录',
@@ -12707,78 +12989,148 @@ function showDisclaimer(){
   document.getElementById('disclaimer-ok').addEventListener('click', ()=>{ ov.remove(); });
 }
 
-// ==================== 玩家反馈（v1.9.7）====================
-// 右上角「❓ 反馈」按钮：点击后自动暂停游戏（冻结），输入并提交后恢复原暂停状态。
-// 反馈内容存入 localStorage 历史，并导出为 txt（可用系统对话框选择保存到 D:\Qst）。
-const FEEDBACK_DIR = 'D:\\Qst';   // 反馈导出说明中提示的目标文件夹
-function openFeedbackPanel(){
-  if(document.getElementById('feedback-panel')) return;
-  let wasPaused = game.paused;
-  game.paused = true;             // 冻结游戏
-  updateBottomBar();
-  let ov = document.createElement('div');
-  ov.id = 'feedback-panel';
-  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9998;display:flex;align-items:center;justify-content:center';
-  ov.innerHTML =
-    '<div style="background:#161b22;border:1px solid #3fb950;border-radius:10px;max-width:520px;width:92%;padding:20px 24px;box-shadow:0 8px 40px rgba(0,0,0,0.6)">'
-    + '<div style="font-size:17px;font-weight:bold;color:#3fb950">❓ 问题反馈</div>'
-    + '<div style="font-size:11.5px;color:#8b949e;margin:6px 0 10px">游戏已自动暂停。请描述你遇到的问题或建议（_bug、平衡性、新玩法点子都可以），提交后会保存到本地反馈记录，并导出为 txt 文件（可在弹出的保存窗口中选择 '+FEEDBACK_DIR+' 文件夹，或保存到下载目录后移动过去）。</div>'
-    + '<textarea id="feedback-text" placeholder="请输入反馈内容（至少 5 个字）…" style="width:100%;box-sizing:border-box;height:130px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;padding:8px;font-size:13px;resize:vertical"></textarea>'
-    + '<div style="font-size:11px;color:#8b949e;margin-top:4px" id="feedback-hint"></div>'
-    + '<div style="text-align:right;margin-top:12px">'
-    + '<button id="feedback-cancel" style="background:#21262d;color:#8b949e;border:1px solid #30363d;border-radius:6px;padding:7px 18px;font-size:13px;cursor:pointer;margin-right:8px">取消</button>'
-    + '<button id="feedback-submit" style="background:#238636;color:#fff;border:none;border-radius:6px;padding:7px 22px;font-size:13px;cursor:pointer">提交反馈</button>'
-    + '</div></div>';
-  document.body.appendChild(ov);
-  let ta = document.getElementById('feedback-text');
-  if(ta) ta.focus();
-  function done(){
-    ov.remove();
-    game.paused = wasPaused;      // 恢复原暂停状态
-    updateBottomBar();
-  }
-  let cancelBtn = document.getElementById('feedback-cancel');
-  if(cancelBtn) cancelBtn.addEventListener('click', done);
-  let submitBtn = document.getElementById('feedback-submit');
-  if(submitBtn) submitBtn.addEventListener('click', ()=>{
-    let text = (ta && ta.value ? ta.value : '').trim();
-    let hint = document.getElementById('feedback-hint');
-    if(text.length < 5){ if(hint) hint.innerHTML = '<span style="color:#ff7b72">反馈内容太短了，至少写 5 个字</span>'; return; }
-    let rec = {
-      time: new Date().toLocaleString('zh-CN'),
-      ver: GAME_VERSION,
-      country: (game.player && COUNTRY_DEFS[game.player]) ? COUNTRY_DEFS[game.player].name : (game.player||'未知'),
-      date: (game.tick!==undefined && game.date) ? fmtDate() : '',
-      text: text
-    };
-    // 1) 存入本地反馈历史（最多 50 条）
+// ==================== 玩家反馈（v1.9.8）====================
+// 右上角「❓ 反馈」按钮：
+//   · 断网时按钮置灰、点击提示「目前未连接网络，不可反馈」（游戏内浮层，不用原生 alert）
+//   · 点击后自动暂停游戏（冻结），输入并提交后恢复原暂停状态
+//   · 反馈**存到玩家本机磁盘**：第一次选择保存文件夹（建议 D:\Qst），之后静默写 txt
+//     （File System Access API + IndexedDB 记住目录句柄）；不支持时退化为另存为/下载
+const FEEDBACK_DIR = 'D:\\Qst';   // 推荐的反馈保存文件夹（首次选择目录时提示）
+const FEEDBACK_IDB = 'ww1936_fs';
+const FEEDBACK_UPLOAD_URL = '';   // 想接服务端时填接口地址；留空则只存本机
+
+// ---- 轻量浮动提示（替代原生 alert，避免阻塞游戏循环）----
+function showFloatTip(msg, opts){
+  try{
+    let el = document.getElementById('float-tip');
+    if(!el){
+      el = document.createElement('div');
+      el.id = 'float-tip';
+      document.body.appendChild(el);
+    }
+    let color = (opts && opts.color) || '#c9d1d9';
+    el.innerHTML = '<span style="color:'+color+'">'+msg+'</span>';
+    el.classList.add('show');
+    if(el._hideTimer) clearTimeout(el._hideTimer);
+    el._hideTimer = setTimeout(function(){ try{ el.classList.remove('show'); }catch(e){} }, (opts && opts.ms) || 2200);
+  }catch(e){}
+}
+
+// ---- 网络状态：离线时反馈按钮自动置灰 ----
+function feedbackOnline(){
+  try{ return !(typeof navigator !== 'undefined' && navigator.onLine === false); }catch(e){ return true; }
+}
+function updateFeedbackButtonState(){
+  try{
+    let btn = document.getElementById('btn-feedback');
+    if(!btn) return;
+    if(feedbackOnline()){
+      btn.classList.remove('offline');
+      btn.title = '向我们反馈问题或建议（会自动暂停游戏，保存到本机文件夹）';
+    } else {
+      btn.classList.add('offline');
+      btn.title = '目前未连接网络，不可反馈';
+    }
+  }catch(e){}
+}
+function initFeedbackNetworkWatch(){
+  try{
+    if(window.__fbNetWatched) return;
+    window.__fbNetWatched = true;
+    window.addEventListener('online', ()=>{ updateFeedbackButtonState(); showFloatTip('✅ 网络已连接，可以反馈了', {color:'#3fb950'}); });
+    window.addEventListener('offline', ()=>{ updateFeedbackButtonState(); showFloatTip('⚠️ 网络已断开，反馈暂不可用', {color:'#d29922'}); });
+    updateFeedbackButtonState();
+  }catch(e){}
+}
+
+// ---- IndexedDB：持久化保存目录句柄 ----
+function fbIdbOpen(){
+  return new Promise(function(res, rej){
     try{
-      let list = JSON.parse(localStorage.getItem('ww1936_feedbacks')||'[]');
-      list.unshift(rec); if(list.length>50) list.length = 50;
-      localStorage.setItem('ww1936_feedbacks', JSON.stringify(list));
-    }catch(e){}
-    // 2) 导出 txt（优先系统保存对话框，可保存到 D:\Qst）
-    let body = '【世界大战1936 玩家反馈】\n时间: '+rec.time+'\n版本: '+rec.ver+'\n游玩国家: '+rec.country+'\n游戏内日期: '+rec.date+'\n\n'+rec.text+'\n';
-    let how = saveFeedbackFile(body);
-    if(hint) hint.innerHTML = '<span style="color:#3fb950">✅ 反馈已提交'+(how==='picker'?'，请在保存窗口中选择 '+FEEDBACK_DIR+' 文件夹':(how==='download'?'，txt 已开始下载（默认在浏览器下载目录，可移动到 '+FEEDBACK_DIR+'）':''))+'</span>';
-    addLog('📝','感谢反馈！你的意见已记录，我们会认真阅读');
-    setTimeout(done, 1400);
+      if(typeof indexedDB === 'undefined' || !indexedDB) return rej(new Error('no indexedDB'));
+      let r = indexedDB.open(FEEDBACK_IDB, 1);
+      r.onupgradeneeded = function(){ try{ r.result.createObjectStore('kv'); }catch(e){} };
+      r.onsuccess = function(){ res(r.result); };
+      r.onerror = function(){ rej(r.error || new Error('idb error')); };
+    }catch(e){ rej(e); }
+  });
+}
+function fbIdbGet(k){
+  return fbIdbOpen().then(function(db){
+    return new Promise(function(res, rej){
+      try{
+        let req = db.transaction('kv','readonly').objectStore('kv').get(k);
+        req.onsuccess = function(){ res(req.result); };
+        req.onerror = function(){ rej(req.error); };
+      }catch(e){ rej(e); }
+    });
+  });
+}
+function fbIdbSet(k, v){
+  return fbIdbOpen().then(function(db){
+    return new Promise(function(res, rej){
+      try{
+        let req = db.transaction('kv','readwrite').objectStore('kv').put(v, k);
+        req.onsuccess = function(){ res(true); };
+        req.onerror = function(){ rej(req.error); };
+      }catch(e){ rej(e); }
+    });
   });
 }
 
-// 把反馈文本导出为 txt：优先 File System Access API（弹系统另存为，可选 D:\Qst），
-// 不支持则退化为浏览器下载（进默认下载目录）。全部失败则静默（历史已存 localStorage）。
-function saveFeedbackFile(text){
-  let fname = 'feedback_' + new Date().toISOString().slice(0,19).replace(/[:T]/g,'-') + '.txt';
+// 让玩家挑一个保存目录（推荐 D:\Qst），句柄持久化后以后就不用再选
+function pickFeedbackDir(){
+  if(!window.showDirectoryPicker){
+    showFloatTip('当前浏览器不支持记住文件夹，将改用「另存为」/下载', {color:'#d29922'});
+    return Promise.resolve(null);
+  }
+  return window.showDirectoryPicker({mode:'readwrite'}).then(function(dir){
+    window.__fbDirHandle = dir;
+    return fbIdbSet('feedbackDir', dir).then(function(){ return dir; });
+  }).then(function(dir){
+    showFloatTip('✅ 反馈将自动保存到「'+dir.name+'」文件夹', {color:'#3fb950'});
+    let st = document.getElementById('feedback-dir-state');
+    if(st) st.innerHTML = '📁 自动保存到：<b style="color:#7ee787">'+dir.name+'</b>';
+    return dir;
+  }).catch(function(){ return null; });
+}
+
+// 把反馈写到本机文件夹：已选目录 → 静默写文件；否则另存为 → 再退化为下载
+// 已选目录时写盘是异步的；未选过目录时立刻走 picker/下载（同步触发，用户当场看到结果）
+async function saveFeedbackFile(text, fname){
+  fname = fname || ('feedback_' + new Date().toISOString().slice(0,19).replace(/[:T]/g,'-') + '.txt');
+  let dir = window.__fbDirHandle;
+  if(dir){
+    try{
+      let perm = 'granted';
+      if(dir.queryPermission) perm = await dir.queryPermission({mode:'readwrite'});
+      if(perm !== 'granted' && dir.requestPermission) perm = await dir.requestPermission({mode:'readwrite'});
+      if(perm === 'granted'){
+        let fh = await dir.getFileHandle(fname, {create:true});
+        let w = await fh.createWritable();
+        await w.write(text);
+        if(w.close) await w.close();
+        return 'dir';
+      }
+    }catch(e){ try{ console.warn('[feedback] 目录写入失败:', e && e.message); }catch(_){} }
+  }
+  return saveFeedbackFileFallback(text, fname);
+}
+
+function saveFeedbackFileFallback(text, fname){
+  // 系统另存为（玩家可自己选 D:\Qst）
   try{
     if(typeof window.showSaveFilePicker === 'function'){
       window.showSaveFilePicker({
         suggestedName: fname,
         types: [{description:'文本反馈', accept:{'text/plain':['.txt']}}]
-      }).then(function(h){ return h.write(new Blob([text], {type:'text/plain;charset=utf-8'})); }).catch(function(){});
+      }).then(function(h){ return h.createWritable ? h.createWritable() : h; })
+        .then(function(w){ return w.write ? w.write(text).then(function(){ return w.close && w.close(); }) : null; })
+        .catch(function(){});
       return 'picker';
     }
   }catch(e){}
+  // 退化：浏览器下载（进默认下载目录）
   try{
     let blob = new Blob([text], {type:'text/plain;charset=utf-8'});
     let a = document.createElement('a');
@@ -12791,6 +13143,100 @@ function saveFeedbackFile(text){
     return 'download';
   }catch(e){}
   return 'none';
+}
+
+// 可选：配置了 FEEDBACK_UPLOAD_URL 时，联网状态下把反馈也发到服务端
+function uploadFeedback(rec){
+  if(!FEEDBACK_UPLOAD_URL || !feedbackOnline()) return Promise.resolve(false);
+  try{
+    return fetch(FEEDBACK_UPLOAD_URL, {
+      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(rec)
+    }).then(function(r){ return !!(r && r.ok); }).catch(function(){ return false; });
+  }catch(e){ return Promise.resolve(false); }
+}
+
+function openFeedbackPanel(){
+  // 断网不可反馈（按钮本身也会置灰）
+  if(!feedbackOnline()){
+    showFloatTip('目前未连接网络，不可反馈', {color:'#ff7b72'});
+    return;
+  }
+  if(document.getElementById('feedback-panel')) return;
+  let wasPaused = game.paused;
+  game.paused = true;             // 冻结游戏
+  updateBottomBar();
+  let ov = document.createElement('div');
+  ov.id = 'feedback-panel';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9998;display:flex;align-items:center;justify-content:center';
+  ov.innerHTML =
+    '<div style="background:#161b22;border:1px solid #3fb950;border-radius:10px;max-width:540px;width:92%;padding:20px 24px;box-shadow:0 8px 40px rgba(0,0,0,0.6)">'
+    + '<div style="font-size:17px;font-weight:bold;color:#3fb950">❓ 问题反馈</div>'
+    + '<div style="font-size:11.5px;color:#8b949e;margin:6px 0 10px">游戏已自动暂停。请描述你遇到的问题或建议（_bug、平衡性、新玩法点子都可以）。提交后会<b style="color:#c9d1d9">直接存到你这台电脑的文件夹</b>（首次会让你选目录，建议 '+FEEDBACK_DIR+'；浏览器不允许网页自己建目录，所以需要你点一下「选择保存文件夹」）。</div>'
+    + '<textarea id="feedback-text" placeholder="请输入反馈内容（至少 5 个字）…" style="width:100%;box-sizing:border-box;height:130px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;padding:8px;font-size:13px;resize:vertical"></textarea>'
+    + '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px">'
+    + '<span id="feedback-dir-state" style="font-size:11px;color:#8b949e">📁 尚未选择保存文件夹</span>'
+    + '<button id="feedback-pickdir" style="background:#21262d;color:#58a6ff;border:1px solid #30363d;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;white-space:nowrap">选择保存文件夹</button>'
+    + '</div>'
+    + '<div style="font-size:11px;color:#8b949e;margin-top:4px" id="feedback-hint"></div>'
+    + '<div style="text-align:right;margin-top:12px">'
+    + '<button id="feedback-cancel" style="background:#21262d;color:#8b949e;border:1px solid #30363d;border-radius:6px;padding:7px 18px;font-size:13px;cursor:pointer;margin-right:8px">取消</button>'
+    + '<button id="feedback-submit" style="background:#238636;color:#fff;border:none;border-radius:6px;padding:7px 22px;font-size:13px;cursor:pointer">提交反馈</button>'
+    + '</div></div>';
+  document.body.appendChild(ov);
+  let ta = document.getElementById('feedback-text');
+  if(ta) ta.focus();
+  // 显示已记住的保存目录名
+  fbIdbGet('feedbackDir').then(function(dir){
+    if(dir) window.__fbDirHandle = dir;
+    let st = document.getElementById('feedback-dir-state');
+    if(st && dir) st.innerHTML = '📁 自动保存到：<b style="color:#7ee787">'+dir.name+'</b>';
+  }).catch(function(){});
+  function done(){
+    ov.remove();
+    game.paused = wasPaused;      // 恢复原暂停状态
+    updateBottomBar();
+  }
+  let pickBtn = document.getElementById('feedback-pickdir');
+  if(pickBtn) pickBtn.addEventListener('click', function(){ pickFeedbackDir(); });
+  let cancelBtn = document.getElementById('feedback-cancel');
+  if(cancelBtn) cancelBtn.addEventListener('click', done);
+  let submitBtn = document.getElementById('feedback-submit');
+  if(submitBtn) submitBtn.addEventListener('click', ()=>{
+    let text = (ta && ta.value ? ta.value : '').trim();
+    let hint = document.getElementById('feedback-hint');
+    if(text.length < 5){ if(hint) hint.innerHTML = '<span style="color:#ff7b72">反馈内容太短了，至少写 5 个字</span>'; return; }
+    if(!feedbackOnline()){
+      if(hint) hint.innerHTML = '<span style="color:#ff7b72">目前未连接网络，不可反馈</span>';
+      return;
+    }
+    let rec = {
+      time: new Date().toLocaleString('zh-CN'),
+      ver: GAME_VERSION,
+      country: (game.player && COUNTRY_DEFS[game.player]) ? COUNTRY_DEFS[game.player].name : (game.player||'未知'),
+      date: (game.tick!==undefined && game.date) ? fmtDate() : '',
+      text: text
+    };
+    // 1) 本地反馈历史（最多 50 条，防止无限膨胀）
+    try{
+      let list = JSON.parse(localStorage.getItem('ww1936_feedbacks')||'[]');
+      list.unshift(rec); if(list.length>50) list.length = 50;
+      localStorage.setItem('ww1936_feedbacks', JSON.stringify(list));
+    }catch(e){}
+    // 2) 存到本机文件夹（异步，先给用户成功反馈）
+    let body = '【世界大战1936 玩家反馈】\n时间: '+rec.time+'\n版本: '+rec.ver+'\n游玩国家: '+rec.country+'\n游戏内日期: '+rec.date+'\n\n'+rec.text+'\n';
+    if(hint) hint.innerHTML = '<span style="color:#3fb950">✅ 反馈已提交，正在保存到本机…</span>';
+    saveFeedbackFile(body).then(function(how){
+      let h = document.getElementById('feedback-hint');
+      if(!h) return;
+      if(how === 'dir') h.innerHTML = '<span style="color:#3fb950">✅ 已保存到所选文件夹</span>';
+      else if(how === 'picker') h.innerHTML = '<span style="color:#3fb950">✅ 请在保存窗口中选择 '+FEEDBACK_DIR+' 文件夹</span>';
+      else if(how === 'download') h.innerHTML = '<span style="color:#d29922">✅ 已下载到浏览器下载目录（可移动到 '+FEEDBACK_DIR+'）</span>';
+      else h.innerHTML = '<span style="color:#d29922">✅ 已记录在游戏内反馈列表（本机文件夹写入失败）</span>';
+    }).catch(function(){});
+    uploadFeedback(rec);
+    addLog('📝','感谢反馈！你的意见已记录，我们会认真阅读');
+    setTimeout(done, 1600);
+  });
 }
 
 // 🥚 彩蛋：游玩中国时，连续输入 LRY（不分大小写）→ 无限人力、无限金钱、无限石油
@@ -12833,6 +13279,9 @@ function init(){
 
   // 免责声明（v1.9.7：每次进入游戏前强制弹出，必须同意才能开始）
   showDisclaimer();
+
+  // 网络状态监听：断网时反馈按钮置灰（v1.9.8）
+  initFeedbackNetworkWatch();
 
   // 版本更新弹窗（localStorage 记录的上次版本 ≠ 当前版本时弹出）
   showUpdateModal();
