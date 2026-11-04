@@ -16,11 +16,14 @@ body{background:#0d1117;font-family:'Microsoft YaHei',sans-serif;overflow:hidden
 #log-list{flex:1;overflow-y:auto;font-size:11px;color:#8b949e}
 #log-list div{padding:3px 0;border-bottom:1px solid #21262d;line-height:1.5}
 #main{flex:1;position:relative;display:flex;flex-direction:column}
-#topbar{height:42px;background:#161b22;border-bottom:1px solid #30363d;display:flex;align-items:center;padding:0 16px;gap:20px}
-#topbar .res{font-size:13px;color:#8b949e}
+#topbar{height:42px;background:#161b22;border-bottom:1px solid #30363d;display:flex;align-items:center;padding:0 16px;padding-right:92px;gap:13px;position:relative;overflow-x:auto;overflow-y:hidden;scrollbar-width:none}
+#topbar::-webkit-scrollbar{display:none}
+#topbar .res{font-size:13px;color:#8b949e;white-space:nowrap}
 #topbar .res b{color:#f0c040}
-#topbar .date{font-size:15px;color:#f0c040;font-weight:bold;margin-left:auto}
-#topbar .pts{font-size:13px;color:#58a6ff;margin-left:12px}
+#topbar .date{font-size:15px;color:#f0c040;font-weight:bold;margin-left:auto;white-space:nowrap}
+#topbar .pts{font-size:13px;color:#58a6ff;margin-left:12px;white-space:nowrap}
+/* v1.9.7 反馈按钮：固定钉在顶栏最右侧，不参与 flex 排布，窗口再窄也不会被挤走 */
+#btn-feedback{position:absolute;right:10px;top:8px;height:26px;z-index:60;white-space:nowrap}
 #canvas-wrap{flex:1;position:relative;overflow:hidden;cursor:grab}
 #canvas-wrap.panning{cursor:grabbing}
 #zoom-controls{position:absolute;right:12px;top:12px;display:flex;flex-direction:column;gap:4px;z-index:50}
@@ -175,6 +178,7 @@ canvas{display:block}
     <div class="res" id="t-mp" style="display:none;color:#56d364;font-size:12px" title="联机对战状态"></div>
     <div class="pts"><button id="btn-sfx" class="btn-sm" style="font-size:10px;padding:2px 6px" onclick="toggleSfx()" title="开/关音效">🔊 音效</button></div>
     <div class="date" id="t-date">1936年1月1日</div>
+    <div class="pts"><button id="btn-feedback" class="btn-sm" style="font-size:10px;padding:2px 6px;background:#1f2d1f;border-color:#3fb950;color:#3fb950" onclick="openFeedbackPanel()" title="向我们反馈问题或建议（会自动暂停游戏）">❓ 反馈</button></div>
   </div>
   <div id="canvas-wrap">
     <canvas id="map"></canvas>
@@ -2156,10 +2160,13 @@ const UNIT_TYPES = {
   destroyer:{name:'驱逐舰',atk:35,def:25,spd:7,hp:90,cost:600,manpower:1,eqName:'摩托化装备',naval:true,fuel:0.3},
   submarine:{name:'潜艇',atk:40,def:12,spd:6,hp:60,cost:500,manpower:1,eqName:'摩托化装备',naval:true,sub:true,fuel:0.25},
   carrier:{name:'航空母舰',atk:28,def:32,spd:6,hp:150,cost:1200,manpower:2,eqName:'坦克',naval:true,carrier:true,fuel:0.6},
-  fighter:{name:'战斗机联队',atk:25,def:15,spd:4,hp:60,cost:400,manpower:1,eqName:'摩托化装备',air:true,fuel:0.2},
-  bomber:{name:'轰炸机联队',atk:35,def:10,spd:3,hp:50,cost:500,manpower:1,eqName:'坦克',air:true,bomber:true,fuel:0.3}
+  // v1.9.6：航空单位统一 0.5 石油/天（按"架·天"计），且只有出动时才烧油
+  fighter:{name:'战斗机联队',atk:25,def:15,spd:4,hp:60,cost:400,manpower:1,eqName:'摩托化装备',air:true,fuel:0.5},
+  bomber:{name:'轰炸机联队',atk:35,def:10,spd:3,hp:50,cost:500,manpower:1,eqName:'坦克',air:true,bomber:true,fuel:0.5}
 };
 const FUEL_LEVELS = ['🟢','🟡','🔴']; // fuel status icons
+// 航空单位航程：无上限（v1.9.6）—— 唯一的限制是燃油，油不够就飞不起来，油尽会坠机
+const AIR_RANGE_UNLIMITED = true;
 
 // ==================== 训练耗时 ====================
 // 用户需求：训练部队需要真实时间 —— 陆军类默认 5 秒，海军/空军 10 秒
@@ -2184,23 +2191,51 @@ function getFuelStatus(cid){
 
 // Air units can fly over any province (enemy territory at war, friendly territory)
 // They provide bonuses to nearby combat and strategic bombing
+// v1.9.6：航空单位航程无上限 —— 想飞哪就飞哪（跨越任何领土/海洋/中立国），
+// 唯一的限制是燃油（起飞要油、空中烧油、油尽坠机）。领土中转规则取消。
 function canAirMove(unit, targetProv, targetController){
   let p = provinces[targetProv];
   if(!p) return false;
-  let c = countries[unit.country];
-  if(!c) return false;
-  // Can fly over own territory, allies, or enemies at war
-  if(p.controller === unit.country) return true;
-  if(COUNTRY_DEFS[p.controller] && COUNTRY_DEFS[p.controller].puppetOf === unit.country) return true; // BUG-I: 傀儡关系存于 puppetOf，原 c.puppets 从未初始化
-  if(areAtWar(unit.country, p.controller)) return true;
-  // Can also fly 1 extra range through neutral territory
-  if(!areAtWar(unit.country, p.controller)){
-    let src = provinces[unit.provinceId];
-    if(!src) return false;
-    // Allow flying through neutral if source or any allied province borders it
-    return Math.abs(p.x - src.x) < 50 && Math.abs(p.y - src.y) < 50;
-  }
+  if(!countries[unit.country]) return false;
+  return true;
+}
+
+// 单位本 tick 是否"在使用中"（在烧油）。
+// v1.9.6：养兵不烧油 —— 只有行军/转场/交战的机械化·海军·空军才消耗石油，
+// 静止待命的一律 0 石油/天。步兵这类 fuel=0 的自然永远为 0。
+function unitIsBurningFuel(u){
+  if(!u) return false;
+  if(u.moving) return true;
+  if(u.fighting) return true;
+  if(u.moveTo !== null && u.moveTo !== undefined) return true;
   return false;
+}
+
+// 燃油耗尽 → 航空单位坠机（v1.9.6）
+// 空中（转场/空战）油尽最危险，停在机场上的也会被抽干油箱后报废。
+function applyFuelCrashes(cid){
+  let c = countries[cid];
+  if(!c || c.eliminated) return;
+  let airs = units.filter(u=>u.country===cid && (UNIT_TYPES[u.type]||{}).air);
+  if(!airs.length) return;
+  let crashed = [];
+  airs.forEach(u=>{
+    let inAir = !!(u.moving || u.fighting);
+    let chance = inAir ? 0.40 : 0.18; // 空中 40%/天，停放 18%/天
+    if(Math.random() < chance) crashed.push(u);
+  });
+  if(!crashed.length) return;
+  let ids = crashed.map(u=>u.id);
+  units = units.filter(u=>ids.indexOf(u.id) === -1);
+  crashed.forEach(u=>{
+    let p = provinces[u.provinceId];
+    if(p && p.unitIds) p.unitIds = p.unitIds.filter(id=>id!==u.id);
+  });
+  c._airCrashed = (c._airCrashed||0) + crashed.length;
+  if(cid===game.player){
+    let nm = crashed.map(u=>(UNIT_TYPES[u.type]||{}).name||'飞机').join('、');
+    addLog('💥','✈️ 燃油枯竭，'+crashed.length+' 个航空单位坠机报废（'+nm+'）！赶紧抢油田或解散空军');
+  }
 }
 
 // Tech tree
@@ -3728,22 +3763,25 @@ function moveUnit(unit, toProvinceId){
   let seasonMod = getSeasonMod(to, false);
   if(seasonMod.spdMult !== 1) speed = Math.max(0.5, speed * seasonMod.spdMult);
   
-  // === AIR UNIT MOVEMENT ===
+  // === AIR UNIT MOVEMENT (v1.9.6: 航程无上限，飞行唯一门槛是燃油) ===
   if(type.air){
-    // Air units can fly to provinces in range (within ~100px radius)
     let dist = Math.hypot(to.x-from.x, to.y-from.y);
-    if(dist > 100){
-      if(unit.country===game.player) addLog('⚠️','✈️ '+UNIT_TYPES[unit.type].name+' 超出航程('+Math.floor(dist)+'px>100)，无法飞抵 '+to.name);
+    // 起飞前提：油箱里至少得有一天的油。没油就别想起飞（否则直接坠机）
+    let needFuel = type.fuel || 0;
+    if(uCountry && needFuel > 0 && uCountry.oil < needFuel){
+      if(unit.country===game.player) addLog('⛽','⛽ 燃油不足！'+UNIT_TYPES[unit.type].name+' 无法起飞（需 '+needFuel+' 石油，现有 '+Math.floor(uCountry.oil)+'）');
       return false;
     }
     if(!canAirMove(unit, toProvinceId, to.controller)){
-      if(unit.country===game.player) addLog('⚠️','✈️ '+UNIT_TYPES[unit.type].name+' 无法飞往 '+to.name+'（需己方/盟友领土中转）');
+      if(unit.country===game.player) addLog('⚠️','✈️ '+UNIT_TYPES[unit.type].name+' 无法飞往 '+to.name);
       return false;
     }
     unit.moving = true;
     unit.moveTo = toProvinceId;
     unit.moveProgress = 0;
-    unit.moveTotal = dist / (speed * 1.5); // Air speed multiplier (slowed)
+    // v1.9.6：航程无上限后不能再按像素算耗时 —— 否则跨洲转场要飞几百天。
+    // 现实里转场就是几小时到一两天，这里钳在 0.5~6 天。
+    unit.moveTotal = Math.max(0.5, Math.min(6, dist / (speed * 1.5)));
     unit._orderAt = Date.now(); // 行军插值起点：新下令的部队从 0 开始平滑走，不继承本 tick 已流逝时间
     unit.fighting = false;
     unit.fightTarget = null;
@@ -5887,12 +5925,20 @@ function gameTick(){
     c.steel += steelIncome * 0.1 * resBonus;
     c.oil += oilIncome * 0.5 * resBonus; // 石油产出（作为燃料储备）
     
-    // ==== 燃料消耗系统：机械化/海军/空军每天消耗石油 ====
-    let fuelUse = units.filter(u=>u.country===cid).reduce((s,u)=>s+((UNIT_TYPES[u.type]||{}).fuel||0),0);
-    if(fuelUse > 0){
-      c.oil = Math.max(0, c.oil - fuelUse);
+    // ==== 燃料消耗系统（v1.9.6：按"使用"计费，养兵不烧油）====
+    // 只有出动中的机械化/海军/空军才扣油：行军、转场、交战。
+    // 停在原地待命 → 0 石油/天。航空单位出动 0.5 石油/天/架。
+    let fuelUnits = units.filter(u=>u.country===cid && ((UNIT_TYPES[u.type]||{}).fuel||0) > 0);
+    let fuelUse = fuelUnits.reduce((s,u)=>s+(UNIT_TYPES[u.type].fuel||0),0); // 潜在日耗（只用于燃料状态评估）
+    let burnUse = 0;
+    fuelUnits.forEach(u=>{ if(unitIsBurningFuel(u)) burnUse += (UNIT_TYPES[u.type].fuel||0); });
+    if(burnUse > 0){
+      c.oil = Math.max(0, c.oil - burnUse);
     }
-    // 燃料状态评估（v1.9.4：参考值改为「自身 30 天耗油量」）
+    c._fuelBurnToday = burnUse;      // 今日实际耗油（出动中的部队）
+    c._fuelUsePotential = fuelUse;   // 全军出动的日耗（评估用）
+    // 燃料状态评估（v1.9.4：参考值改为「自身 30 天耗油量」；v1.9.6 仍按潜在日耗评估，
+    // 表示"全军出动还能撑几天"，与实际每日扣油分离）
     // 原实现是「60 天产出 + 200 基础」，于是任何没有油田的国家（120 个）开局就被判 ⛽紧张，
     // 哪怕它一支部队都不烧油。现在：没耗油部队 → 永远充足；有 → 看自己的储备能撑几天。
     let fuelRef = fuelUse * 30;
@@ -5901,11 +5947,13 @@ function gameTick(){
     c._fuelShortage = c.oil <= 1 && fuelUse > 0;
     if(cid===game.player){
       if(!wasShort && c._fuelShortage){
-        addLog('⛽','⚠️ 燃料耗尽！机械化部队攻防-40% 移速-50%！');
+        addLog('⛽','⚠️ 燃料耗尽！机械化部队攻防-40% 移速-50%，空军随时可能坠机！');
       } else if(wasShort && !c._fuelShortage){
         addLog('⛽','✅ 燃料补给恢复，机械化部队战力复原');
       }
     }
+    // 燃油耗尽 → 航空单位坠机（v1.9.6）
+    if(c._fuelShortage) applyFuelCrashes(cid);
     // AI 避免过度扩充耗油部队（油少时少造机械化）
     if(cid!==game.player && c._fuelShortage){
       c._aiFuelSaver = (c._aiFuelSaver||0) + 1;
@@ -9401,12 +9449,14 @@ function updateTopBar(){
     let seasonColor = season.name==='寒冬'?'#8fb8e8':season.name==='泥泞季'?'#b8a88f':season.name==='盛夏'?'#f0a040':season.name==='春季'?'#7ee787':'#d29922';
     seasonEl.innerHTML = season.emoji+' <span style="color:'+seasonColor+'">'+season.name+'</span>';
   }
-  // 燃料状态指示
+  // 燃料状态指示（v1.9.6：静止待命不烧油，只有出动中的部队计入日耗）
   let fuelEl = document.getElementById('t-fuel');
   if(fuelEl){
     if(c._fuelShortage) fuelEl.innerHTML = '<span style="color:#ff7b72">⛽枯竭!</span>';
     else if(c.fuelRatio !== undefined && c.fuelRatio < 0.25) fuelEl.innerHTML = '<span style="color:#d29922">⛽紧张</span>';
-    else fuelEl.innerHTML = '';
+    else if((c._fuelBurnToday||0) > 0) fuelEl.innerHTML = '<span style="color:#8b949e">出动 -'+(Math.round(c._fuelBurnToday*10)/10)+'/天</span>';
+    else fuelEl.innerHTML = '<span style="color:#8b949e">待命 0/天</span>';
+    fuelEl.title = '只有行军/转场/交战中的机械化·海军·空军才烧油（航空 0.5 石油/天/架）；静止待命 0 石油/天。全军出动日耗 '+(Math.round((c._fuelUsePotential||0)*10)/10)+' 石油，燃油枯竭会掉战力并导致坠机。';
   }
   document.getElementById('s-stab').textContent = c.stability+'%';
   let wsEl = document.getElementById('s-ws');
@@ -10441,7 +10491,7 @@ const GUIDE_STEPS = [
     phase:'advanced',
     title:'组建空军',
     desc:'<strong>点击柏林</strong>，切到<strong>🎖 训练</strong>面板，点「✈️ 战斗机联队」。<br><br>'
-      + '<span class="g-tip">✈️ 空军能<b>飞越任何领土</b>（射程 6），提供制空权加成和战略轰炸。'
+      + '<span class="g-tip">✈️ 空军能<b>飞越任何领土、航程无上限</b>（只受燃油限制，出动 0.5 石油/天/架，油尽会坠机），提供制空权加成和战略轰炸。'
       + '它是唯一不受邻接关系限制的兵种——被包围时也能出击。</span>',
     check:()=>{
       let airUnits = units.filter(u=>u.country==='germany' && UNIT_TYPES[u.type] && UNIT_TYPES[u.type].air);
@@ -12507,8 +12557,21 @@ setSpeed = function(s){
 // ---- 版本与更新日志 ----
 // 每次发布新版本：改 GAME_VERSION，并在 UPDATE_HISTORY 顶部加一条。
 // 玩家打开线上版时若版本号与 localStorage 记录不同，就弹「本次版本更新了以下内容」弹窗。
-const GAME_VERSION = 'v1.9.5';
+const GAME_VERSION = 'v1.9.7';
 const UPDATE_HISTORY = [
+  { ver:'v1.9.7', date:'2026-11-04', items:[
+    '⚠️ **进入游戏前新增免责声明**：每次打开游戏都会先弹出完整声明页（必须点「我已阅读并同意」才能开始）——说明本作为架空历史虚构推演、坚决反对法西斯主义/军国主义/纳粹主义与一切极端主义、地图与阵营仅为历史格局的简化模拟、坚持一个中国原则、未成年人须知与健康游戏忠告',
+    '❓ **右上角新增「反馈」按钮**：点击后游戏自动暂停（冻结），弹出反馈面板；提交后自动恢复原来的暂停状态。反馈会存入浏览器本地记录（保留最近 50 条），并导出为 txt 文件——优先弹出系统"另存为"窗口（可选 D:\\Qst 文件夹），不支持时自动下载到浏览器下载目录',
+    '🧪 新增 test_disclaimer_feedback.js：声明每次必弹、必须点同意、反馈暂停/恢复、内容校验、txt 导出、本地历史保存等',
+  ]},
+  { ver:'v1.9.6', date:'2026-11-03', items:[
+    '✈️ **空军航程无上限**：原来飞离出发省超过 100px 就报「超出航程」，跨个海峡都飞不过去。现在飞机想去哪就去哪 —— 跨海、跨国、跨洲都行，唯一限制是燃油；长途转场耗时也钳在 0.5~6 天内，不会飞上几百天',
+    '⛽ **燃油成为航空唯一门槛**：油箱里不够一天的油（航空 0.5 石油/架）就无法起飞，并给出提示；起飞后在空中的部队持续烧油',
+    '💥 **油尽会坠机**：燃料枯竭时航空单位每天有概率坠机报废（转场/空战中 40%，停放 18%），会写进战报 —— 抢油田、解散空军或者别乱飞',
+    '🅿️ **养兵不再烧油（所有耗油部队统一）**：燃料消耗改成按“使用”计费 —— 只有行军、转场、交战中的摩托化/装甲/舰船/飞机才扣石油，静止待命一律 **0 石油/天**。以前是全国部队按人头每天硬扣，不开战也会把油烧干',
+    '📊 顶栏石油旁新增日耗指示：「出动 -X/天」或「待命 0/天」，悬停可看全军出动的日耗与燃油规则',
+    '🧪 新增 test_air_range_fuel.js：航程无上限跨洲飞行、无油拒飞、静止 0 耗油、出动扣油、燃油枯竭坠机、航空 0.5 燃料等',
+  ]},
   { ver:'v1.9.5', date:'2026-11-03', items:[
     '⚡ **修复点面板卡死**：科技/外交/战报/国策四个面板原来是「拼一行就写一次 DOM」，浏览器每写一次都要把整块面板重新解析重排版。外交页有 150 多行、500 多个按钮，实测单次点击要卡 5~20 秒，看起来就是死机。现在改成先在内存里拼好、最后只写一次，外交页渲染耗时降到原来的十分之一以内',
     '🖱 **面板里连点也不卡了**：内容没变化时直接跳过 DOM 写入；外交页每一行还单独做了「屏幕外跳过排版」处理，滚动到哪才排到哪',
@@ -12616,6 +12679,120 @@ function showUpdateModal(){
   });
 }
 
+// ==================== 免责声明（v1.9.7）====================
+// 每次进入游戏前强制弹出，必须点「同意」才能开始；不做 localStorage 豁免。
+function showDisclaimer(){
+  let ov = document.createElement('div');
+  ov.id = 'disclaimer-modal';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.82);z-index:10000;display:flex;align-items:center;justify-content:center';
+  const LINES = [
+    ['📜', '<b>一、本游戏为架空历史策略游戏。</b>全部内容均为基于第二次世界大战历史格局的虚构"假如"推演，事件、局势与结局皆为游戏机制演算的结果，与现实世界不存在任何对应关系，请勿将游戏内容当作真实历史或现实信息。'],
+    ['🕊️', '<b>二、坚决反对法西斯主义、军国主义、纳粹主义与一切极端主义。</b>本游戏呈现战争题材的目的只有一个：帮助玩家了解那段历史、铭记战争给人类带来的深重灾难、珍惜来之不易的和平。任何美化、宣扬侵略战争的内容都为本游戏所坚决反对。'],
+    ['🗺️', '<b>三、游戏中的国家、旗帜、组织、人物、地图边界与事件，仅为对 1936—1945 年间历史格局的简化模拟</b>，服务于策略玩法，不代表任何现实国家的领土主张、政治立场或价值判断，亦不构成对任何历史事件或现实国家的评价。'],
+    ['🇨🇳', '<b>四、本游戏坚持一个中国原则。</b>游戏中的世界地图始终将台湾、香港、澳门、西藏、新疆等地呈现为中国领土不可分割的一部分，任何分裂国家的言论与行为都与本游戏立场相悖。'],
+    ['⚖️', '<b>五、本游戏不含任何现实政治、军事建议。</b>玩家在游戏中取得的一切"胜利"或"失败"都只是娱乐演算，不构成对历史进程或现实世界的评判；请勿将游戏机制带入现实讨论。'],
+    ['👨‍👩‍👧', '<b>六、未成年人应在家长或监护人陪同下游玩。</b>本游戏包含战争题材内容与策略博弈元素，建议 12 周岁以上玩家游玩，家长应引导未成年人正确认识历史。'],
+    ['⏰', '<b>七、健康游戏忠告：</b>抵制不良游戏，拒绝盗版游戏；注意自我保护，谨防受骗上当；适度游戏益脑，沉迷游戏伤身；合理安排时间，享受健康生活。'],
+  ];
+  let rows = LINES.map(l=>'<div style="margin:8px 0;font-size:12.5px;line-height:1.65;color:#c9d1d9"><span style="margin-right:4px">'+l[0]+'</span>'+l[1]+'</div>').join('');
+  ov.innerHTML =
+    '<div style="background:#161b22;border:1px solid #f0c040;border-radius:10px;max-width:640px;width:94%;max-height:88vh;overflow-y:auto;padding:20px 26px;box-shadow:0 8px 40px rgba(0,0,0,0.6)">'
+    + '<div style="font-size:19px;font-weight:bold;color:#f0c040;margin-bottom:2px">⚠️ 免责声明 · 游戏开始前请务必阅读</div>'
+    + '<div style="font-size:11px;color:#8b949e;margin-bottom:8px">《世界大战 1936》'+GAME_VERSION+' · 架空历史策略推演</div>'
+    + '<div style="border-top:1px solid #30363d;padding-top:6px">'+rows+'</div>'
+    + '<div style="font-size:12px;color:#d29922;margin-top:6px">点击下方按钮即表示您已完整阅读、充分理解并同意以上全部内容，且自愿继续游玩。</div>'
+    + '<div style="text-align:center;margin-top:14px"><button id="disclaimer-ok" style="background:#238636;color:#fff;border:none;border-radius:6px;padding:9px 46px;font-size:14px;cursor:pointer">我已阅读并同意，开始游戏</button></div>'
+    + '</div>';
+  document.body.appendChild(ov);
+  document.getElementById('disclaimer-ok').addEventListener('click', ()=>{ ov.remove(); });
+}
+
+// ==================== 玩家反馈（v1.9.7）====================
+// 右上角「❓ 反馈」按钮：点击后自动暂停游戏（冻结），输入并提交后恢复原暂停状态。
+// 反馈内容存入 localStorage 历史，并导出为 txt（可用系统对话框选择保存到 D:\Qst）。
+const FEEDBACK_DIR = 'D:\\Qst';   // 反馈导出说明中提示的目标文件夹
+function openFeedbackPanel(){
+  if(document.getElementById('feedback-panel')) return;
+  let wasPaused = game.paused;
+  game.paused = true;             // 冻结游戏
+  updateBottomBar();
+  let ov = document.createElement('div');
+  ov.id = 'feedback-panel';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9998;display:flex;align-items:center;justify-content:center';
+  ov.innerHTML =
+    '<div style="background:#161b22;border:1px solid #3fb950;border-radius:10px;max-width:520px;width:92%;padding:20px 24px;box-shadow:0 8px 40px rgba(0,0,0,0.6)">'
+    + '<div style="font-size:17px;font-weight:bold;color:#3fb950">❓ 问题反馈</div>'
+    + '<div style="font-size:11.5px;color:#8b949e;margin:6px 0 10px">游戏已自动暂停。请描述你遇到的问题或建议（_bug、平衡性、新玩法点子都可以），提交后会保存到本地反馈记录，并导出为 txt 文件（可在弹出的保存窗口中选择 '+FEEDBACK_DIR+' 文件夹，或保存到下载目录后移动过去）。</div>'
+    + '<textarea id="feedback-text" placeholder="请输入反馈内容（至少 5 个字）…" style="width:100%;box-sizing:border-box;height:130px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;padding:8px;font-size:13px;resize:vertical"></textarea>'
+    + '<div style="font-size:11px;color:#8b949e;margin-top:4px" id="feedback-hint"></div>'
+    + '<div style="text-align:right;margin-top:12px">'
+    + '<button id="feedback-cancel" style="background:#21262d;color:#8b949e;border:1px solid #30363d;border-radius:6px;padding:7px 18px;font-size:13px;cursor:pointer;margin-right:8px">取消</button>'
+    + '<button id="feedback-submit" style="background:#238636;color:#fff;border:none;border-radius:6px;padding:7px 22px;font-size:13px;cursor:pointer">提交反馈</button>'
+    + '</div></div>';
+  document.body.appendChild(ov);
+  let ta = document.getElementById('feedback-text');
+  if(ta) ta.focus();
+  function done(){
+    ov.remove();
+    game.paused = wasPaused;      // 恢复原暂停状态
+    updateBottomBar();
+  }
+  let cancelBtn = document.getElementById('feedback-cancel');
+  if(cancelBtn) cancelBtn.addEventListener('click', done);
+  let submitBtn = document.getElementById('feedback-submit');
+  if(submitBtn) submitBtn.addEventListener('click', ()=>{
+    let text = (ta && ta.value ? ta.value : '').trim();
+    let hint = document.getElementById('feedback-hint');
+    if(text.length < 5){ if(hint) hint.innerHTML = '<span style="color:#ff7b72">反馈内容太短了，至少写 5 个字</span>'; return; }
+    let rec = {
+      time: new Date().toLocaleString('zh-CN'),
+      ver: GAME_VERSION,
+      country: (game.player && COUNTRY_DEFS[game.player]) ? COUNTRY_DEFS[game.player].name : (game.player||'未知'),
+      date: (game.tick!==undefined && game.date) ? fmtDate() : '',
+      text: text
+    };
+    // 1) 存入本地反馈历史（最多 50 条）
+    try{
+      let list = JSON.parse(localStorage.getItem('ww1936_feedbacks')||'[]');
+      list.unshift(rec); if(list.length>50) list.length = 50;
+      localStorage.setItem('ww1936_feedbacks', JSON.stringify(list));
+    }catch(e){}
+    // 2) 导出 txt（优先系统保存对话框，可保存到 D:\Qst）
+    let body = '【世界大战1936 玩家反馈】\n时间: '+rec.time+'\n版本: '+rec.ver+'\n游玩国家: '+rec.country+'\n游戏内日期: '+rec.date+'\n\n'+rec.text+'\n';
+    let how = saveFeedbackFile(body);
+    if(hint) hint.innerHTML = '<span style="color:#3fb950">✅ 反馈已提交'+(how==='picker'?'，请在保存窗口中选择 '+FEEDBACK_DIR+' 文件夹':(how==='download'?'，txt 已开始下载（默认在浏览器下载目录，可移动到 '+FEEDBACK_DIR+'）':''))+'</span>';
+    addLog('📝','感谢反馈！你的意见已记录，我们会认真阅读');
+    setTimeout(done, 1400);
+  });
+}
+
+// 把反馈文本导出为 txt：优先 File System Access API（弹系统另存为，可选 D:\Qst），
+// 不支持则退化为浏览器下载（进默认下载目录）。全部失败则静默（历史已存 localStorage）。
+function saveFeedbackFile(text){
+  let fname = 'feedback_' + new Date().toISOString().slice(0,19).replace(/[:T]/g,'-') + '.txt';
+  try{
+    if(typeof window.showSaveFilePicker === 'function'){
+      window.showSaveFilePicker({
+        suggestedName: fname,
+        types: [{description:'文本反馈', accept:{'text/plain':['.txt']}}]
+      }).then(function(h){ return h.write(new Blob([text], {type:'text/plain;charset=utf-8'})); }).catch(function(){});
+      return 'picker';
+    }
+  }catch(e){}
+  try{
+    let blob = new Blob([text], {type:'text/plain;charset=utf-8'});
+    let a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = fname;
+    if(a.style) a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function(){ try{ document.body.removeChild(a); }catch(e){} }, 0);
+    return 'download';
+  }catch(e){}
+  return 'none';
+}
+
 // 🥚 彩蛋：游玩中国时，连续输入 LRY（不分大小写）→ 无限人力、无限金钱、无限石油
 // 处理器暴露在 initLRYCheat._onKey 上，方便自动化测试直接派发按键
 function initLRYCheat(){
@@ -12653,6 +12830,9 @@ function init(){
 
   // Show country selection
   document.getElementById('country-overlay').style.display = 'flex';
+
+  // 免责声明（v1.9.7：每次进入游戏前强制弹出，必须同意才能开始）
+  showDisclaimer();
 
   // 版本更新弹窗（localStorage 记录的上次版本 ≠ 当前版本时弹出）
   showUpdateModal();
