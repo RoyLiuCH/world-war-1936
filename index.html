@@ -13771,8 +13771,14 @@ setSpeed = function(s){
 // ---- 版本与更新日志 ----
 // 每次发布新版本：改 GAME_VERSION，并在 UPDATE_HISTORY 顶部加一条。
 // 玩家打开线上版时若版本号与 localStorage 记录不同，就弹「本次版本更新了以下内容」弹窗。
-const GAME_VERSION = 'v2.1.2';
+const GAME_VERSION = 'v2.1.3';
 const UPDATE_HISTORY = [
+  { ver:'v2.1.3', date:'2026-11-08', items:[
+    '🖥 **反馈真的存到「服务器端」= 你这台电脑的 D:\\Qst 了**：之前只有「弹一次文件夹授权」这条路（浏览器安全模型不允许网页凭空写磁盘），现在游戏目录里多了一个 **feedback-server.js**，双击「**启动反馈服务器.bat**」就会在你本机起一个小服务（127.0.0.1:8765，同时把游戏也挂在上面打开）—— 之后每次提交反馈都是 **POST 一句话，服务器自己把 txt 写进 D:\\Qst，全程零弹窗、零授权**，面板上会直接显示「✅ 已由本机服务器写入 D:\\Qst\\feedback_2026…txt」',
+    '🧭 **三条通路自动降级，反馈永远不会丢**：① 本机服务器（最优，直写 D:\\Qst）→ ② 你授权过一次的文件夹句柄（IndexedDB 记住，静默写）→ ③ 浏览器下载目录兜底。服务器没开时面板会明说「本机反馈服务器未启动 → 双击启动反馈服务器.bat」，不会让你以为存进去了',
+    '🧪 新增 test_feedback_server.js（**49 断言**，含**真的起一个服务器进程**、真的写文件、真的读回来比对中文内容：探活 / CORS 与私有网络预检头 / 同名自动加 -2 / 空内容拒绝 / 路径穿越 403 / 一堆降级分支）',
+    '📄 服务器顺手维护一份「**_全部反馈汇总.txt**」，所有反馈按时间追加在同一个文件里，你不用一条条点开；D 盘不可写时会自动退到游戏目录下的 feedback\\ 并提示，不会静默失败',
+  ]},
   { ver:'v2.1.2', date:'2026-11-08', items:[
     '🔧 **右上角「❓ 反馈」不再遮挡顶栏**：以前它是一层浮在顶栏最右侧的绝对定位按钮，只要窗口变窄（或你把左侧面板拖宽）导致顶栏内容横向滚动，「🎯 国策树」和日期就会被它压住、点不到。现在顶栏拆成「可滚动内容区 + 固定右区」两块：**⭐ 国策点数、🎯 国策树、日期、❓ 反馈永远固定在最右侧**，滚动内容再也挤不进这块；顶栏右侧还有渐隐提示，告诉你左边还有内容可以滚',
     '🏛 **「反抗合并」国策线只属于独立主权国家**：这条线针对的是**非武力的国策「和平合并」**（德奥合并、慕尼黑阴谋、波罗的海并入苏联那种），不是战场上的吞并 —— 打输了被占领，什么法也救不了你。**傀儡国整条线关闭**：傀儡没有独立主权，不会被别国以国策和平合并（要动它只能先跟宗主开战），也没有「国会立法抗拒」这回事；国策树里会明确标注「傀儡国无独立主权 · 整条线关闭」并说明原因',
@@ -13959,16 +13965,20 @@ function showDisclaimer(){
   document.getElementById('disclaimer-ok').addEventListener('click', ()=>{ ov.remove(); });
 }
 
-// ==================== 玩家反馈（v1.9.8）====================
+// ==================== 玩家反馈（v1.9.8 → v2.1.3）====================
 // 右上角「❓ 反馈」按钮：
 //   · 断网时按钮置灰、点击提示「目前未连接网络，不可反馈」（游戏内浮层，不用原生 alert）
 //   · 点击后自动暂停游戏（冻结），输入并提交后恢复原暂停状态
-//   · 反馈**直接写进玩家这台电脑上的文件夹**（建议 D:\Qst）：
-//     整个游戏只需要选一次文件夹 → 句柄存进 IndexedDB → 以后每次提交都静默写 txt，
-//     不再弹任何「另存为」窗口。没有存档系统参与，也不上传服务器。
-const FEEDBACK_DIR = 'D:\\Qst';   // 推荐/默认的反馈落盘文件夹
+//   · 反馈**写进这台电脑（本机「服务器端」= 玩家自己这台机器）的 D:\Qst 文件夹**，三条通路按优先级：
+//       ① 本机反馈服务器 feedback-server.js（双击「启动反馈服务器.bat」启动）
+//          → POST /api/feedback → 服务器自己 fs.writeFile 落盘 D:\Qst，全程零弹窗、零授权
+//       ② 一次性授权的文件夹句柄（IndexedDB 记住 D:\Qst）→ 静默写 txt（浏览器安全模型要求选一次）
+//       ③ 最后兜底：落到浏览器下载目录
+//   · 三条通路都只写本机磁盘，不上传任何外部服务器 —— 所谓「服务器端」就是玩家这台电脑
+const FEEDBACK_DIR = 'D:\\Qst';   // 反馈最终落盘位置（本机服务器端固定目录）
 const FEEDBACK_IDB = 'ww1936_fs';
-const FEEDBACK_UPLOAD_URL = '';   // 想接服务端时填接口地址；留空则纯本机，一个字节都不外传
+const FEEDBACK_SRV_PORT = 8765;   // 本机反馈服务器端口（feedback-server.js / 启动反馈服务器.bat）
+const FEEDBACK_UPLOAD_URL = '';   // 想额外转发到公网服务端时填地址；留空则一个字节都不外传
 
 // ---- 轻量浮动提示（替代原生 alert，避免阻塞游戏循环）----
 function showFloatTip(msg, opts){
@@ -13997,7 +14007,7 @@ function updateFeedbackButtonState(){
     if(!btn) return;
     if(feedbackOnline()){
       btn.classList.remove('offline');
-      btn.title = '向我们反馈问题或建议（会自动暂停游戏，保存到本机文件夹）';
+      btn.title = '向我们反馈问题或建议（会自动暂停游戏，保存到本机服务器端的 D:\\Qst）';
     } else {
       btn.classList.add('offline');
       btn.title = '目前未连接网络，不可反馈';
@@ -14090,9 +14100,86 @@ function feedbackFileName(){
        + p(d.getHours()) + p(d.getMinutes()) + p(d.getSeconds()) + '.txt';
 }
 
-// 把反馈写进玩家本机文件夹（静默，无对话框）。返回 'dir' | 'download' | 'none'
+// ---- 本机反馈服务器（v2.1.3）：真正的「保存到服务器端」，真正的 D:\Qst ----
+// 为什么需要它：浏览器安全模型不允许网页凭空写任意磁盘路径（要么弹一次文件夹授权，
+// 要么把文件丢进下载目录）。这台电脑上跑一个小服务（feedback-server.js），
+// 网页只要 POST 一句话，服务器就用 fs 直接写进 D:\Qst —— 这才是玩家说的「服务器端」。
+function feedbackServerBases(){
+  let out = [];
+  try{
+    let p = (window.location && window.location.protocol) || '';
+    // 用本机服务器打开游戏（http://127.0.0.1:8765/）时优先同源，连端口都不用猜
+    if(p === 'http:' || p === 'https:') out.push('');
+  }catch(e){}
+  out.push('http://127.0.0.1:' + FEEDBACK_SRV_PORT);
+  return out;
+}
+// 统一的带超时请求：服务器没开时要**立刻**失败（不能让玩家等），失败一律返回 null
+async function feedbackHttp(url, opt, timeoutMs){
+  if(typeof fetch !== 'function') return null;
+  let ctl = null, to = null;
+  try{
+    if(typeof AbortController === 'function'){
+      ctl = new AbortController(); opt.signal = ctl.signal;
+      to = setTimeout(function(){ try{ ctl.abort(); }catch(e){} }, timeoutMs || 2500);
+    }
+  }catch(e){}
+  try{
+    let r = await fetch(url, opt);
+    if(to) clearTimeout(to);
+    if(!r || !r.ok) return null;
+    let j = null;
+    try{ j = await r.json(); }catch(e){ return null; }
+    return (j && j.ok) ? j : null;
+  }catch(e){ if(to) clearTimeout(to); return null; }
+}
+async function pingFeedbackServer(){
+  let bases = feedbackServerBases();
+  for(let i=0;i<bases.length;i++){
+    let j = await feedbackHttp(bases[i] + '/api/feedback/ping', {method:'GET'}, 900);
+    if(j){
+      window.__fbSrvOk = true;
+      window.__fbSrvDir = j.dir || FEEDBACK_DIR;
+      return j;
+    }
+  }
+  window.__fbSrvOk = false; window.__fbSrvDir = '';
+  return null;
+}
+// 写服务器：成功返回服务器回执（含真实绝对路径），失败返回 null 让上层继续兜底
+async function saveFeedbackToServer(text, fname){
+  let bases = feedbackServerBases();
+  for(let i=0;i<bases.length;i++){
+    let j = await feedbackHttp(bases[i] + '/api/feedback', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ fname: fname, text: text, ver: GAME_VERSION })
+    }, 3000);
+    if(j && j.file){
+      window.__fbSrvOk = true;
+      window.__fbSrvDir = j.dir || FEEDBACK_DIR;
+      window.__fbLastPath = j.path || ((j.dir || FEEDBACK_DIR) + '\\' + j.file);
+      return j;
+    }
+  }
+  return null;
+}
+function updateFeedbackSrvState(){
+  let el = document.getElementById('feedback-srv-state');
+  if(!el) return;
+  if(window.__fbSrvOk){
+    el.innerHTML = '🖥 已连接本机反馈服务器　<b style="color:#7ee787">'+ (window.__fbSrvDir || FEEDBACK_DIR) +'</b>　提交即写入，无需任何授权';
+  } else {
+    el.innerHTML = '🖥 本机反馈服务器未启动 → 双击游戏目录里的「<b style="color:#58a6ff">启动反馈服务器.bat</b>」即可自动直写 '+FEEDBACK_DIR+'；不启动也行，会写进你授权过的文件夹';
+  }
+}
+
+// 把反馈写进这台电脑：① 服务器（D:\Qst，零弹窗）② 已授权文件夹 ③ 下载兜底
+// 返回 'server' | 'dir' | 'download' | 'none'
 async function saveFeedbackFile(text, fname){
   fname = fname || feedbackFileName();
+  let srv = await saveFeedbackToServer(text, fname);
+  if(srv) return 'server';
   let dir = window.__fbDirHandle;
   if(dir){
     try{
@@ -14156,9 +14243,10 @@ function openFeedbackPanel(){
   ov.innerHTML =
     '<div style="background:#161b22;border:1px solid #3fb950;border-radius:10px;max-width:540px;width:92%;padding:20px 24px;box-shadow:0 8px 40px rgba(0,0,0,0.6)">'
     + '<div style="font-size:17px;font-weight:bold;color:#3fb950">❓ 问题反馈</div>'
-    + '<div style="font-size:11.5px;color:#8b949e;margin:6px 0 10px">游戏已自动暂停。请描述你遇到的问题或建议（bug、平衡性、新玩法点子都可以）。提交后会<b style="color:#c9d1d9">直接写进你这台电脑上的文件夹</b>（建议 '+FEEDBACK_DIR+'）：第一次点「提交」会弹一次文件夹选择框，选完就永久记住，以后提交不再弹任何窗口，也不上传到任何服务器。</div>'
+    + '<div style="font-size:11.5px;color:#8b949e;margin:6px 0 10px">游戏已自动暂停。请描述你遇到的问题或建议（bug、平衡性、新玩法点子都可以）。提交后会<b style="color:#c9d1d9">直接写进这台电脑（服务器端）的 '+FEEDBACK_DIR+' 文件夹</b>：本机反馈服务器开着就零弹窗直写；没开则第一次提交会让你选一次文件夹（选 '+FEEDBACK_DIR+' 即可），之后永久记住。三条通路都只写本机磁盘，不上传任何外部服务器。</div>'
     + '<textarea id="feedback-text" placeholder="请输入反馈内容（至少 5 个字）…" style="width:100%;box-sizing:border-box;height:130px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;padding:8px;font-size:13px;resize:vertical"></textarea>'
-    + '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px">'
+    + '<div id="feedback-srv-state" style="font-size:10.5px;color:#8b949e;margin-top:6px;line-height:1.5">🖥 正在检测本机反馈服务器…</div>'
+    + '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:4px">'
     + '<span id="feedback-dir-state" style="font-size:11px;color:#8b949e">📁 首次提交时选一次文件夹（建议 '+FEEDBACK_DIR+'），之后就不用管了</span>'
     + '<button id="feedback-pickdir" style="background:#21262d;color:#58a6ff;border:1px solid #30363d;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;white-space:nowrap">换文件夹</button>'
     + '</div>'
@@ -14170,6 +14258,8 @@ function openFeedbackPanel(){
   document.body.appendChild(ov);
   let ta = document.getElementById('feedback-text');
   if(ta) ta.focus();
+  // 先探一下本机反馈服务器（开着就能直写 D:\Qst，不再需要任何授权）
+  pingFeedbackServer().then(function(){ updateFeedbackSrvState(); }).catch(function(){ updateFeedbackSrvState(); });
   // 显示已记住的落盘目录名
   fbIdbGet('feedbackDir').then(function(dir){
     if(dir) window.__fbDirHandle = dir;
@@ -14210,14 +14300,15 @@ function openFeedbackPanel(){
         list.unshift(rec); if(list.length>50) list.length = 50;
         localStorage.setItem('ww1936_feedbacks', JSON.stringify(list));
       }catch(e){}
-      if(hint) hint.innerHTML = '<span style="color:#3fb950">✅ 正在写入文件夹…</span>';
+      if(hint) hint.innerHTML = '<span style="color:#3fb950">✅ 正在写入 '+FEEDBACK_DIR+' …</span>';
       saveFeedbackFile(body).then(function(how){
         let h = document.getElementById('feedback-hint');
         if(!h) return;
         let where = window.__fbLastPath || FEEDBACK_DIR;
-        if(how === 'dir') h.innerHTML = '<span style="color:#3fb950">✅ 已存到你电脑上：<b>'+where+'</b></span>';
-        else if(how === 'download') h.innerHTML = '<span style="color:#d29922">✅ 本浏览器不支持直接写文件夹，已下载到本机：<b>'+where+'</b></span>';
-        else h.innerHTML = '<span style="color:#ff7b72">✗ 写入失败，请点右上角「换文件夹」重新选一次</span>';
+        if(how === 'server') h.innerHTML = '<span style="color:#3fb950">✅ 已由本机服务器写入：<b>'+where+'</b></span>';
+        else if(how === 'dir') h.innerHTML = '<span style="color:#3fb950">✅ 已存到你电脑上：<b>'+where+'</b></span>';
+        else if(how === 'download') h.innerHTML = '<span style="color:#d29922">✅ 本机服务器没开、浏览器也不支持直接写文件夹，已下载到本机：<b>'+where+'</b></span>';
+        else h.innerHTML = '<span style="color:#ff7b72">✗ 写入失败：请双击「启动反馈服务器.bat」，或点「换文件夹」重新选一次</span>';
         if(how !== 'none') setTimeout(done, 2100);
       }).catch(function(){});
       uploadFeedback(rec);
@@ -14226,7 +14317,8 @@ function openFeedbackPanel(){
 
     // 还没选过目录 → 就在这次点击里弹一次文件夹选择框（用户手势仍在，浏览器才允许），
     // 选完立刻静默写入 —— 不会再有第二个「另存为」窗口。
-    if(!window.__fbDirHandle && typeof window.showDirectoryPicker === 'function'){
+    // v2.1.3：本机反馈服务器在线时**不弹任何框**，直接 POST 让服务器写 D:\Qst。
+    if(!window.__fbDirHandle && !window.__fbSrvOk && typeof window.showDirectoryPicker === 'function'){
       if(hint) hint.innerHTML = '<span style="color:#58a6ff">请选一个文件夹（建议 '+FEEDBACK_DIR+'），只需这一次</span>';
       pickFeedbackDir().then(function(dir){
         if(!dir){
