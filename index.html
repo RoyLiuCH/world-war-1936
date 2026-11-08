@@ -10,12 +10,19 @@
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#0d1117;font-family:'Microsoft YaHei',sans-serif;overflow:hidden;user-select:none;color:#c9d1d9}
 #app{display:flex;height:100vh}
-#sidebar{width:270px;background:#161b22;border-right:1px solid #30363d;display:flex;flex-direction:column;overflow-y:auto;padding:8px;gap:6px;z-index:10}
-#log-panel{width:250px;background:#161b22;border-left:1px solid #30363d;display:flex;flex-direction:column;overflow:hidden;padding:8px;gap:4px}
+#sidebar{width:270px;flex:0 0 auto;background:#161b22;border-right:1px solid #30363d;display:flex;flex-direction:column;overflow-y:auto;padding:8px;gap:6px;z-index:10}
+#log-panel{width:250px;flex:0 0 auto;background:#161b22;border-left:1px solid #30363d;display:flex;flex-direction:column;overflow:hidden;padding:8px;gap:4px}
+/* v2.1.1 左右面板宽度可拖动（双击分隔条恢复默认） */
+.splitter{flex:0 0 6px;width:6px;cursor:col-resize;background:#0d1117;position:relative;z-index:12;touch-action:none}
+.splitter::after{content:'';position:absolute;left:2px;top:50%;transform:translateY(-50%);width:2px;height:44px;border-radius:1px;background:#484f58;transition:background .12s,height .12s}
+.splitter:hover::after,.splitter.dragging::after{background:#58a6ff;height:64px}
+body.pane-dragging{cursor:col-resize!important}
+body.pane-dragging #canvas-wrap{cursor:col-resize!important}
+body.pane-dragging *{user-select:none!important}
 #log-panel h3{flex:none}
 #log-list{flex:1;overflow-y:auto;font-size:11px;color:#8b949e}
 #log-list div{padding:3px 0;border-bottom:1px solid #21262d;line-height:1.5}
-#main{flex:1;position:relative;display:flex;flex-direction:column}
+#main{flex:1 1 0;min-width:0;position:relative;display:flex;flex-direction:column}
 #topbar{height:42px;background:#161b22;border-bottom:1px solid #30363d;display:flex;align-items:center;padding:0 16px;padding-right:92px;gap:13px;position:relative;overflow-x:auto;overflow-y:hidden;scrollbar-width:none}
 #topbar::-webkit-scrollbar{display:none}
 #topbar .res{font-size:13px;color:#8b949e;white-space:nowrap}
@@ -29,7 +36,7 @@ body{background:#0d1117;font-family:'Microsoft YaHei',sans-serif;overflow:hidden
 /* 轻量浮动提示（不用原生 alert，避免阻塞游戏循环） */
 #float-tip{position:fixed;left:50%;top:64px;transform:translateX(-50%) translateY(-8px);background:#161b22;border:1px solid #30363d;border-radius:8px;padding:9px 18px;font-size:13px;color:#c9d1d9;z-index:12000;opacity:0;transition:opacity .18s,transform .18s;pointer-events:none;box-shadow:0 6px 24px rgba(0,0,0,.5);max-width:80vw;text-align:center}
 #float-tip.show{opacity:1;transform:translateX(-50%) translateY(0)}
-#canvas-wrap{flex:1;position:relative;overflow:hidden;cursor:grab}
+#canvas-wrap{flex:1 1 0;min-width:0;min-height:0;position:relative;overflow:hidden;cursor:grab}
 #canvas-wrap.panning{cursor:grabbing}
 #zoom-controls{position:absolute;right:12px;top:12px;display:flex;flex-direction:column;gap:4px;z-index:50}
 #zoom-controls button{width:36px;height:36px;border-radius:6px;background:rgba(22,27,34,0.9);color:#c9d1d9;border:1px solid #30363d;font-size:18px;cursor:pointer;line-height:1;transition:all .15s}
@@ -62,8 +69,8 @@ canvas{display:block}
 .progress-fill{height:100%;background:#238636;transition:width .3s}
 .progress-fill.war{background:#da3633}
 
-.tab-row{display:flex;gap:4px;margin-bottom:6px}
-.tab-btn{padding:4px 10px;font-size:11px;border-radius:3px;background:#21262d;color:#8b949e;border:1px solid #30363d;cursor:pointer;flex:1;text-align:center}
+.tab-row{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px}
+.tab-btn{padding:4px 10px;font-size:11px;border-radius:3px;background:#21262d;color:#8b949e;border:1px solid #30363d;cursor:pointer;flex:1 1 72px;min-width:0;text-align:center;white-space:nowrap}
 .tab-btn:hover{color:#c9d1d9}
 .tab-btn.active{background:#1f6feb;color:#fff;border-color:#1f6feb}
 
@@ -168,6 +175,7 @@ canvas{display:block}
   </div>
   <div id="tab-content"></div>
 </div>
+<div id="split-left" class="splitter" title="拖动调整左侧面板宽度 · 双击恢复默认"></div>
 <div id="main">
   <div id="topbar">
     <div class="res">💰 资金 <b id="t-cash">0</b></div>
@@ -210,6 +218,7 @@ canvas{display:block}
   </div>
 </div>
 
+<div id="split-right" class="splitter" title="拖动调整右侧日志栏宽度 · 双击恢复默认"></div>
 <div id="log-panel" class="panel">
   <h3>📜 事件日志</h3>
   <div id="log-list"></div>
@@ -4324,6 +4333,7 @@ function centerMap() {
 
 function resizeCanvas(){
   let wrap = document.getElementById('canvas-wrap');
+  canvas.style.width = ''; canvas.style.height = '';   // 清掉拖动时的临时拉伸
   canvas.width = wrap.clientWidth;
   canvas.height = wrap.clientHeight;
   if (!game.player) centerMap();
@@ -4332,6 +4342,153 @@ function resizeCanvas(){
 window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
 centerMap();
+
+/* ===== v2.1.1 左右面板宽度可拖动 =====
+   左：内政侧栏（建造/训练/科技/外交/战报/国策）  右：事件日志
+   拖动中只用 CSS 拉伸 canvas 位图（GPU 缩放，零重绘），松手才真正重设画布尺寸并重烘焙底图，
+   否则每动一像素就要烘焙一次 309 省世界底图，拖起来会卡成幻灯片。 */
+const PANE_DEFAULTS = { left: 270, right: 250 };
+const PANE_LIMITS   = { left: [200, 620], right: [150, 560] };
+const PANE_MIN_MAP  = 280;              // 中间地图至少保留的宽度
+const PANE_STORE_KEY = 'ww1936_pane_w';
+// w = 当前实际生效宽度（受窗口总宽约束）；pref = 用户亲手设定的宽度（只受单边上下限约束）
+// 分开存是为了「窗口拉窄 → 面板被压缩 → 窗口再拉宽 → 宽度回到用户设定的值」，而不是被永久压小。
+let _pane = {
+  w:    { left: PANE_DEFAULTS.left,  right: PANE_DEFAULTS.right },
+  pref: { left: PANE_DEFAULTS.left,  right: PANE_DEFAULTS.right },
+  raf: 0, dragging: null,
+};
+
+function readPanePrefs(){
+  try{
+    let raw = localStorage.getItem(PANE_STORE_KEY);
+    let o = raw ? JSON.parse(raw) : null;
+    if(o && typeof o === 'object'){
+      let l = Number(o.left), r = Number(o.right);
+      return {
+        left:  isFinite(l) && l > 0 ? l : PANE_DEFAULTS.left,
+        right: isFinite(r) && r > 0 ? r : PANE_DEFAULTS.right,
+      };
+    }
+  }catch(e){}
+  return { left: PANE_DEFAULTS.left, right: PANE_DEFAULTS.right };
+}
+function savePanePrefs(){
+  try{ localStorage.setItem(PANE_STORE_KEY, JSON.stringify(_pane.pref)); }catch(e){}
+}
+function paneEl(side){
+  return document.getElementById(side === 'left' ? 'sidebar' : 'log-panel');
+}
+// 钳制两侧宽度（含窗口变窄时按比例让步），写入内联宽度
+function applyPaneWidths(opt){
+  let elL = paneEl('left'), elR = paneEl('right');
+  let l = _pane.pref.left, r = _pane.pref.right;
+  l = Math.max(PANE_LIMITS.left[0],  Math.min(PANE_LIMITS.left[1],  l));
+  r = Math.max(PANE_LIMITS.right[0], Math.min(PANE_LIMITS.right[1], r));
+  let maxTotal = Math.max(PANE_LIMITS.left[0] + PANE_LIMITS.right[0], window.innerWidth - PANE_MIN_MAP);
+  if(l + r > maxTotal){
+    let over = l + r - maxTotal;
+    let lRange = l - PANE_LIMITS.left[0], rRange = r - PANE_LIMITS.right[0];
+    let tot = lRange + rRange;
+    if(tot > 0){
+      l -= over * lRange / tot;
+      r -= over * rRange / tot;
+    }else{
+      l = Math.max(PANE_LIMITS.left[0], l - over / 2);
+      r = Math.max(PANE_LIMITS.right[0], r - over / 2);
+    }
+  }
+  _pane.w.left = Math.round(l);
+  _pane.w.right = Math.round(r);
+  if(elL) elL.style.width = _pane.w.left + 'px';
+  if(elR) elR.style.width = _pane.w.right + 'px';
+  if(opt && opt.resizeMap) schedulePaneResize();
+}
+function schedulePaneResize(){
+  if(_pane.raf) return;
+  _pane.raf = requestAnimationFrame(() => {
+    _pane.raf = 0;
+    if(_pane.dragging){ stretchCanvasToWrap(); return; }
+    finishPaneResize();
+  });
+}
+// 拖动中：位图按新容器尺寸拉伸显示（浏览器 GPU 缩放，不用重画）
+function stretchCanvasToWrap(){
+  let wrap = document.getElementById('canvas-wrap');
+  if(!wrap || !wrap.clientWidth || !wrap.clientHeight) return;
+  canvas.style.width  = wrap.clientWidth  + 'px';
+  canvas.style.height = wrap.clientHeight + 'px';
+}
+function finishPaneResize(){
+  try{
+    canvas.style.width = ''; canvas.style.height = '';   // 撤销拉伸，按真实像素重设
+    resizeCanvas();
+    drawMap();
+  }catch(e){}
+}
+function startPaneDrag(side, ev){
+  if(ev.button !== undefined && ev.button !== 0) return;
+  let el = paneEl(side);
+  if(!el) return;
+  ev.preventDefault();
+  // 用当前记录值当起点（它已经是钳制后的真实宽度），避免布局还没结算时量到旧值
+  let startW = _pane.w[side];
+  if(!(startW > 0) && el.getBoundingClientRect) startW = el.getBoundingClientRect().width;
+  _pane.dragging = { side, startX: ev.clientX, startW };
+  let sp = document.getElementById(side === 'left' ? 'split-left' : 'split-right');
+  if(sp) sp.classList.add('dragging');
+  if(document.body.classList) document.body.classList.add('pane-dragging');
+  window.addEventListener('mousemove', onPaneDrag);
+  window.addEventListener('mouseup', endPaneDrag);
+}
+function onPaneDrag(ev){
+  let d = _pane.dragging;
+  if(!d) return;
+  let dx = ev.clientX - d.startX;
+  let lim = PANE_LIMITS[d.side];
+  let w = d.startW + (d.side === 'left' ? dx : -dx);   // 右侧栏向右拖 = 变窄
+  _pane.pref[d.side] = Math.max(lim[0], Math.min(lim[1], w));
+  applyPaneWidths({ resizeMap: true });
+}
+function endPaneDrag(){
+  if(!_pane.dragging) return;
+  _pane.dragging = null;
+  if(document.body.classList) document.body.classList.remove('pane-dragging');
+  ['split-left', 'split-right'].forEach(id => {
+    let e = document.getElementById(id);
+    if(e && e.classList) e.classList.remove('dragging');
+  });
+  window.removeEventListener('mousemove', onPaneDrag);
+  window.removeEventListener('mouseup', endPaneDrag);
+  savePanePrefs();
+  applyPaneWidths({ resizeMap: false });
+  // 立刻精确重绘，不等下一帧；顺手取消拖动中排队的那一帧，免得再白烘焙一次底图
+  if(_pane.raf){ try{ cancelAnimationFrame(_pane.raf); }catch(e){} _pane.raf = 0; }
+  finishPaneResize();
+}
+function resetPaneWidths(side){
+  if(side === 'left' || side === undefined)  _pane.pref.left  = PANE_DEFAULTS.left;
+  if(side === 'right' || side === undefined) _pane.pref.right = PANE_DEFAULTS.right;
+  savePanePrefs();
+  applyPaneWidths({ resizeMap: true });
+}
+(function initPaneResizers(){
+  _pane.pref = readPanePrefs();
+  _pane.w = { left: _pane.pref.left, right: _pane.pref.right };
+  let l = document.getElementById('split-left');
+  let r = document.getElementById('split-right');
+  if(l){
+    l.addEventListener('mousedown', ev => startPaneDrag('left', ev));
+    l.addEventListener('dblclick', () => resetPaneWidths('left'));
+  }
+  if(r){
+    r.addEventListener('mousedown', ev => startPaneDrag('right', ev));
+    r.addEventListener('dblclick', () => resetPaneWidths('right'));
+  }
+  applyPaneWidths({ resizeMap: false });
+})();
+// 窗口尺寸变化：先钳制面板宽度，再重设画布
+window.addEventListener('resize', () => { applyPaneWidths({ resizeMap: false }); schedulePaneResize(); });
 
 function zoomIn(){ setZoom(mapScale * 1.3); }
 function zoomOut(){ setZoom(mapScale / 1.3); }
@@ -13574,8 +13731,14 @@ setSpeed = function(s){
 // ---- 版本与更新日志 ----
 // 每次发布新版本：改 GAME_VERSION，并在 UPDATE_HISTORY 顶部加一条。
 // 玩家打开线上版时若版本号与 localStorage 记录不同，就弹「本次版本更新了以下内容」弹窗。
-const GAME_VERSION = 'v2.1.0';
+const GAME_VERSION = 'v2.1.1';
 const UPDATE_HISTORY = [
+  { ver:'v2.1.1', date:'2026-11-08', items:[
+    '↔️ **左右面板宽度可以拖了**：左边内政侧栏（建造/训练/科技/外交/战报/国策）和右边事件日志之间各加了一条**竖向分隔条**，鼠标移上去会变蓝、光标变成左右箭头，按住拖动即可调宽；拖动时地图只做即时缩放预览，松手才精确重绘，所以拖起来是跟手的（不会一卡一卡地重算整张世界地图）',
+    '💾 **宽度会记住**：调好的宽度存进浏览器本地，下次打开还是你调的样子（和存档分开存，读别人的存档也不会把面板宽度拽回去）',
+    '🖱️ **双击分隔条 = 恢复默认**（左 270px / 右 250px）；窗口拉窄时会自动按比例让步，保证中间地图至少留 280px，不会把地图挤成一条缝',
+    '📐 侧栏标签按钮改成自动换行（`flex-wrap`）：侧栏拖到最窄时，「🏗 建造 / 🎖 训练 / 🔬 科技…」六个按钮会折成两行，不会挤成看不清的一坨',
+  ]},
   { ver:'v2.1.0', date:'2026-11-08', items:[
     '🗺️ **中国西部与内地终于有城市点了**：此前中国只有 13 个省、最西只到成都/昆明/兰州，整个青藏高原与新疆是一片空白，点不到也看不见。现在补上 **迪化（新疆）、拉萨（西藏）、西宁（青海）、太原（山西）、桂林（广西）** 5 个省，中国 13 → 18 省，省份总数 304 → 309；拉萨到尼泊尔/锡金/不丹、迪化到苏联哈萨克与蒙古的山口隘道全部打通（有路可走才谈得上打仗）',
     '🏛 **新增「地方军政势力」机制（仅中国）**：1936 年的中国名义统一、实际中央政令难达 —— 新疆督办盛世才（亲苏）、西藏噶厦地方政府（热振摄政，倾向英国）、青海马步芳（马家军）、山西阎锡山（晋系，太原兵工厂）、广西李宗仁（桂系）、云南龙云（滇系）、山东韩复榘（鲁系）。**这些省始终是中国领土（owner/controller 都是中国），不是独立国家、也不是可玩国家**，地图上永远画成中国的省；区别只在「税收、工厂、兵员暂不上缴中央」：未整编时只按 **35% 协饷** 上缴，中央面板会明确显示「地方截留 🏭X / 🔧Y」',
