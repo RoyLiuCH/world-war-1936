@@ -1306,7 +1306,7 @@ const PROVINCE_DEFS = [
 [278,'italy','威尼斯',694,152,'plains',0,1,0,0,0,2],
 [279,'italy','热那亚',682,156,'hills',0,1,0,0,0,2],
 [280,'danzig','但泽',717,126,'plains',1,1,0,0,0,2],
-[281,'turkey','埃尔祖鲁姆',770,171,'hills',0,1,0,0,0,2],
+[281,'turkey','埃尔祖鲁姆',799,181,'hills',0,1,0,0,0,2],
 [282,'india','加尔各答',945,235,'urban',0,2,1,1,0,4],
 [283,'canada','蒙特利尔',322,152,'urban',0,1,0,0,0,2],
 [284,'brazil','萨尔瓦多',469,302,'plains',0,1,0,0,0,2],
@@ -4748,11 +4748,13 @@ function drawSeaLabels(){
     ctx.save();
     ctx.translate(l.x, l.y);
     ctx.rotate(l.rot);
-    ctx.font = 'italic bold '+(l.s/mapScale)+'px Georgia, "Times New Roman", serif';
+    // labelPx：缩小到世界视野时海域名跟着变小（否则 27px 的「大西洋」比整片海还醒目）
+    let _sp = labelPx(l.s) / mapScale;
+    ctx.font = 'italic bold '+_sp+'px Georgia, "Times New Roman", serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     // 深色描边：压过下方大陆色块
-    ctx.lineWidth = 5/mapScale;
+    ctx.lineWidth = labelPx(5)/mapScale;
     ctx.strokeStyle = 'rgba(5,14,31,0.92)';
     ctx.strokeText(l.name, 0, 0);
     ctx.fillStyle = 'rgba(152,207,255,0.95)';
@@ -4761,10 +4763,10 @@ function drawSeaLabels(){
     ctx.strokeStyle = 'rgba(152,207,255,0.5)';
     ctx.lineWidth = 1.4/mapScale;
     ctx.beginPath();
-    let w = l.name.length * (l.s/mapScale) * 0.95;
+    let w = l.name.length * _sp * 0.95;
     for(let i=0;i<=12;i++){
       let wx = -w/2 + (w*i)/12;
-      let wy = (l.s/mapScale)*0.62 + Math.sin(i*0.9)*2.2/mapScale;
+      let wy = _sp*0.62 + Math.sin(i*0.9)*2.2/mapScale;
       if(i===0) ctx.moveTo(wx, wy); else ctx.lineTo(wx, wy);
     }
     ctx.stroke();
@@ -4955,30 +4957,110 @@ function clipPolyToRect(poly, x0, y0, x1, y1){
   return p;
 }
 
-// 多边形命中检测：优先"点在省份块内"，回退到"最近中心点"
-// ★ 省块是 Voronoi 单元（会延伸到国境外），所以命中前先判「点在陆地内」+「点在该省所属国的真实国界内」，
+// 多边形命中检测
+// ★ 省块是 Voronoi 单元（会延伸到国境外），所以命中前要判「点在该省所属国的真实国界内」，
 //   否则点一片空海或邻国领土也会选中几百像素外的省。
-// 命中时该省是否接受这个点：飞地放行；其余要求落在本国国界内
-// （3px 容差：国界折线经过取整，沿海省份的中心/边界点常有 1~2px 误差）
-function provinceHitOK(p, x, y){
-  if(p._outOfBorder) return true;
-  if(pointInCountry(p.cid, x, y)) return true;
-  return borderDistOf(p.cid, x, y) <= 9;
+// ★★ v1.9.10 血泪修复（小国永远选不中）：Voronoi 单元是跨国界蔓延的（荷兰那一格宽 4505px、
+//   高 6006px，一直铺到德国腹地），而大国的省 id 排在小国前面 —— 原来的「遍历到第一个命中就
+//   return」让阿姆斯特丹/布鲁塞尔/维也纳/里斯本全被邻国的大省截胡；再加上 9 **地图单位** 的
+//   国界容差（整个荷兰才 11px 宽，"容差"比小国本身还大），等于把小国整个让给了大国。
+//   另外原来一上来就 `if(!pointInLand()) return null` —— 可瑙鲁/汤加/澳门/但泽/巴哈马这些
+//   弹丸之地根本不在 110m 陆地掩膜里，于是自己的国土点在海里，永远点不到。
+//   现在：① 准入 = 省块含点 + 「该国国界内 / 国界容差内 / 飞地单元」
+//         ② 打分 = 离省中心距离（主）+ 离国界距离 + 小国权重（次）
+//      —— 距离最近的省就是这个 Voronoi 单元的真正主人，大国省块再大也抢不过小国首都。
+//         ③ 省块形状退化（如哥本哈根自己的省块不含自己的中心）时，按「最近省会中心」兜底。
+const HIT_BORDER_TOL_PX = 4;    // 国界容差（屏幕像素，随缩放折算）
+const HIT_NEAR_PX = 26;         // 最近省中心兜底（屏幕像素）
+
+// 该国是否「省中心本身就不在陆地掩膜里」（微型岛国：瑙鲁/汤加/澳门/但泽/巴哈马…）
+// 110m 陆地掩膜里根本没有这些弹丸之地，所以「点在海里」也可能是它们的国土。
+function provOffLand(p){
+  if(p._offLand === undefined) p._offLand = !pointInLand(p.x, p.y);
+  return p._offLand;
 }
+// 每国省数（命中时用于「小国优先」——1 省国 vs 40 省国只差一点权重）
+let _cidProvCount = null, _cidProvCountN = -1;
+function provCountOf(cid){
+  if(!_cidProvCount || _cidProvCountN !== provinces.length){
+    _cidProvCount = {}; _cidProvCountN = provinces.length;
+    for(let i=0;i<provinces.length;i++){
+      let c = provinces[i].cid;
+      _cidProvCount[c] = (_cidProvCount[c] || 0) + 1;
+    }
+  }
+  return _cidProvCount[cid] || 1;
+}
+
+// 命中候选缓冲（复用以避免 mousemove 每帧分配数组）
+const _hitP = [], _hitD = [];
+
 function getProvinceAtPoint(mx, my){
-  if(!pointInLand(mx, my)) return null;
-  for(let p of provinces){
+  let scale = (mapScale > 0 && isFinite(mapScale)) ? mapScale : 1;
+  let tol = HIT_BORDER_TOL_PX / scale;
+  let nearMax = HIT_NEAR_PX / scale;
+  let onLand = pointInLand(mx, my);
+
+  // ① 先收集「省块含这个点」的候选（bbox + 点在多边形内 —— 这两步很便宜）
+  _hitP.length = 0; _hitD.length = 0;
+  for(let i=0;i<provinces.length;i++){
+    let p = provinces[i];
     let bb = PROVINCE_BBOXES[p.id];
     if(!bb) continue;
-    if(mx < bb.minX-4 || mx > bb.maxX+4 || my < bb.minY-4 || my > bb.maxY+4) continue;
-    if(pointInPoly(mx, my, PROVINCE_SHAPES[p.id]) && provinceHitOK(p, mx, my)) return p.id;
+    if(mx < bb.minX-1 || mx > bb.maxX+1 || my < bb.minY-1 || my > bb.maxY+1) continue;
+    let poly = PROVINCE_SHAPES[p.id];
+    if(!poly || poly.length < 3) continue;
+    if(!pointInPoly(mx, my, poly)) continue;
+    // 在海面上点击：只认「省中心也在海里」的微型岛国省，免得点空海也选中沿岸省
+    if(!onLand && !provOffLand(p)) continue;
+    _hitP.push(p);
+    _hitD.push(Math.hypot(mx-p.x, my-p.y));
   }
-  let best = null, bestD = Infinity;
-  for(let p of provinces){
+
+  // ② 按「离省中心由近到远」逐个验明正身（点是否在该国国界内 / 容差内）。
+  //    距离是主项 —— Voronoi 的定义就是"离哪个中心最近"，所以大国那块蔓延几千像素的
+  //    省块抢不过小国自己的首都。国界距离、省数只在同距时做微调（飞地/海岸取整）。
+  //    一旦「剩下的候选光是距离就已经比当前最优更差」就提前收工，
+  //    这样每帧只会做 1~3 次昂贵的 pointInCountry/borderDistOf，而不是 304 次。
+  let best = null, bestScore = Infinity, bestD = Infinity;
+  let n = _hitP.length;
+  for(let k=0;k<n;k++){
+    let mi = -1, mv = Infinity;
+    for(let i=0;i<n;i++){ let dd = _hitD[i]; if(dd < mv){ mv = dd; mi = i; } }
+    if(mi < 0) break;
+    if(mv * 10 >= bestScore) break;
+    let p = _hitP[mi];
+    _hitD[mi] = Infinity;                   // 取走
+    let bd = 0;
+    if(!p._outOfBorder && !pointInCountry(p.cid, mx, my)){
+      bd = borderDistOf(p.cid, mx, my);
+      if(bd > tol) continue;                // 既不在国界内、也离得太远 → 不是这个国家的点
+    }
+    let score = mv * 10 + bd + provCountOf(p.cid) * 0.3;
+    if(score < bestScore){ bestScore = score; bestD = mv; best = p; }
+  }
+
+  // ③ 兜底：省块形状退化（哥本哈根/平壤/赫尔辛基/卢森堡/冈比亚等省块甚至不含自己的中心点，
+  //    摩纳哥/安道尔/圣马力诺只有 5px 见方的块），或者点刚好落在块外一两个像素
+  //    → 认最近的省会中心。屏幕 8px 内无条件认（玩家就是在点城市圆点）；
+  //    8~26px 要求该国国界在容差内，免得抢邻国省。
+  let near = null, nearD = nearMax;
+  for(let i=0;i<provinces.length;i++){
+    let p = provinces[i];
+    if(Math.abs(mx-p.x) > nearD || Math.abs(my-p.y) > nearD) continue;
     let d = Math.hypot(mx-p.x, my-p.y);
-    if(d < bestD && provinceHitOK(p, mx, my)){ bestD = d; best = p.id; }
+    if(d >= nearD) continue;
+    if(!onLand && !provOffLand(p)) continue;
+    // 8px 内就是点在城市圆点上，直接认；再远就必须真的是这个国家的点
+    // （这里**不给 _outOfBorder 开绿灯**，否则一个坐标跑偏的省会把整片海都算成它）
+    if(d * scale > 8){
+      if(!pointInCountry(p.cid, mx, my) && borderDistOf(p.cid, mx, my) > Math.max(tol, 12 / scale)) continue;
+    }
+    nearD = d; near = p;
   }
-  return bestD <= 28 ? best : null;
+  // 就近的城市点比 ② 的赢家更近 → 用就近的（否则保留 ②）
+  if(near && (!best || nearD < bestD)) return near.id;
+  return best ? best.id : null;
 }
 
 // ==================== 渲染分层：静态底图缓存 + 动态层（v1.9.9） ====================
@@ -5064,6 +5146,18 @@ function requestDraw(){
   try{
     requestAnimationFrame(function(){ _drawQueued = false; drawMap(); });
   }catch(e){ _drawQueued = false; drawMap(); }
+}
+
+// ★ 屏幕字号的「缩放折算」函数（v1.9.10 修「缩小地图后字超级大」）
+// 所有地名/国名的 ctx.font 都写成 (px/mapScale)，这样屏幕上恒为 px —— 这对"放大"是对的，
+// 但对"缩小"是灾难：地图缩到 40% 时整张世界只有 400px 宽，而"苏维埃社会主义共和国联盟"
+// 仍然是 17px 的字，比它标注的国家还大，欧洲一片糊成一团、连鼠标悬停的城市名都比城市大。
+// 所以 mapScale < 1 时按 sqrt 收缩屏幕字号（缩到 40% → 字降到 ~63%），并留 6px 可读下限。
+// mapScale >= 1 时原样返回，高倍视图的观感完全不变。
+function labelPx(base, minPx){
+  if(!(mapScale < 1)) return base;
+  let s = Math.max(mapScale, 0.05);
+  return Math.max(minPx === undefined ? 6 : minPx, base * Math.sqrt(s));
 }
 
 // 静态层：陆地 / 省块 / 国界 / 道路 / 海路 / 城市点 / 地名 / 国名 / 雪花 / 战线
@@ -5464,30 +5558,35 @@ function drawMapStatic(){
     let cx = ps.reduce((s,p)=>s+p.x,0)/ps.length;
     let cy = ps.reduce((s,p)=>s+p.y,0)/ps.length;
     if(!inViewPt(cx, cy)) return;   // v1.9.9 视口裁剪
-    let size = ps.length>=5 ? 17 : (ps.length>=3 ? 13 : 10);
+    // 屏幕字号（缩小视图时按 labelPx 收缩），碰撞框必须换成**地图单位**比较 ——
+    // 原来 wpx/hpx/pad 是拿屏幕像素直接当地图单位用，只要 mapScale≠1 碰撞判定就整体失真
+    // （缩小时判定框偏小 → 国家名互相叠成一团；放大时偏大 → 该画的国名被误判碰撞而不画）
+    let size = labelPx(ps.length>=5 ? 17 : (ps.length>=3 ? 13 : 10));
+    let sizeMap = size / mapScale;
     let name = COUNTRY_DEFS[cid].short;
-    let wpx = name.length * size * 0.95;
-    let hpx = size * 1.35;
+    let wpx = name.length * sizeMap * 0.95;
+    let hpx = sizeMap * 1.35;
+    let pad = 18 / mapScale;
+    let gapY = 26 / mapScale;
     let cands = [
-      {x:cx,   y:cy-26},
-      {x:cx,   y:cy-12},
-      {x:cx,   y:cy-40},
-      {x:cx-wpx*0.55, y:cy-26},
-      {x:cx+wpx*0.55, y:cy-26}
+      {x:cx,   y:cy-gapY},
+      {x:cx,   y:cy-gapY*0.46},
+      {x:cx,   y:cy-gapY*1.54},
+      {x:cx-wpx*0.55, y:cy-gapY},
+      {x:cx+wpx*0.55, y:cy-gapY}
     ];
     let pick = null;
     for(let c of cands){
       let ok = placedLabels.every(r=>{
-        let pad = 18;
         return Math.abs(c.x-r.cx) >= (wpx+r.w)/2 + pad || Math.abs(c.y-r.cy) >= (hpx+r.h)/2 + pad;
       });
       if(ok){ pick = c; break; }
     }
     if(!pick) return; // 碰撞则让位
     placedLabels.push({cx:pick.x, cy:pick.y, w:wpx, h:hpx});
-    ctx.font = 'bold '+(size/mapScale)+'px Microsoft YaHei';
+    ctx.font = 'bold '+sizeMap+'px Microsoft YaHei';
     ctx.textAlign = 'center';
-    ctx.lineWidth = 4/mapScale;
+    ctx.lineWidth = labelPx(4)/mapScale;
     ctx.strokeStyle = 'rgba(5,12,22,0.85)';
     ctx.strokeText(name, pick.x, pick.y);
     ctx.fillStyle = hexToRgba(COUNTRY_DEFS[cid].color, 0.95);
@@ -5876,10 +5975,12 @@ function drawSelectionOverlay(){
       ctx.strokeStyle = '#ffd75e';
       ctx.lineWidth = 3 / mapScale;
     } else if(kind === 'hi'){
+      // 呼吸只做透明度，**不做线宽**：线宽随脉冲变会让描边一闪一闪（而且按 wall-clock 取值，
+      // 截图/回归测试每次量到的粗细都不同）。固定屏幕 3px 更稳。
       ctx.globalAlpha = 0.75 + 0.25 * (pulse || 0);
       ctx.fillStyle = hexToRgba(color, 0.18 + 0.20 * (pulse || 0));
       ctx.strokeStyle = '#4de1ff';
-      ctx.lineWidth = (2 + 2 * (pulse || 0)) / mapScale;
+      ctx.lineWidth = 3 / mapScale;
     } else if(kind === 'atk'){
       ctx.fillStyle = hexToRgba(color, 0.16);
       ctx.strokeStyle = '#ff6b5e';
@@ -5941,13 +6042,16 @@ function drawSelectionOverlay(){
     ctx.fillStyle = (id === sel) ? 'rgba(255,215,94,0.35)' : 'rgba(255,255,255,0.2)';
     ctx.fill();
     if(mapScale < 6){   // 放大到 6 倍以上时静态层已经常显地名，这里不重复描
-      ctx.font = '11px Microsoft YaHei';
+      // ★ 字号必须 /mapScale：ctx 已经 scale(mapScale) 过了，写成固定 11px 的话
+      //   屏幕上是 11×mapScale —— 缩放到 400%~590% 时就是 44~65px 的巨型字（v1.9.10 修）
+      // ★ 再套 labelPx：缩小到世界视野时也要跟着变小，否则悬停的城市名比城市本身还大
+      ctx.font = (labelPx(11, 8) / mapScale) + 'px Microsoft YaHei';
       ctx.textAlign = 'center';
-      ctx.lineWidth = 2.5 / mapScale;
+      ctx.lineWidth = labelPx(2.5, 2) / mapScale;
       ctx.strokeStyle = 'rgba(0,0,0,0.75)';
-      ctx.strokeText(p.name, p.x, p.y + 18 / mapScale);
+      ctx.strokeText(p.name, p.x, p.y + labelPx(18, 12) / mapScale);
       ctx.fillStyle = p.capital ? '#ffd75e' : '#fff';
-      ctx.fillText(p.name, p.x, p.y + 18 / mapScale);
+      ctx.fillText(p.name, p.x, p.y + labelPx(18, 12) / mapScale);
     }
   });
 }
@@ -5991,12 +6095,15 @@ function drawCountryHighlight(){
     ctx.fill();
     // 📍国名标签：小国也一眼知道"我在这"
     let name = '📍 ' + (def ? (def.short || def.name) : cid);
-    ctx.font = 'bold ' + Math.round(13/mapScale) + 'px "Microsoft YaHei", sans-serif';
+    // 不能 Math.round 折算后的值：mapScale=20 时 round(0.65)=1 → 屏幕上 20px（比原设计大一倍）；
+    // 缩小时也要跟 labelPx 一起收，否则"📍国名"比国家本身还大
+    let _fp = labelPx(13) / mapScale;
+    ctx.font = 'bold ' + _fp + 'px "Microsoft YaHei", sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     let w = ctx.measureText(name).width;
-    let ly = cy - R - 11/mapScale;
-    let bh = 17/mapScale;
+    let ly = cy - R - _fp * 0.85;
+    let bh = _fp * 1.35;
     ctx.fillStyle = 'rgba(6,10,16,0.80)';
     ctx.fillRect(cx - w/2 - 5/mapScale, ly - bh/2, w + 10/mapScale, bh);
     ctx.fillStyle = '#8ff0ff';
@@ -13170,8 +13277,15 @@ setSpeed = function(s){
 // ---- 版本与更新日志 ----
 // 每次发布新版本：改 GAME_VERSION，并在 UPDATE_HISTORY 顶部加一条。
 // 玩家打开线上版时若版本号与 localStorage 记录不同，就弹「本次版本更新了以下内容」弹窗。
-const GAME_VERSION = 'v1.9.9';
+const GAME_VERSION = 'v1.9.10';
 const UPDATE_HISTORY = [
+  { ver:'v1.9.10', date:'2026-11-06', items:[
+    '🎯 **修复「小国在地图上点不中」**：以前点自己的小国领土，选中的却是旁边的大国 —— 因为每个省块是按「离省会最近」划出来的隐形格子，大国的格子会一直蔓延到国境外面（荷兰那一格宽 4505px、铺到德国腹地），而命中判定是"谁排在前面就算谁的"，大国省更靠前就全抢走了；再加上一个 9 像素的容差（整个荷兰才 11px 宽），等于把小国整个送给了大国。现在改成按「离哪个省会最近」判定（格子本来就该这么分），并让国界严格把关。**166 个小国的首都全部能点中自己，304 个省的中心全部命中本国**',
+    '🏝️ **微型岛国终于能点到了**：瑙鲁、汤加、澳门、但泽、巴哈马、塞舌尔这些弹丸之地根本不在世界陆地数据里（110m 精度画不出它们），以前"点在海里"就直接判定为空，永远选不到。现在会认它们的真实国土',
+    '🔍 **修复「缩小地图后文字比国家还大」**：地名 / 国名的字号一直是「屏幕恒定像素」—— 放大时没问题，但缩到世界视野（40%）时整张世界只有 560px 宽，国家名照样画 17px、海域名 27px，欧洲一片糊成一团，鼠标悬停的城市名比它标注的国家还大。现在缩小视图时字号按 √缩放 收缩（40% → 字号降到约 63%：国家名 17→10.8px、海名 27→17px、悬停城市名 11→8px），并保留可读下限；100% 及以上完全不变。顺带修好国家名的防重叠判定 —— 它原来拿屏幕像素直接当地图单位用，只要缩放≠100% 判定就整体失真',
+    '🗺️ **修正埃尔祖鲁姆的位置**：这个土耳其省份的坐标偏了大约 30 像素，一直落在黑海里（还因此在海上抢别人的点击）。已按真实经纬度移回土耳其东部',
+    '🧪 新增 test_province_hit.js（15 断言）：小国首都/全部省中心命中本国、大国不被邻国抢、海洋点返回空、岛国可点中、命中性能（0.1ms/次）、悬停字号随缩放折算',
+  ]},
   { ver:'v1.9.9', date:'2026-11-04', items:[
     '⚡ **大幅优化流畅度（本次重点）**：以前每一帧都要把 304 个省块 + 182 个国家的真实国界（每国还要裁剪一次）+ 城市点 / 地名 / 道路全部重画一遍，单帧要几十毫秒 —— 拖动、缩放、鼠标划过省界都会一顿一顿的。现在把「相机和局势没变时完全一样」的东西烘焙进一张离屏底图，每帧只做一次位图拷贝 + 画会动的东西。实测静止场景单帧从 **90ms 降到 0.2ms**',
     '🖱 **拖动和滚轮不再卡**：底图比屏幕大一圈（四周各留 200px），拖动时直接把已有底图平移贴上去，不用重画；滚轮缩放先用拉伸版顶着，手停下来 160ms 后再重烘焙清晰版 —— 连续滚 20 格也不会每格卡一下（缩放单帧 174ms → 20ms）',
@@ -13179,7 +13293,7 @@ const UPDATE_HISTORY = [
     '🎞 **帧率不再被 20fps 卡死**：行军动画原来是 `setInterval(50)` 定时器驱动，最多 20fps 且和屏幕刷新不同步。现在改用 `requestAnimationFrame`，直接跟显示器同步（60 / 120 / 144Hz），部队行军和交战特效明显更顺；同一帧内的多次重绘请求会合并成一次',
     '🚫 **屏幕外的东西不画**：视口之外的国家、省块、国界、连线一律跳过（连线按线段包围盒判断，不会把横穿屏幕的长线误裁掉）—— 缩到最小看全球时省下最多',
     '📈 **顶栏显示实时帧率**：缩放条下方新增 FPS 指示，绿 ≥50 / 黄 ≥30 / 红 <30；完全空闲时显示「待机」（说明确实没在空转重绘）',
-    '🧪 新增 test_render_perf.js（35 断言）：静态/动态分层、底图超采尺寸、相机不动复用、悬停选中不重烘焙、平移复用与拖出边距重烘焙、状态变化正确失效、视口裁剪、rAF 循环、帧率指示、降级路径',
+    '🧪 新增 test_render_perf.js（41 断言）：静态/动态分层、底图超采尺寸、相机不动复用、悬停选中不重烘焙、平移复用与拖出边距重烘焙、状态变化正确失效、视口裁剪、rAF 循环、帧率指示、降级路径',
   ]},
   { ver:'v1.9.8', date:'2026-11-04', items:[
     '📁 **反馈直接写进你这台电脑的文件夹**：不再是浏览器本地记录、也不是存档。第一次点「提交反馈」会弹一次文件夹选择框（建议 D:\\Qst），选完永久记住 —— 以后每次提交都**静默写一个 txt 进那个文件夹，不再弹任何窗口**，成功后会显示完整文件路径，你可以直接在资源管理器里看到它。没有联网上传（一个字节都不外传）。浏览器安全模型不允许网页自己创建/写入任意路径，所以这**一次**点选必须由你亲手完成',
