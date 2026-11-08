@@ -23,14 +23,24 @@ body.pane-dragging *{user-select:none!important}
 #log-list{flex:1;overflow-y:auto;font-size:11px;color:#8b949e}
 #log-list div{padding:3px 0;border-bottom:1px solid #21262d;line-height:1.5}
 #main{flex:1 1 0;min-width:0;position:relative;display:flex;flex-direction:column}
-#topbar{height:42px;background:#161b22;border-bottom:1px solid #30363d;display:flex;align-items:center;padding:0 16px;padding-right:92px;gap:13px;position:relative;overflow-x:auto;overflow-y:hidden;scrollbar-width:none}
-#topbar::-webkit-scrollbar{display:none}
+/* v2.1.2 顶栏拆成「可滚动区 + 固定右区」：
+   从前反馈按钮是 position:absolute 浮在顶栏右侧，只要窗口一窄、顶栏内容横向滚动，
+   它就会盖住底下的「🎯 国策树」/日期（用户实测被遮）。现在右侧区是真实 flex 项，
+   滚动内容永远挤不进这块，反馈按钮也就再也不会压住任何东西。 */
+#topbar{height:42px;background:#161b22;border-bottom:1px solid #30363d;display:flex;align-items:center;position:relative;padding:0}
+#topbar-scroll{flex:1 1 auto;min-width:0;height:100%;display:flex;align-items:center;gap:13px;padding:0 6px 0 16px;overflow-x:auto;overflow-y:hidden;scrollbar-width:none}
+#topbar-scroll::-webkit-scrollbar{display:none}
+#topbar-fixed{flex:0 0 auto;height:100%;display:flex;align-items:center;gap:10px;padding:0 12px 0 10px;background:#161b22;box-shadow:-10px 0 14px -8px rgba(0,0,0,.75);z-index:2}
+/* 顶栏滚动条是隐藏的：内容超出时右端渐隐，提示「右边还有东西可以滚」 */
+#topbar-scroll.can-scroll{-webkit-mask-image:linear-gradient(to right,#000 calc(100% - 44px),transparent 100%);mask-image:linear-gradient(to right,#000 calc(100% - 44px),transparent 100%)}
 #topbar .res{font-size:13px;color:#8b949e;white-space:nowrap}
 #topbar .res b{color:#f0c040}
 #topbar .date{font-size:15px;color:#f0c040;font-weight:bold;margin-left:auto;white-space:nowrap}
 #topbar .pts{font-size:13px;color:#58a6ff;margin-left:12px;white-space:nowrap}
+#topbar-fixed .pts-fixed{font-size:12px;color:#58a6ff;white-space:nowrap}
+#topbar-fixed .pts-fixed b{color:#58a6ff}
 /* v1.9.7 反馈按钮：固定钉在顶栏最右侧，不参与 flex 排布，窗口再窄也不会被挤走 */
-#btn-feedback{position:absolute;right:10px;top:8px;height:26px;z-index:60;white-space:nowrap}
+#btn-feedback{height:26px;white-space:nowrap}
 /* v1.9.8 断网时反馈按钮置灰不可点 */
 #btn-feedback.offline{background:#161b22 !important;border-color:#30363d !important;color:#6e7681 !important;cursor:not-allowed;filter:grayscale(1);opacity:.6}
 /* 轻量浮动提示（不用原生 alert，避免阻塞游戏循环） */
@@ -178,6 +188,7 @@ canvas{display:block}
 <div id="split-left" class="splitter" title="拖动调整左侧面板宽度 · 双击恢复默认"></div>
 <div id="main">
   <div id="topbar">
+   <div id="topbar-scroll">
     <div class="res">💰 资金 <b id="t-cash">0</b></div>
     <div class="res">👥 人力 <b id="t-man">0</b></div>
     <div class="res">⚒ 钢铁 <b id="t-steel">0</b></div>
@@ -186,14 +197,17 @@ canvas{display:block}
     <div class="res">🔧 军用 <b id="t-mil">0</b></div>
     <div class="pts" style="margin-left:8px"><button class="btn-sm" style="font-size:10px;padding:2px 6px" onclick="openSaveModal()" title="保存游戏进度">💾 存档</button></div>
     <div class="pts"><button class="btn-sm" style="font-size:10px;padding:2px 6px" onclick="openLoadModal()" title="读取游戏存档">📂 读档</button></div>
-    <div class="pts">⭐ 国策: <b id="t-pts">0</b></div>
-    <div class="pts"><button id="btn-focus" class="btn-sm" style="font-size:10px;padding:2px 6px;background:#3d2e0f;border-color:#f0c040;color:#f0c040" onclick="openFocusTree()" title="历史国策树：苏德条约、巴巴罗萨计划…">🎯 国策树</button></div>
-    <div class="res" id="t-focus" style="color:#f0c040;font-size:11px;display:none" title="当前推行的国策"></div>
     <div class="res" id="t-season" style="color:#58a6ff;font-size:12px"></div>
     <div class="res" id="t-mp" style="display:none;color:#56d364;font-size:12px" title="联机对战状态"></div>
     <div class="pts"><button id="btn-sfx" class="btn-sm" style="font-size:10px;padding:2px 6px" onclick="toggleSfx()" title="开/关音效">🔊 音效</button></div>
+    <div class="res" id="t-focus" style="color:#f0c040;font-size:11px;display:none" title="当前推行的国策"></div>
+   </div>
+   <div id="topbar-fixed">
+    <div class="pts-fixed">⭐ 国策: <b id="t-pts">0</b></div>
+    <button id="btn-focus" class="btn-sm" style="font-size:10px;padding:2px 6px;background:#3d2e0f;border-color:#f0c040;color:#f0c040" onclick="openFocusTree()" title="历史国策树：苏德条约、巴巴罗萨计划…">🎯 国策树</button>
     <div class="date" id="t-date">1936年1月1日</div>
-    <div class="pts"><button id="btn-feedback" class="btn-sm" style="font-size:10px;padding:2px 6px;background:#1f2d1f;border-color:#3fb950;color:#3fb950" onclick="openFeedbackPanel()" title="向我们反馈问题或建议（会自动暂停游戏）">❓ 反馈</button></div>
+    <button id="btn-feedback" class="btn-sm" style="font-size:10px;padding:2px 6px;background:#1f2d1f;border-color:#3fb950;color:#3fb950" onclick="openFeedbackPanel()" title="向我们反馈问题或建议（会自动暂停游戏）">❓ 反馈</button>
+   </div>
   </div>
   <div id="canvas-wrap">
     <canvas id="map"></canvas>
@@ -3415,6 +3429,10 @@ function getCombatBonus(cid, skillId){
 function isAnnexThreatened(cid){
   let c = countries[cid];
   if(!c || c.eliminated || cid==='rebels') return false;
+  // v2.1.2：傀儡国没有独立主权 —— 国策「和平合并」的对象从来都是独立国家，
+  // 傀儡也不会被别国以国策吞来吞去（要动它只能先跟宗主开战）。
+  // 所以整条「反抗合并」线对傀儡国关闭，不给它虚耗国策点。
+  if(getMaster(cid)) return false;
   // 同一 tick 内复用缓存（AI 每轮会问很多次，别每次全表扫描国策树）
   if(game._annexThreatTick !== game.tick || !game._annexThreatSet){
     game._annexThreatTick = game.tick;
@@ -3451,8 +3469,13 @@ function focusNodeState(cid, node){
   }
   // 附加条件：need.year = 历史年份门槛（如诺曼底1944、巴巴罗萨1941），未到年份锁定
   if(node.need && node.need.year && game.date.year < node.need.year) return 'locked';
-  // 附加条件：need.annexThreat = 只有"可能被和平吞并的小国"才能点（v1.9.8 反抗合并线）
-  if(node.need && node.need.annexThreat && !isAnnexThreatened(cid)) return 'locked';
+  // 附加条件：need.annexThreat = 只有"可能被和平吞并的独立小国"才能点（v1.9.8 反抗合并线）
+  //   v2.1.2：傀儡国整条线关闭 —— 傀儡没有独立主权，既不会被国策和平合并，
+  //   也没有「国会立法抗拒」这回事（isAnnexThreatened 里也排除了傀儡，这里是双保险）
+  if(node.need && node.need.annexThreat){
+    if(getMaster(cid)) return 'locked';
+    if(!isAnnexThreatened(cid)) return 'locked';
+  }
   // 附加条件：need.annexedOnly = 已经点过 noAnnex 的国家不再需要反抗线
   if(node.need && node.need.notAnnexed && c._noAnnex) return 'done';
   // 宣战类节点：目标已灭亡/已交战则视为已完成
@@ -3490,15 +3513,13 @@ function startFocus(cid, nodeId){
 function aiPickFocusNode(cid){
   let c = countries[cid];
   if(!c || c.eliminated) return null;
-  if(isAnnexThreatened(cid) && !c._noAnnex){
-    for(let id of ['res_network','res_ban','res_appeal','res_arms']){
-      let n = findFocusNode(cid, id);
-      if(n && focusNodeState(cid, n)==='available') return n;
-    }
-  }
   let tree = getFocusTree(cid);
   for(let branch of tree.branches){
     for(let node of branch.nodes){
+      // v2.1.2：AI 一律不碰「反抗合并」线（need.annexThreat）。
+      // 这条线是「被大国以国策和平吞并」时的外交自救决策，属于玩家手操范畴；
+      // 交给 AI 只会让它把国策点耗在注定失败的文字抵抗上，还不如去点实业/扩军。
+      if(node.need && node.need.annexThreat) continue;
       if(focusNodeState(cid, node)==='available') return node;
     }
   }
@@ -4424,6 +4445,7 @@ function finishPaneResize(){
     canvas.style.width = ''; canvas.style.height = '';   // 撤销拉伸，按真实像素重设
     resizeCanvas();
     drawMap();
+    updateTopbarOverflow();      // 面板宽度变了 → 顶栏可用宽度也变了
   }catch(e){}
 }
 function startPaneDrag(side, ev){
@@ -4488,7 +4510,7 @@ function resetPaneWidths(side){
   applyPaneWidths({ resizeMap: false });
 })();
 // 窗口尺寸变化：先钳制面板宽度，再重设画布
-window.addEventListener('resize', () => { applyPaneWidths({ resizeMap: false }); schedulePaneResize(); });
+window.addEventListener('resize', () => { applyPaneWidths({ resizeMap: false }); schedulePaneResize(); updateTopbarOverflow(); });
 
 function zoomIn(){ setZoom(mapScale * 1.3); }
 function zoomOut(){ setZoom(mapScale / 1.3); }
@@ -10538,6 +10560,18 @@ function runAI(){
 } // end runAI}
 
 // ==================== UI 更新 ====================
+// 顶栏横向溢出检测（滚动条隐藏，溢出时右端渐隐作提示）。只在状态翻转时改 DOM。
+let _tbOverflow = null;
+function updateTopbarOverflow(){
+  try{
+    let el = document.getElementById('topbar-scroll');
+    if(!el || !el.classList || el.clientWidth === undefined) return;
+    let over = (el.scrollWidth - el.clientWidth) > 2;
+    if(over === _tbOverflow) return;
+    _tbOverflow = over;
+    if(over) el.classList.add('can-scroll'); else el.classList.remove('can-scroll');
+  }catch(e){}
+}
 // Lightweight top bar + sidebar update (no DOM rebuild)
 function updateTopBar(){
   if(!game.player) return;
@@ -10553,7 +10587,8 @@ function updateTopBar(){
   document.getElementById('t-mil').textContent = milF;
   document.getElementById('t-pts').textContent = game.skillPoints;
   document.getElementById('t-date').textContent = fmtDate();
-  updateFocusTopbar(); // 国策树进度
+  updateFocusTopbar(); // 国策树进度（会改变顶栏宽度 → 下面顺手重算溢出）
+  updateTopbarOverflow();
   // 季节显示
   let season = getSeasonName();
   let seasonEl = document.getElementById('t-season');
@@ -12706,8 +12741,12 @@ function openFocusTree(){
   let c = countries[cid];
   let tree = getFocusTree(cid);
   let cd = COUNTRY_DEFS[cid];
+  let master = getMaster(cid);          // v2.1.2：傀儡国的「反抗合并」线直接不显示
   // 分支列渲染
-  let cols = tree.branches.map(branch=>{
+  // 傀儡国没有独立主权 → 这条线整个不渲染（不是灰掉，是「没有」）
+  let visibleBranches = tree.branches.filter(branch =>
+    !(master && branch.nodes.some(n => n.need && n.need.annexThreat)));
+  let cols = visibleBranches.map(branch=>{
     let nodes = branch.nodes.map(node=>{
       let st = focusNodeState(cid, node);
       let style, badge, prog='';
@@ -12741,6 +12780,7 @@ function openFocusTree(){
   let cur = c.focus ? findFocusNode(cid, c.focus.nodeId) : null;
   mpShowModal(`
     <h2>${cd.flag||'🎯'} ${cd.name} — ${tree.name}</h2>
+    ${master?`<div style="font-size:11px;color:#8b949e;margin-bottom:6px;line-height:1.5">ℹ️ 你国是 <b style="color:#c9d1d9">${COUNTRY_DEFS[master]?COUNTRY_DEFS[master].short:master}</b> 的傀儡国：没有独立主权，不会被别国以国策「和平合并」，因此<b style="color:#d29922">「反抗合并」这条线根本不存在于你的国策树里</b>（要动傀儡国只能先跟宗主开战，那是战场上的事，不是国会的事）。</div>`:''}
     ${cur?`<div style="font-size:11px;color:#f0c040;margin-bottom:8px">⏳ 正在推行：<b>${cur.icon} ${cur.name}</b>（${c.focus.progress}/${cur.days}天）</div>`
       :'<div style="font-size:11px;color:#58a6ff;margin-bottom:8px">💡 点击可点亮的国策查看详情并开始推行（同一时间只能进行一个）</div>'}
     <div style="display:flex;gap:10px;overflow-x:auto;padding:4px 0;max-height:55vh;overflow-y:auto">${cols}</div>
@@ -13731,8 +13771,13 @@ setSpeed = function(s){
 // ---- 版本与更新日志 ----
 // 每次发布新版本：改 GAME_VERSION，并在 UPDATE_HISTORY 顶部加一条。
 // 玩家打开线上版时若版本号与 localStorage 记录不同，就弹「本次版本更新了以下内容」弹窗。
-const GAME_VERSION = 'v2.1.1';
+const GAME_VERSION = 'v2.1.2';
 const UPDATE_HISTORY = [
+  { ver:'v2.1.2', date:'2026-11-08', items:[
+    '🔧 **右上角「❓ 反馈」不再遮挡顶栏**：以前它是一层浮在顶栏最右侧的绝对定位按钮，只要窗口变窄（或你把左侧面板拖宽）导致顶栏内容横向滚动，「🎯 国策树」和日期就会被它压住、点不到。现在顶栏拆成「可滚动内容区 + 固定右区」两块：**⭐ 国策点数、🎯 国策树、日期、❓ 反馈永远固定在最右侧**，滚动内容再也挤不进这块；顶栏右侧还有渐隐提示，告诉你左边还有内容可以滚',
+    '🏛 **「反抗合并」国策线只属于独立主权国家**：这条线针对的是**非武力的国策「和平合并」**（德奥合并、慕尼黑阴谋、波罗的海并入苏联那种），不是战场上的吞并 —— 打输了被占领，什么法也救不了你。**傀儡国整条线关闭**：傀儡没有独立主权，不会被别国以国策和平合并（要动它只能先跟宗主开战），也没有「国会立法抗拒」这回事；国策树里会明确标注「傀儡国无独立主权 · 整条线关闭」并说明原因',
+    '🤖 **AI 不再点「反抗合并」线**：以前 AI 一被判定受吞并威胁就优先点这条线，把国策点全耗在注定失败的文字抵抗上。现在 AI 一律跳过这条线，把点数用在实业/扩军上 —— 遇到大国压境，AI 会真刀真枪地打，而不是发抗议书',
+  ]},
   { ver:'v2.1.1', date:'2026-11-08', items:[
     '↔️ **左右面板宽度可以拖了**：左边内政侧栏（建造/训练/科技/外交/战报/国策）和右边事件日志之间各加了一条**竖向分隔条**，鼠标移上去会变蓝、光标变成左右箭头，按住拖动即可调宽；拖动时地图只做即时缩放预览，松手才精确重绘，所以拖起来是跟手的（不会一卡一卡地重算整张世界地图）',
     '💾 **宽度会记住**：调好的宽度存进浏览器本地，下次打开还是你调的样子（和存档分开存，读别人的存档也不会把面板宽度拽回去）',
