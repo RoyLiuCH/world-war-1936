@@ -1330,7 +1330,102 @@ const PROVINCE_DEFS = [
 [301,'seychelles','维多利亚',850.2,341.7,'plains',1,0,0,0,0,1],
 [302,'saintelena','詹姆斯敦',629.3,382.6,'hills',1,0,0,0,0,1],
 [303,'aden','亚丁',813.0,277.5,'plains',1,1,0,0,0,2],
+// ---- v2.1.0 中国西部与内地：地方军政势力辖区 ----
+// ★ 这些全部是中国省份（cid/owner/controller 均为 china），不是独立国家。
+//   1936 年国民政府名义统一、实际对西部与部分内地省份控制力有限，这里如实建模为
+//   「地方军政势力辖区」：领土主权仍属中国，只是税收、工厂、兵员暂时不上缴中央，
+//   中央可通过「财政协饷」累积忠诚、再花国策点数「整编」收归（详见 WARLORDS 与 warlordIntegrate）。
+// 拉萨/西宁/迪化同时补齐了青藏与新疆的空白 —— 此前中国最西的城市点只到成都/昆明/兰州。
+[304,'china','迪化',966,167,'plains',0,1,1,0,1,2],    // 新疆 · 盛世才（亲苏）
+[305,'china','拉萨',979,218,'mountain',0,0,0,0,0,1],   // 西藏地方 · 噶厦（热振摄政）
+[306,'china','西宁',1013,191,'hills',0,1,0,0,0,2],     // 青海 · 马步芳（马家军）
+[307,'china','太原',1056,189,'hills',0,1,2,1,0,3],     // 山西 · 阎锡山（晋系，兵工厂）
+[308,'china','桂林',1048,234,'hills',0,1,1,0,0,2],     // 广西 · 李宗仁（桂系）
 ];
+
+// ==================== 中国地方军政势力（v2.1.0）====================
+// ★ 立场与建模边界：抗日战争时期的中国是「名义统一、实际割据」的形态。这里建模的是
+//   **中国境内的地方军政势力辖区** —— 主权与领土始终属于中国（省份 cid/owner/controller 全是 china），
+//   既不是独立国家，也不是可玩国家，地图上始终是中国的省。所谓「割据」只体现在
+//   工厂、资源、兵员只按 35% 协饷上缴中央；中央可花资金拉拢忠诚，达标后整编收归全额，
+//   这与 1936 年国民政府推进军政统一的史实一致。
+// ★ 历史依据：1936 年新疆督办盛世才与苏联关系密切（苏派顾问、驻哈密、给军援）；
+//   西藏是十三世达赖 1933 年圆寂后的噶厦地方政府（热振摄政，倾向英国）；
+//   青海是马步芳的马家军；山西阎锡山（晋系）、广西李宗仁（桂系）、云南龙云（滇系）、
+//   山东韩复榘（鲁系）都是当时中央政令难达的地方实力派。tilt 只影响忠诚变化曲线。
+const WARLORDS = {
+  xinjiang: { name:'新疆',     leader:'盛世才',   city:'迪化', tilt:'亲苏',   patron:'ussr', loyalty:28, str:2, garrison:2 },
+  xizang:   { name:'西藏地方', leader:'热振摄政', city:'拉萨', tilt:'亲英',   patron:'uk',   loyalty:16, str:1, garrison:1 },
+  qinghai:  { name:'青海',     leader:'马步芳',   city:'西宁', tilt:'马家军', patron:null,   loyalty:22, str:2, garrison:2 },
+  shanxi:   { name:'山西',     leader:'阎锡山',   city:'太原', tilt:'晋系',   patron:null,   loyalty:34, str:3, garrison:2 },
+  guangxi:  { name:'广西',     leader:'李宗仁',   city:'桂林', tilt:'桂系',   patron:null,   loyalty:30, str:2, garrison:1 },
+  yunnan:   { name:'云南',     leader:'龙云',     city:'昆明', tilt:'滇系',   patron:null,   loyalty:26, str:2, garrison:1 },
+  shandong: { name:'山东',     leader:'韩复榘',   city:'济南', tilt:'鲁系',   patron:null,   loyalty:24, str:2, garrison:1 },
+};
+// 省份名 → 势力 key。PROVINCE_DEFS 保持 12 字段不变，用名字映射，不用动 300+ 行
+const WARLORD_CITY = {
+  '迪化':'xinjiang', '拉萨':'xizang', '西宁':'qinghai',
+  '太原':'shanxi', '桂林':'guangxi', '昆明':'yunnan', '济南':'shandong',
+};
+function warlordKeyOfProvince(p){ return (p && WARLORD_CITY[p.name]) || null; }
+
+// ---- 军阀机制参数 ----
+// 未整编：地方只按「协饷」比例上缴中央（历史上各省按定额解款，中央拿不到全额）；
+// 整编后 100% 上缴。这样「统一军政」是实打实的收益，而不是纯文本。
+const WARLORD_TITHE = 0.35;              // 未整编时的上缴比例
+const WARLORD_INTEGRATE_SP = 2;          // 整编消耗国策点数
+const WARLORD_INTEGRATE_CASH = 1000;     // 整编消耗资金（收买/安置/换防）
+const WARLORD_SUBSIDY_CASH = 400;        // 「财政协饷」一次花费
+const WARLORD_SUBSIDY_LOYALTY = 6;       // 一次协饷提升的忠诚
+const WARLORD_INTEGRATE_LOYALTY = 55;    // 整编所需最低忠诚
+const WARLORD_LOYALTY_CAP = 100;
+
+function initWarlordState(){
+  game.warlords = {};
+  for(let k in WARLORDS){
+    game.warlords[k] = { loyalty: WARLORDS[k].loyalty, integrated: false };
+  }
+}
+// 懒创建：旧存档 / 中途重开也不至于崩
+function warlordSt(k){
+  if(!k || !WARLORDS[k]) return null;
+  if(!game.warlords) game.warlords = {};
+  if(!game.warlords[k]) game.warlords[k] = { loyalty: WARLORDS[k].loyalty, integrated: false };
+  return game.warlords[k];
+}
+// 是否仍是「中央管不到的地方辖区」：必须是中国领土且仍由中国控制。
+// 一旦被日本/苏联占领，这省的产出就正常归占领者（占领者才不管什么协饷）。
+function isWarlordZone(p){
+  return !!(p && p.warlord && p.owner === 'china' && p.controller === 'china');
+}
+// 该省产出上缴中央的系数：正常省 1；未整编的地方辖区 WARLORD_TITHE；整编后 1
+function provYieldWeight(p){
+  if(!isWarlordZone(p)) return 1;
+  let st = warlordSt(p.warlord);
+  return (st && st.integrated) ? 1 : WARLORD_TITHE;
+}
+// 按「上缴系数」加权求和（工厂/资源/人力都用它，避免各处重复写 reduce）
+function wsumProv(provList, field){
+  let s = 0;
+  for(let i=0;i<provList.length;i++){
+    let p = provList[i];
+    s += (p[field] || 0) * provYieldWeight(p);
+  }
+  return s;
+}
+// 中央拿不到的那部分（面板上告诉玩家「地方截留多少」）
+function warlordWithheldOf(cid, provList){
+  if(cid !== 'china') return {civ:0, mil:0};
+  let out = {civ:0, mil:0};
+  for(let p of provList){
+    let w = provYieldWeight(p);
+    if(w >= 1) continue;
+    out.civ += p.civFactories * (1-w);
+    out.mil += p.milFactories * (1-w);
+  }
+  return out;
+}
+
 
 // Province adjacency: province pairs that border each other
 const ADJACENCY = [
@@ -2017,7 +2112,18 @@ const ADJACENCY = [
 // 澳大利亚
 [285,84],
 // ---- v1.9.8 小国邻接 ----
-[123,83],[123,82],[286,122],[287,122],[287,157],[115,114],[289,218],[290,218],[291,38],[291,220],[291,256],[292,50],[292,275],[292,13],[293,19],[293,17],[293,11],[294,16],[294,96],[294,17],[295,279],[295,277],[295,96],[280,4],[280,48],[280,46],[127,240],[127,150],[298,221],[299,221],[303,190],[303,154],[303,171]
+[123,83],[123,82],[286,122],[287,122],[287,157],[115,114],[289,218],[290,218],[291,38],[291,220],[291,256],[292,50],[292,275],[292,13],[293,19],[293,17],[293,11],[294,16],[294,96],[294,17],[295,279],[295,277],[295,96],[280,4],[280,48],[280,46],[127,240],[127,150],[298,221],[299,221],[303,190],[303,154],[303,171],
+// ---- v2.1.0 中国西部与内地新省邻接 ----
+// 迪化（新疆）：河西走廊（兰州）、青海、西藏、蒙古、苏联哈萨克
+[304,253],[304,306],[304,305],[304,94],[304,118],
+// 拉萨（西藏）：川、滇、青海、新疆，以及喜马拉雅山南麓的尼泊尔/锡金/不丹
+[305,251],[305,252],[305,306],[305,157],[305,287],[305,286],
+// 西宁（青海）：兰州、成都、新疆、西藏
+[306,253],[306,251],
+// 太原（山西）：北平、西安、济南
+[307,35],[307,40],[307,255],
+// 桂林（广西）：南宁、广州、长沙、昆明
+[308,256],[308,38],[308,254],[308,252],
 ];
 
 // Sea routes — cross-ocean adjacency requiring naval capability
@@ -2606,6 +2712,8 @@ function initProvince(pDef){
     civFactories:civs, milFactories:mils,
     steel,oil,manpower:mp,
     owner:cid, controller:cid,
+    // v2.1.0：地方军政势力辖区（始终是中国领土，只是税收兵员暂不上缴中央）
+    warlord: warlordKeyOfProvince({ name }),
     fortLevel:0,
     buildQueue:[], // [{type:'civ'|'mil', progress:0, total:150}]
     unitIds:[]
@@ -2723,6 +2831,7 @@ function initGame(){
   game.factionOverride = {};
   game.militaryAccess = {};
   game.trainingQueue = [];
+  initWarlordState();   // v2.1.0：地方军政势力（忠诚度 / 是否已整编）
   game.accessAskCd = 0;
   game.recruitCd = 0;
   game._lryCheat = false; // 🥚 彩蛋（中国输入 LRY）：仅本局生效，不持久化
@@ -2854,7 +2963,7 @@ const STARTING_ARMY = {
   italy:          {infantry:6, motorized:1},
   uk:             {infantry:4, motorized:1},
   usa:            {infantry:7, motorized:1},   // +3：11 省对齐（含海外省驻军）
-  china:          {infantry:14, garrison:2},   // 人多装备差，用数量体现人海
+  china:          {infantry:13, garrison:2},   // 人多装备差，用数量体现人海（v2.1.0：18 省 + 各势力自带地方部队）
   poland:         {infantry:6, garrison:1},
   // ---- 中等国家 ----
   turkey:         {infantry:4, garrison:1},
@@ -2977,6 +3086,18 @@ function grantStartingArmies(){
     while(idx < queue.length){
       spawnUnitRaw(order[i % order.length].id, queue[idx++]);
       i++;
+    }
+
+    // v2.1.0：地方军政势力自带地方部队。
+    // 这些仍是「中国军队」（unit.country = china，中央打日本时它们照样上），
+    // 只是平时养在本地 —— 否则新加的迪化/拉萨/西宁/太原/桂林会开局就是空省。
+    if(cid === 'china'){
+      for(let p of myProvs){
+        if(!isWarlordZone(p)) continue;
+        let def = WARLORDS[p.warlord];
+        let n = (def && def.garrison) || 1;
+        for(let j=0;j<n;j++) spawnUnitRaw(p.id, 'garrison');
+      }
     }
   }
 }
@@ -3392,6 +3513,128 @@ function advanceFocus(){
     }
   }
 }
+// ==================== v2.1.0 地方军政势力：推进与操作 ====================
+// 忠诚度每天漂移一点：
+//  · 中日开战（抗日民族统一战线）→ 地方愿意听中央调遣，忠诚 +
+//  · 中央稳定 → 略涨；中央快投降了 → 明显下跌（谁还听你的）
+//  · 亲苏 / 亲英的势力还会跟着「中国与该国关系」摆动
+function warlordLoyaltyTick(){
+  if(!game.warlords) initWarlordState();
+  let china = countries['china'];
+  if(!china || china.eliminated) return;
+  let japanWar = game.wars.some(w=>
+    (w.attacker==='china' && w.defender==='japan') || (w.defender==='china' && w.attacker==='japan'));
+  for(let k in WARLORDS){
+    let st = warlordSt(k);
+    if(!st || st.integrated) continue;
+    let def = WARLORDS[k];
+    let d = 0;
+    if(japanWar) d += 0.10;
+    if(china.stability >= 60) d += 0.03;
+    if(china.surrender > 40) d -= 0.12;
+    if(china.surrender > 70) d -= 0.12;
+    if(def.patron){
+      let rel = (game.relations['china'] && game.relations['china'][def.patron]) || 0;
+      if(rel >= 20) d += 0.03;
+      else if(rel <= -20) d -= 0.04;
+    }
+    st.loyalty = Math.max(0, Math.min(WARLORD_LOYALTY_CAP, st.loyalty + d));
+  }
+  // AI 中国：忠诚够高就自己整编（否则 AI 中国永远拿不到那部分产能）。
+  // 注意不能走 warlordIntegrate —— 那会扣玩家名下的国策点数。
+  if(game.player !== 'china'){
+    for(let k in WARLORDS) aiWarlordIntegrate(k);
+  }
+}
+// 「苏援」：新疆未整编期间，苏联经迪化给中国送军援（1936 年盛世才与苏联的真实关系）。
+// 一旦中央整编新疆，苏联失去这个落脚点 → 中苏关系下降。
+function warlordSovietAidTick(){
+  if(game.tick <= 0 || game.tick % 120 !== 0) return;
+  let st = warlordSt('xinjiang');
+  if(!st || st.integrated) return;
+  let china = countries['china'];
+  if(!china || china.eliminated) return;
+  if(areAtWar('china','ussr')) return;
+  china.equipment['步兵装备'] = (china.equipment['步兵装备']||0) + 25;
+  if(game.relations['china'] && game.relations['china'].ussr !== undefined){
+    game.relations['china'].ussr = Math.min(100, (game.relations['china'].ussr||0) + 1);
+  }
+  if(game.player === 'china'){
+    addLog('🚂','苏联经迪化运来一批军援：+25 步兵装备（新疆督办盛世才的渠道）');
+  }
+}
+// 财政协饷：花钱买忠诚（中央拨款给地方）
+function warlordSubsidy(key){
+  if(!game.player || game.player !== 'china'){ addLog('⚠️','只有中国中央政府可以调动地方军政势力'); return false; }
+  let def = WARLORDS[key], st = warlordSt(key);
+  if(!def || !st) return false;
+  if(st.integrated){ addLog('⚠️',def.name+' 已完成整编，无需再协饷'); return false; }
+  let c = countries['china'];
+  if(c.cash < WARLORD_SUBSIDY_CASH){ addLog('⚠️','资金不足（需要 '+WARLORD_SUBSIDY_CASH+'）'); return false; }
+  c.cash -= WARLORD_SUBSIDY_CASH;
+  st.loyalty = Math.min(WARLORD_LOYALTY_CAP, st.loyalty + WARLORD_SUBSIDY_LOYALTY);
+  addLog('💴','向 '+def.name+'（'+def.leader+'）拨付协饷：忠诚 +'+WARLORD_SUBSIDY_LOYALTY+'（现 '+Math.floor(st.loyalty)+'）');
+  updateUI();
+  return true;
+}
+// 整编（统一军政）：忠诚达标后花国策点数+资金，把地方辖区正式收归中央
+function warlordIntegrate(key, silent){
+  let def = WARLORDS[key], st = warlordSt(key);
+  if(!def || !st || st.integrated) return false;
+  let c = countries['china'];
+  if(!c || c.eliminated) return false;
+  if(st.loyalty < WARLORD_INTEGRATE_LOYALTY){
+    if(!silent) addLog('⚠️',def.name+' 忠诚不足（'+Math.floor(st.loyalty)+'/'+WARLORD_INTEGRATE_LOYALTY+'），现在整编只会逼反他们');
+    return false;
+  }
+  if((game.skillPoints||0) < WARLORD_INTEGRATE_SP || c.cash < WARLORD_INTEGRATE_CASH){
+    if(!silent) addLog('⚠️','整编 '+def.name+' 需要 '+WARLORD_INTEGRATE_SP+' 点国策点数 + '+WARLORD_INTEGRATE_CASH+' 资金');
+    return false;
+  }
+  game.skillPoints -= WARLORD_INTEGRATE_SP;
+  c.cash -= WARLORD_INTEGRATE_CASH;
+  finishWarlordIntegrate(key);
+  if(!silent){ SFX.build(); updateUI(); }
+  return true;
+}
+// 整编完成的纯状态变更（玩家与 AI 共用）
+function finishWarlordIntegrate(key){
+  let def = WARLORDS[key], st = warlordSt(key);
+  if(!def || !st) return false;
+  st.integrated = true;
+  st.loyalty = WARLORD_LOYALTY_CAP;
+  // 外国靠山不高兴：新疆整编 = 苏联失去迪化这个落脚点
+  let patronHit = { xinjiang:{cid:'ussr',d:-15}, xizang:{cid:'uk',d:-8} }[key];
+  if(patronHit && game.relations['china'] && game.relations['china'][patronHit.cid] !== undefined){
+    game.relations['china'][patronHit.cid] = Math.max(-100, game.relations['china'][patronHit.cid] + patronHit.d);
+    if(game.relations[patronHit.cid] && game.relations[patronHit.cid].china !== undefined){
+      game.relations[patronHit.cid].china = Math.max(-100, game.relations[patronHit.cid].china + patronHit.d);
+    }
+  }
+  // 统一之后中央才会往边疆投钱：给该势力首府补一座民用工厂。
+  // （否则像西藏这种「0 工厂 0 军工」的辖区，整编了也看不出任何收益）
+  let zone = provinces.filter(p=>p.warlord===key && p.controller==='china')
+                      .sort((a,b)=>b.civFactories-a.civFactories)[0];
+  if(zone){
+    zone.civFactories++;
+    addLog('🏗','中央拨款在 '+zone.name+' 兴建一座民用工厂');
+  }
+  addLog('🏛',def.name+' 完成整编：'+def.leader+' 接受中央统一指挥，当地工厂/资源/兵员开始全额上缴');
+  return true;
+}
+// AI 中国用：不能花玩家的国策点数（game.skillPoints 只属于玩家），
+// 改判「忠诚 ≥ 70 + 自己掏得出整编费」，时间上更慢但同样会走向统一。
+function aiWarlordIntegrate(key){
+  let def = WARLORDS[key], st = warlordSt(key);
+  if(!def || !st || st.integrated) return false;
+  let c = countries['china'];
+  if(!c || c.eliminated) return false;
+  if(st.loyalty < 70 || c.cash < WARLORD_INTEGRATE_CASH) return false;
+  c.cash -= WARLORD_INTEGRATE_CASH;
+  finishWarlordIntegrate(key);
+  return true;
+}
+
 // 执行国策效果
 function applyFocusEffects(cid, node){
   let c = countries[cid];
@@ -6383,6 +6626,14 @@ function updateTooltip(mx, my){
   else if(isMud()) seasonTip = ' 🌧️泥泞: 进攻-15% 移速-30%';
   if(seasonTip) html += `<div class="t-info" style="color:#8fb8e8">${season.emoji} ${season.name}${seasonTip}</div>`;
   html += `<div class="t-info">🏭 民用${p.civFactories} 军用${p.milFactories} | ⚒${p.steel} 🛢${p.oil} 👥${p.manpower}</div>`;
+  // v2.1.0：地方军政势力辖区（领土仍是中国，只是产出不上缴中央）
+  if(p.warlord && p.owner === 'china' && WARLORDS[p.warlord]){
+    let wd = WARLORDS[p.warlord], wst = warlordSt(p.warlord);
+    let done = !!(wst && wst.integrated);
+    html += `<div class="t-info" style="color:#f0c040">🏛 ${wd.name} · ${wd.leader}（${wd.tilt}）`
+          + (done ? '· 已整编' : ('· 忠诚 '+Math.floor(wst?wst.loyalty:0))) + `</div>`;
+    if(!done) html += `<div class="t-info" style="color:#8b949e">地方辖区：产出仅 ${Math.round(WARLORD_TITHE*100)}% 上缴中央</div>`;
+  }
   
   // Show air power if controller has fighter tech
   let ctrlAir = getAirPower(p.controller);
@@ -6512,6 +6763,10 @@ function gameTick(){
   // 国策树：每日推进（AI 与玩家统一走这里）
   advanceFocus();
 
+  // v2.1.0 地方军政势力：忠诚度每日漂移 + 新疆苏援（每 120 天）
+  warlordLoyaltyTick();
+  warlordSovietAidTick();
+
   // Update sea control (every 3 ticks for performance)
   if(game.tick % 3 === 0) updateSeaControl();
   
@@ -6553,7 +6808,9 @@ function gameTick(){
     let myProvs = provByCtrl[cid] || [];
     
     // Production
-    let milFactories = myProvs.reduce((s,p)=>s+p.milFactories,0);
+    // v2.1.0：山西/广西/云南/山东/新疆/西藏/青海 的地方军政势力未整编前只按「协饷」上缴，
+    // 所以这里一律走 wsumProv 加权求和（正常省权重 1，未整编辖区 WARLORD_TITHE）
+    let milFactories = wsumProv(myProvs, 'milFactories');
     let prodBonus = 1 + (cid===game.player ? getSkillBonus(1) : getAIBonus(cid,1))/100;
     if(c.techLevels&&c.techLevels[7]) prodBonus += 0.3;
     // National doctrine: USA industrial supremacy — production bonus
@@ -6623,8 +6880,8 @@ function gameTick(){
     }
     
     // Resources
-    let steelIncome = myProvs.reduce((s,p)=>s+p.steel,0);
-    let oilIncome = myProvs.reduce((s,p)=>s+p.oil,0);
+    let steelIncome = wsumProv(myProvs, 'steel');
+    let oilIncome = wsumProv(myProvs, 'oil');
     let resBonus = 1 + (c.techLevels&&c.techLevels[8]?0.2:0);
     c.steel += steelIncome * 0.1 * resBonus;
     c.oil += oilIncome * 0.5 * resBonus; // 石油产出（作为燃料储备）
@@ -6664,7 +6921,7 @@ function gameTick(){
     } else if(cid!==game.player){
       c._aiFuelSaver = 0;
     }
-    c.cash += milFactories * 2 + myProvs.reduce((s,p)=>s+p.civFactories,0)*3;
+    c.cash += milFactories * 2 + wsumProv(myProvs, 'civFactories')*3;
     
     // Manpower — apply bonus for all, not just player
     let mpBonus = 1 + (cid===game.player ? getSkillBonus(7) : getAIBonus(cid,7))/100;
@@ -6672,8 +6929,8 @@ function gameTick(){
     if(cid!==game.player && c.techLevels && c.techLevels[7]) mpBonus += 0.2;
     // National doctrine: USSR deep battle — manpower recovery bonus
     mpBonus += getDoctrineBonus(cid,'manpowerRecovery');
-    c.manpowerPool += myProvs.reduce((s,p)=>s+p.manpower,0) * 0.05 * mpBonus;
-    let maxMP = myProvs.reduce((s,p)=>s+p.manpower,0) * 8 * mpBonus;
+    c.manpowerPool += wsumProv(myProvs, 'manpower') * 0.05 * mpBonus;
+    let maxMP = wsumProv(myProvs, 'manpower') * 8 * mpBonus;
     if(c.manpowerPool > maxMP) c.manpowerPool = maxMP;
     // 🥚 彩蛋（LRY）：无限人力/金钱/石油 —— 每周结算补满，AI 不受影响
     if(cid===game.player && game._lryCheat){
@@ -10698,6 +10955,39 @@ function renderActiveTab(){
         content.innerHTML += `</div>`;
       });
       content.innerHTML += '</div>';
+
+      // 🏛 v2.1.0 地方军政势力（只有玩中国时出现）
+      // 说明会写清「领土仍是中国、只是税收兵员暂时不上缴」，避免被误读成割据政权。
+      if(game.player === 'china'){
+        let wh = warlordWithheldOf('china', myProvs);
+        content.innerHTML += `<div class="panel" style="margin-top:8px"><h3>🏛 地方军政势力</h3>`;
+        content.innerHTML += `<div style="font-size:10px;color:#8b949e;line-height:1.6;margin-bottom:6px">`
+          + `这些省<b style="color:#c9d1d9">依然是中国领土</b>，只是中央政令暂时难达：当地工厂/资源/兵员只按 <b style="color:#f0c040">${Math.round(WARLORD_TITHE*100)}% 协饷</b>上缴。`
+          + `<br>忠诚 ≥ ${WARLORD_INTEGRATE_LOYALTY} 后可「整编」收归中央（全额上缴）。`
+          + `<br>当前地方截留：🏭 民用 ${wh.civ.toFixed(1)} / 🔧 军用 ${wh.mil.toFixed(1)}</div>`;
+        for(let k in WARLORDS){
+          let def = WARLORDS[k], st = warlordSt(k);
+          if(!st) continue;
+          let zoneAlive = provinces.some(p=>p.warlord===k && p.controller==='china');
+          let pct = Math.round(st.loyalty);
+          let col = st.integrated ? '#3fb950' : (pct >= WARLORD_INTEGRATE_LOYALTY ? '#7ee787' : (pct >= 35 ? '#d29922' : '#f85149'));
+          content.innerHTML += `<div style="border-top:1px solid #21262d;padding:4px 0">`;
+          content.innerHTML += `<div style="font-size:11px;color:#c9d1d9">${def.city}·${def.name} <span style="color:#8b949e">${def.leader}（${def.tilt}）</span>`;
+          content.innerHTML += `<span style="float:right;color:${col}">${st.integrated ? '✅ 已整编' : '忠诚 '+pct}</span></div>`;
+          if(!zoneAlive && !st.integrated){
+            content.innerHTML += `<div style="font-size:10px;color:#8b949e">辖区已失守，暂无可整编对象</div>`;
+          } else if(!st.integrated){
+            content.innerHTML += `<div class="progress-bar"><div class="progress-fill" style="width:${pct}%;background:${col}"></div></div>`;
+            content.innerHTML += `<div style="display:flex;gap:4px;margin-top:2px">`;
+            content.innerHTML += `<button class="btn-sm" style="font-size:10px;flex:1" onclick="warlordSubsidy('${k}')">💴 协饷 ${WARLORD_SUBSIDY_CASH}💰 (+${WARLORD_SUBSIDY_LOYALTY})</button>`;
+            let canInt = pct >= WARLORD_INTEGRATE_LOYALTY && game.skillPoints >= WARLORD_INTEGRATE_SP && c.cash >= WARLORD_INTEGRATE_CASH;
+            content.innerHTML += `<button class="btn-sm ${canInt?'build':''}" style="font-size:10px;flex:1;${canInt?'':'opacity:.5'}" onclick="warlordIntegrate('${k}')">🏛 整编 ${WARLORD_INTEGRATE_SP}⭐+${WARLORD_INTEGRATE_CASH}💰</button>`;
+            content.innerHTML += `</div>`;
+          }
+          content.innerHTML += `</div>`;
+        }
+        content.innerHTML += '</div>';
+      }
       break;
   }
   } finally {
@@ -11825,6 +12115,9 @@ function doLoadFromSlot(slot){
     game.victoryShown = false;  // 读档重置胜利状态
     game.factionOverride = save.factionOverride || {};
     game.militaryAccess = save.militaryAccess || {};
+    // v2.1.0 地方军政势力状态（旧存档没有这个字段 → 按初始值重建）
+    if(save.warlords && Object.keys(save.warlords).length){ game.warlords = JSON.parse(JSON.stringify(save.warlords)); }
+    else { initWarlordState(); }
     game.trainingQueue = (save.trainingQueue||[]).map(q=>({...q}));
     game.stats = save.stats || {byCountry:{}};
     if(!game.stats.byCountry){
@@ -11990,6 +12283,7 @@ function buildSaveData(){
     seaControl: game.seaControl || {},
     factionOverride: game.factionOverride || {},
     militaryAccess: game.militaryAccess || {},
+    warlords: game.warlords ? JSON.parse(JSON.stringify(game.warlords)) : {}, // v2.1.0 地方军政势力（忠诚/整编）
     trainingQueue: (game.trainingQueue||[]).map(q=>({provId:q.provId, type:q.type, country:q.country, readyAt:q.readyAt, totalMs:q.totalMs})),
     stats: game.stats || {byCountry:{}},
     puppets: collectPuppetMap(), // 傀儡关系快照（含国名"XX属XX"状态）
@@ -12982,6 +13276,9 @@ function mpApplySnapshot(save){
     game.seaControl = save.seaControl || {};
     game.factionOverride = save.factionOverride || {};
     game.militaryAccess = save.militaryAccess || {};
+    // v2.1.0 地方军政势力状态（旧存档没有这个字段 → 按初始值重建）
+    if(save.warlords && Object.keys(save.warlords).length){ game.warlords = JSON.parse(JSON.stringify(save.warlords)); }
+    else { initWarlordState(); }
     game.trainingQueue = (save.trainingQueue||[]).map(q=>({...q}));
     game.stats = save.stats || {byCountry:{}};
     unitNextId = save.unitNextId || unitNextId;
@@ -13277,8 +13574,17 @@ setSpeed = function(s){
 // ---- 版本与更新日志 ----
 // 每次发布新版本：改 GAME_VERSION，并在 UPDATE_HISTORY 顶部加一条。
 // 玩家打开线上版时若版本号与 localStorage 记录不同，就弹「本次版本更新了以下内容」弹窗。
-const GAME_VERSION = 'v2.0.0';
+const GAME_VERSION = 'v2.1.0';
 const UPDATE_HISTORY = [
+  { ver:'v2.1.0', date:'2026-11-08', items:[
+    '🗺️ **中国西部与内地终于有城市点了**：此前中国只有 13 个省、最西只到成都/昆明/兰州，整个青藏高原与新疆是一片空白，点不到也看不见。现在补上 **迪化（新疆）、拉萨（西藏）、西宁（青海）、太原（山西）、桂林（广西）** 5 个省，中国 13 → 18 省，省份总数 304 → 309；拉萨到尼泊尔/锡金/不丹、迪化到苏联哈萨克与蒙古的山口隘道全部打通（有路可走才谈得上打仗）',
+    '🏛 **新增「地方军政势力」机制（仅中国）**：1936 年的中国名义统一、实际中央政令难达 —— 新疆督办盛世才（亲苏）、西藏噶厦地方政府（热振摄政，倾向英国）、青海马步芳（马家军）、山西阎锡山（晋系，太原兵工厂）、广西李宗仁（桂系）、云南龙云（滇系）、山东韩复榘（鲁系）。**这些省始终是中国领土（owner/controller 都是中国），不是独立国家、也不是可玩国家**，地图上永远画成中国的省；区别只在「税收、工厂、兵员暂不上缴中央」：未整编时只按 **35% 协饷** 上缴，中央面板会明确显示「地方截留 🏭X / 🔧Y」',
+    '🤝 **忠诚度 + 整编玩法**：每个势力有 0~100 忠诚，中日开战（抗日民族统一战线）时逐日上涨、中央快投降时下跌，亲苏/亲英的还会跟着中苏、中英关系摆动。可以「💴 财政协饷」（400 资金 → 忠诚 +6）拉拢，忠诚 ≥ 55 后「🏛 整编」（2 国策点数 + 1000 资金）正式收归中央 —— **整编后当地工厂/资源/人力 100% 上缴**，这是实打实的收益；AI 中国也会自己整编，不会永远拿不到那部分产能',
+    '🚂 **苏援事件**：新疆未整编期间，苏联每 120 天经迪化送来一批军援（+25 步兵装备，中苏关系 +1）—— 这就是盛世才「亲苏」的具体体现；一旦中央整编新疆，苏联失去这个落脚点，中苏关系 −15',
+    '🪖 **地方部队**：每个势力自带地方部队（山西 2 个、新疆 2 个守备），仍是中国军队编制、中央一声令下照样抗日 —— 新补的 5 个省不会开局就是空省；中国开局部队同步从 16 支补到 18 支（对齐 18 省）',
+    '🖱️ 省份悬停提示新增「🏛 势力 · 领袖（倾向）· 忠诚」一行，局中随时能看到这个省到底归谁管；忠诚/整编状态会存档、读档保留（旧存档自动按初始值重建）',
+    '🧪 新增 test_warlords.js（34 断言：省份/军阀标记/邻接连通/加权上缴/整编收益/忠诚漂移/苏援/存档），并把 4 个旧测试的省份总数断言从 304 更新到 309',
+  ]},
   { ver:'v2.0.0', date:'2026-11-08', items:[
     '⚡ **性能大改造（2.0 的核心）**：以前每一帧都要把 304 个省块 + 182 个国家的真实国界（每国还要裁剪一次）+ 城市点 / 地名 / 道路全部重画一遍，单帧几十毫秒，拖动、缩放、鼠标划过省界都一顿一顿的。现在把「相机和局势没变时完全一样」的东西烘焙进一张比屏幕大一圈的离屏底图，每帧只做一次位图拷贝 + 画会动的东西：静止 90ms → **0.2ms**、拖动 55ms → **0.2ms**、悬停 77ms → **0.3ms**、滚轮缩放 174ms → **20ms**（连续滚 20 格也不卡，手停 160ms 后自动重烘焙清晰版）',
     '🎞 **帧率不再被 20fps 卡死**：行军动画原来靠 setInterval(50) 定时器，最多 20fps 且和屏幕刷新不同步。现在改用 requestAnimationFrame，直接跟显示器同步（60 / 120 / 144Hz），同一帧内的多次重绘请求自动合并；顶栏缩放条下方新增实时 FPS 指示（绿 ≥50 / 黄 ≥30 / 红 <30，完全空闲时显示「待机」）',
