@@ -24,9 +24,9 @@ body.pane-dragging *{user-select:none!important}
 #log-list div{padding:3px 0;border-bottom:1px solid #21262d;line-height:1.5}
 #main{flex:1 1 0;min-width:0;position:relative;display:flex;flex-direction:column}
 /* v2.1.2 顶栏拆成「可滚动区 + 固定右区」：
-   从前反馈按钮是 position:absolute 浮在顶栏右侧，只要窗口一窄、顶栏内容横向滚动，
+   从前右侧按钮是 position:absolute 浮在顶栏右侧，只要窗口一窄、顶栏内容横向滚动，
    它就会盖住底下的「🎯 国策树」/日期（用户实测被遮）。现在右侧区是真实 flex 项，
-   滚动内容永远挤不进这块，反馈按钮也就再也不会压住任何东西。 */
+   滚动内容永远挤不进这块。 */
 #topbar{height:42px;background:#161b22;border-bottom:1px solid #30363d;display:flex;align-items:center;position:relative;padding:0}
 #topbar-scroll{flex:1 1 auto;min-width:0;height:100%;display:flex;align-items:center;gap:13px;padding:0 6px 0 16px;overflow-x:auto;overflow-y:hidden;scrollbar-width:none}
 #topbar-scroll::-webkit-scrollbar{display:none}
@@ -39,13 +39,6 @@ body.pane-dragging *{user-select:none!important}
 #topbar .pts{font-size:13px;color:#58a6ff;margin-left:12px;white-space:nowrap}
 #topbar-fixed .pts-fixed{font-size:12px;color:#58a6ff;white-space:nowrap}
 #topbar-fixed .pts-fixed b{color:#58a6ff}
-/* v1.9.7 反馈按钮：固定钉在顶栏最右侧，不参与 flex 排布，窗口再窄也不会被挤走 */
-#btn-feedback{height:26px;white-space:nowrap}
-/* v1.9.8 断网时反馈按钮置灰不可点 */
-#btn-feedback.offline{background:#161b22 !important;border-color:#30363d !important;color:#6e7681 !important;cursor:not-allowed;filter:grayscale(1);opacity:.6}
-/* 轻量浮动提示（不用原生 alert，避免阻塞游戏循环） */
-#float-tip{position:fixed;left:50%;top:64px;transform:translateX(-50%) translateY(-8px);background:#161b22;border:1px solid #30363d;border-radius:8px;padding:9px 18px;font-size:13px;color:#c9d1d9;z-index:12000;opacity:0;transition:opacity .18s,transform .18s;pointer-events:none;box-shadow:0 6px 24px rgba(0,0,0,.5);max-width:80vw;text-align:center}
-#float-tip.show{opacity:1;transform:translateX(-50%) translateY(0)}
 #canvas-wrap{flex:1 1 0;min-width:0;min-height:0;position:relative;overflow:hidden;cursor:grab}
 #canvas-wrap.panning{cursor:grabbing}
 #zoom-controls{position:absolute;right:12px;top:12px;display:flex;flex-direction:column;gap:4px;z-index:50}
@@ -206,7 +199,6 @@ canvas{display:block}
     <div class="pts-fixed">⭐ 国策: <b id="t-pts">0</b></div>
     <button id="btn-focus" class="btn-sm" style="font-size:10px;padding:2px 6px;background:#3d2e0f;border-color:#f0c040;color:#f0c040" onclick="openFocusTree()" title="历史国策树：苏德条约、巴巴罗萨计划…">🎯 国策树</button>
     <div class="date" id="t-date">1936年1月1日</div>
-    <button id="btn-feedback" class="btn-sm" style="font-size:10px;padding:2px 6px;background:#1f2d1f;border-color:#3fb950;color:#3fb950" onclick="openFeedbackPanel()" title="向我们反馈问题或建议（会自动暂停游戏）">❓ 反馈</button>
    </div>
   </div>
   <div id="canvas-wrap">
@@ -1084,7 +1076,7 @@ const PROVINCE_DEFS = [
 // Denmark
 [66,'denmark','哥本哈根',695,124,'urban',1,1,1,0,0,2],
 // Finland
-[67,'finland','赫尔辛基',744,111,'urban',1,1,1,1,0,2],
+[67,'finland','赫尔辛基',740.4,108.1,'urban',1,1,1,1,0,2],
 [68,'finland','图尔库',730,106,'plains',0,1,0,0,0,1],
 // Yugoslavia
 [69,'yugoslavia','贝尔格莱德',724,163,'urban',1,2,1,1,0,3],
@@ -1164,28 +1156,28 @@ const PROVINCE_DEFS = [
 [115,'malaya','新加坡',1025,319,'urban',0,1,2,0,0,3],
 [116,'ussr','新西伯利亚',949,127,'plains',0,1,0,0,0,3],
 [117,'ussr','伊尔库茨克',1027,136,'plains',0,1,0,0,0,3],
-[118,'ussr','阿拉木图',894,150,'plains',0,1,0,0,0,2],
-[119,'ussr','塔什干',879,174,'plains',0,1,0,0,0,2],
-[120,'india','卡拉奇',900,216,'plains',0,1,0,0,0,3],
-[121,'india','拉合尔',927,198,'plains',0,1,0,0,0,3],
+[118,'ussr','阿拉木图',927.7,169.1,'plains',0,1,0,0,0,2],
+[119,'ussr','塔什干',899.9,176.1,'plains',0,1,0,0,0,2],
+[120,'india','卡拉奇',891.9,235.4,'plains',0,1,0,0,0,3],
+[121,'india','拉合尔',918.3,211.2,'plains',0,1,0,0,0,3],
 [122,'india','达卡',975,240,'plains',0,1,0,0,0,3],
-[123,'burma','仰光',999,249,'plains',1,1,0,0,0,3],
+[123,'burma','仰光',996.8,264.4,'plains',1,1,0,0,0,3],
 [124,'papuanewguinea','莫尔兹比港',1181,359,'plains',1,1,0,0,0,1],
 [125,'australia','拉包尔',1199,340,'plains',0,1,0,0,0,1],
 [126,'greenland','努克',462,93,'plains',1,1,0,0,0,1],
 [127,'puertorico','圣胡安',411,258,'plains',1,0,0,0,0,1],
 [128,'palestine','巴勒斯坦',777,213,'plains',1,1,0,0,0,1],
-[129,'argentina','布宜诺斯艾利斯',414,453,'plains',1,1,0,0,0,4],
-[130,'argentina','门多萨',405,522,'plains',0,1,0,0,0,4],
+[129,'argentina','布宜诺斯艾利斯',440.5,449.7,'plains',1,1,0,0,0,4],
+[130,'argentina','门多萨',402.8,443.5,'plains',0,1,0,0,0,4],
 [131,'chile','圣地亚哥',393,453,'mountain',1,1,0,0,0,2],
-[132,'chile','安托法加斯塔',402,522,'mountain',0,1,0,0,0,2],
+[132,'chile','安托法加斯塔',397.2,410.2,'mountain',0,1,0,0,0,2],
 [133,'peru','利马',381,357,'mountain',1,1,0,0,0,2],
 [134,'colombia','波哥大',387,312,'plains',1,1,0,0,0,2],
 [135,'colombia','巴兰基亚',390,282,'plains',0,1,0,0,0,2],
-[136,'venezuela','加拉加斯',411,300,'plains',1,1,0,0,2,2],
+[136,'venezuela','加拉加斯',409.8,287.2,'plains',1,1,0,0,2,2],
 [137,'venezuela','马拉开波',387,288,'plains',0,1,0,0,2,2],
-[138,'bolivia','拉巴斯',417,384,'mountain',1,1,0,0,0,1],
-[139,'paraguay','亚松森',438,408,'plains',1,1,0,0,0,1],
+[138,'bolivia','拉巴斯',405.3,384.5,'mountain',1,1,0,0,0,1],
+[139,'paraguay','亚松森',443.2,416.2,'plains',1,1,0,0,0,1],
 [140,'uruguay','蒙得维的亚',447,444,'plains',1,1,0,0,0,1],
 [141,'ecuador','基多',366,330,'mountain',1,1,0,0,0,1],
 [142,'panama','巴拿马城',360,294,'plains',1,1,0,0,0,1],
@@ -1194,7 +1186,7 @@ const PROVINCE_DEFS = [
 [145,'honduras','特古西加尔巴',336,270,'plains',1,1,0,0,0,1],
 [146,'elsalvador','圣萨尔瓦多',330,276,'plains',1,1,0,0,0,1],
 [147,'guatemala','危地马拉城',324,267,'mountain',1,1,0,0,0,1],
-[148,'cuba','哈瓦那',366,246,'plains',1,1,0,0,0,2],
+[148,'cuba','哈瓦那',354.1,241.6,'plains',1,1,0,0,0,2],
 [149,'haiti','太子港',387,258,'plains',1,1,0,0,0,1],
 [150,'domrep','圣多明各',396,258,'plains',1,1,0,0,0,1],
 [151,'liberia','蒙罗维亚',615,303,'plains',1,1,0,0,0,1],
@@ -1202,53 +1194,53 @@ const PROVINCE_DEFS = [
 [153,'saudi','汉志',849,249,'plains',0,1,0,0,3,1],
 [154,'yemen','萨那',822,267,'mountain',1,1,0,0,1,1],
 [155,'oman','马斯喀特',852,252,'mountain',1,1,0,0,1,1],
-[156,'afghanistan','喀布尔',888,204,'mountain',1,1,0,0,0,2],
+[156,'afghanistan','喀布尔',899.8,200.5,'mountain',1,1,0,0,0,2],
 [157,'nepal','加德满都',954,222,'mountain',1,1,0,0,0,1],
 [158,'luxembourg','卢森堡',672,144,'plains',1,0,0,0,0,1],
-[159,'iceland','雷克雅未克',582,90,'plains',1,1,0,0,0,1],
+[159,'iceland','雷克雅未克',571.7,93.7,'plains',1,1,0,0,0,1],
 [160,'formosa','台北',1086,240,'plains',1,1,0,0,0,2],
-[161,'korea','平壤',1110,180,'plains',1,1,0,0,0,3],
+[161,'korea','平壤',1103.3,184.3,'plains',1,1,0,0,0,3],
 [162,'korea','京城',1113,192,'plains',0,1,0,0,0,3],
-[163,'algeria','阿尔及尔',660,222,'plains',1,1,0,0,0,2],
-[164,'algeria','奥兰',621,225,'plains',0,1,0,0,0,2],
-[165,'morocco','摩洛哥',618,216,'plains',1,1,0,0,0,1],
-[166,'tunisia','突尼斯保护国',684,201,'plains',1,1,0,0,0,1],
-[167,'libya','的黎波里',714,228,'plains',1,1,0,0,0,1],
-[168,'libya','班加西',738,252,'plains',0,1,0,0,0,1],
+[163,'algeria','阿尔及尔',661.7,192.5,'plains',1,1,0,0,0,2],
+[164,'algeria','奥兰',648.4,196.3,'plains',0,1,0,0,0,2],
+[165,'morocco','摩洛哥',626,202.3,'plains',1,1,0,0,0,1],
+[166,'tunisia','突尼斯保护国',687.3,192.3,'plains',1,1,0,0,0,1],
+[167,'libya','的黎波里',698.1,206.4,'plains',1,1,0,0,0,1],
+[168,'libya','班加西',722.9,209.2,'plains',0,1,0,0,0,1],
 [169,'eritrea','厄立特里亚',789,270,'plains',1,1,0,0,0,1],
-[170,'somalia','索马里',816,309,'plains',1,1,0,0,0,1],
+[170,'somalia','索马里',813.9,317.6,'plains',1,1,0,0,0,1],
 [171,'somaliland','索马里兰',816,291,'plains',1,1,0,0,0,1],
-[172,'sudan','喀土穆',759,267,'plains',1,1,0,0,0,2],
-[173,'sudan','朱巴',783,246,'plains',0,1,0,0,0,2],
+[172,'sudan','喀土穆',767.7,269.1,'plains',1,1,0,0,0,2],
+[173,'sudan','朱巴',764.3,307.5,'plains',0,1,0,0,0,2],
 [174,'westsahara','撒哈拉',606,237,'plains',1,1,0,0,0,1],
 [175,'mali','苏丹',636,261,'plains',1,1,0,0,0,1],
-[176,'niger','尼日尔',684,261,'plains',1,1,0,0,0,1],
-[177,'chad','乍得',717,270,'plains',1,1,0,0,0,1],
-[178,'senegal','塞内加尔',597,273,'plains',1,1,0,0,0,1],
-[179,'guinea','几内亚',609,288,'plains',1,1,0,0,0,1],
-[180,'ivorycoast','象牙海岸',630,297,'plains',1,1,0,0,0,1],
+[176,'niger','尼日尔',658.2,276.3,'plains',1,1,0,0,0,1],
+[177,'chad','乍得',704.8,281.3,'plains',1,1,0,0,0,1],
+[178,'senegal','塞内加尔',587.8,271.9,'plains',1,1,0,0,0,1],
+[179,'guinea','几内亚',601.3,290.7,'plains',1,1,0,0,0,1],
+[180,'ivorycoast','象牙海岸',636.2,305.8,'plains',1,1,0,0,0,1],
 [181,'burkina','上沃尔特',645,282,'plains',1,1,0,0,0,1],
-[182,'benin','达荷美',657,291,'plains',1,1,0,0,0,1],
-[183,'togo','多哥',654,294,'plains',1,1,0,0,0,1],
+[182,'benin','达荷美',660.1,301.5,'plains',1,1,0,0,0,1],
+[183,'togo','多哥',655,302.8,'plains',1,1,0,0,0,1],
 [184,'cameroon','喀麦隆',696,303,'plains',1,1,0,0,0,1],
-[185,'gabon','加蓬',693,327,'plains',1,1,0,0,0,1],
-[186,'congo','刚果',705,327,'plains',1,1,0,0,0,1],
-[187,'car','乌班吉',723,300,'plains',1,1,0,0,0,1],
+[185,'gabon','加蓬',684.7,323.5,'plains',1,1,0,0,0,1],
+[186,'congo','刚果',702,342,'plains',1,1,0,0,0,1],
+[187,'car','乌班吉',717.5,309.2,'plains',1,1,0,0,0,1],
 [188,'mauritania','毛里塔尼亚',612,252,'plains',1,1,0,0,0,1],
 [189,'madagascar','马达加斯加',819,396,'plains',1,1,0,0,0,2],
 [190,'djibouti','索马里海岸',804,282,'plains',1,1,0,0,0,1],
 [191,'comoros','科摩罗',797,376,'plains',1,0,0,0,0,1],
 [192,'newcaledonia','新喀里多尼亚',1248,402,'plains',1,1,0,0,0,1],
-[193,'lebanon','黎巴嫩',780,201,'plains',1,0,0,0,0,1],
-[194,'syria','叙利亚',789,198,'plains',1,1,0,0,0,2],
-[195,'nigeria','拉各斯',678,291,'plains',1,1,0,0,0,3],
-[196,'nigeria','坎诺',699,276,'plains',0,1,0,0,0,3],
-[197,'ghana','黄金海岸',645,297,'plains',1,1,0,0,0,2],
+[193,'lebanon','黎巴嫩',778.4,202.8,'plains',1,0,0,0,0,1],
+[194,'syria','叙利亚',781.3,204.2,'plains',1,1,0,0,0,2],
+[195,'nigeria','拉各斯',662.8,301.7,'plains',1,1,0,0,0,3],
+[196,'nigeria','坎诺',681.3,281.7,'plains',0,1,0,0,0,3],
+[197,'ghana','黄金海岸',650,305,'plains',1,1,0,0,0,2],
 [198,'sierraleone','塞拉利昂',606,294,'plains',1,1,0,0,0,1],
 [199,'gambia','冈比亚',594,276,'plains',1,0,0,0,0,1],
 [200,'kenya','肯尼亚',786,324,'plains',1,1,0,0,0,2],
 [201,'uganda','乌干达保护国',768,321,'plains',1,1,0,0,0,2],
-[202,'tanganyika','坦噶尼喀',777,348,'plains',1,1,0,0,0,2],
+[202,'tanganyika','坦噶尼喀',792,349.5,'plains',1,1,0,0,0,2],
 [203,'zambia','北罗得西亚',750,375,'plains',1,1,0,0,0,1],
 [204,'zimbabwe','南罗得西亚',759,393,'plains',1,1,0,0,0,2],
 [205,'malawi','尼亚萨兰',774,372,'plains',1,1,0,0,0,1],
@@ -1263,39 +1255,39 @@ const PROVINCE_DEFS = [
 [214,'barbados','巴巴多斯',425,286,'plains',1,0,0,0,0,1],
 [215,'falkland','福克兰',438,510,'plains',1,1,0,0,0,1],
 [216,'cyprus','塞浦路斯',768,198,'plains',1,0,0,0,0,1],
-[217,'malta','马耳他',703,191,'plains',1,0,0,0,0,1],
+[217,'malta','马耳他',702.9,195.6,'plains',1,0,0,0,0,1],
 [218,'brunei','文莱',1064,309,'plains',1,0,0,0,2,2],
 [219,'ceylon','锡兰',942,297,'plains',1,1,0,0,0,2],
 [220,'hongkong','香港',1062,243,'plains',1,0,0,0,0,2],
 [221,'fiji','斐济',1293,389,'plains',1,1,0,0,0,1],
-[222,'solomon','所罗门',1212,348,'plains',1,1,0,0,0,1],
-[223,'vanuatu','新赫布里底',1244,399,'plains',1,0,0,0,0,1],
+[222,'solomon','所罗门',1226.5,359,'plains',1,1,0,0,0,1],
+[223,'vanuatu','新赫布里底',1256.6,388.9,'plains',1,0,0,0,0,1],
 [224,'mauritius','毛里求斯',831,381,'plains',1,0,0,0,0,1],
-[225,'belgcongo','利奥波德维尔',735,336,'plains',1,1,0,0,0,3],
+[225,'belgcongo','利奥波德维尔',708,339.5,'plains',1,1,0,0,0,3],
 [226,'belgcongo','伊丽莎白维尔',756,372,'plains',0,1,0,0,0,3],
 [227,'burundi','卢安达-乌隆迪',759,336,'plains',1,1,0,0,0,2],
-[228,'angola','罗安达',714,369,'plains',1,1,0,0,0,2],
+[228,'angola','罗安达',698.3,356.8,'plains',1,1,0,0,0,2],
 [229,'angola','本格拉',696,348,'plains',0,1,0,0,0,2],
-[230,'mozambique','洛伦索马贵斯',777,387,'plains',1,1,0,0,0,2],
-[231,'mozambique','贝拉',768,420,'plains',0,1,0,0,0,2],
+[230,'mozambique','洛伦索马贵斯',767.9,418.6,'plains',1,1,0,0,0,2],
+[231,'mozambique','贝拉',776.1,396.5,'plains',0,1,0,0,0,2],
 [232,'guineabissau','几内亚',597,282,'plains',1,1,0,0,0,1],
-[233,'caboverde','佛得角',587,271,'plains',1,0,0,0,0,1],
+[233,'caboverde','佛得角',565.7,270.9,'plains',1,0,0,0,0,1],
 [234,'saotome','圣多美',682,327,'plains',1,0,0,0,0,1],
 [235,'timor','帝汶',1104,357,'plains',1,1,0,0,1,1],
 [236,'suriname','圭亚那',447,309,'plains',1,1,0,0,0,1],
 [237,'curacao','库拉索',398,282,'plains',1,0,0,0,0,1],
 [238,'eqguinea','几内亚',687,318,'plains',1,1,0,0,0,1],
-[239,'guam','关岛',1129,326,'plains',1,0,0,0,0,1],
-[240,'usvi','维尔京',412,259,'plains',1,0,0,0,0,1],
-[241,'micronesia','南洋群岛',1198,340,'plains',1,0,0,0,0,1],
-[242,'palau','帕劳',1114,320,'plains',1,0,0,0,0,1],
-[243,'nmariana','塞班',1128,326,'plains',1,0,0,0,0,1],
-[244,'jordan','外约旦酋长国',783,213,'plains',1,1,0,0,0,1],
+[239,'guam','关岛',1171.9,276.5,'plains',1,0,0,0,0,1],
+[240,'usvi','维尔京',416.9,258.9,'plains',1,0,0,0,0,1],
+[241,'micronesia','南洋群岛',1197.3,298.2,'plains',1,0,0,0,0,1],
+[242,'palau','帕劳',1135.1,298.5,'plains',1,0,0,0,0,1],
+[243,'nmariana','塞班',1175.3,270.3,'plains',1,0,0,0,0,1],
+[244,'jordan','外约旦酋长国',780,209.8,'plains',1,1,0,0,0,1],
 [245,'kuwait','科威特保护国',822,219,'plains',1,1,0,0,2,2],
 [246,'qatar','卡塔尔保护国',834,234,'plains',1,0,0,0,2,2],
 [247,'bahrain','巴林保护国',831,231,'plains',1,0,0,0,2,2],
 [248,'uae','特鲁西尔阿曼',846,240,'plains',1,1,0,0,2,2],
-[249,'faeroe','法罗',632,114,'plains',1,0,0,0,0,1],
+[249,'faeroe','法罗',626.3,101.4,'plains',1,0,0,0,0,1],
 [250,'aland','奥兰',717,108,'plains',1,0,0,0,0,1],
 // ---- v1.9.3 城市细化（35 个新省，ID 追加在末尾保持旧存档稳定） ----
 // 坐标由统一投影生成：x = 786 + 3.6*(lon-37.6)，y = 124 + 3.605*(55.75-lat)
@@ -1308,15 +1300,15 @@ const PROVINCE_DEFS = [
 [257,'manchukuo','奉天',1094,175,'plains',0,1,1,1,0,3],
 [258,'ussr','哈尔科夫',758,135,'urban',0,1,1,1,0,3],
 [259,'ussr','罗斯托夫',771,145,'plains',0,1,1,0,0,3],
-[260,'ussr','敖德萨',738,148,'plains',0,1,0,0,0,2],
+[260,'ussr','敖德萨',761.3,157.4,'plains',0,1,0,0,0,2],
 [261,'ussr','喀山',804,124,'plains',0,1,0,0,0,3],
-[262,'ussr','阿尔汉格尔斯克',773,86,'hills',0,1,0,0,0,2],
-[263,'ussr','海参崴',1004,157,'urban',0,1,0,0,0,2],
+[262,'ussr','阿尔汉格尔斯克',796.6,92.3,'hills',0,1,0,0,0,2],
+[263,'ussr','海参崴',1125.4,169.5,'urban',0,1,0,0,0,2],
 [264,'usa','底特律',352,172,'urban',0,2,1,1,0,3],
 [265,'usa','波士顿',392,172,'urban',0,1,0,0,0,2],
-[266,'usa','丹佛',269,172,'hills',0,1,0,0,0,2],
-[267,'usa','休斯顿',263,209,'plains',0,1,0,1,1,3],
-[268,'usa','西雅图',225,156,'plains',0,1,0,0,0,2],
+[266,'usa','丹佛',272.7,181.7,'hills',0,1,0,0,0,2],
+[267,'usa','休斯顿',307.3,217.7,'plains',0,1,0,1,1,3],
+[268,'usa','西雅图',210.3,153.3,'plains',0,1,0,0,0,2],
 [269,'japan','名古屋',1140,189,'urban',0,2,1,1,0,3],
 [270,'japan','仙台',1153,178,'plains',0,1,0,0,0,2],
 [271,'japan','鹿儿岛',1116,202,'plains',0,1,0,0,0,2],
@@ -1326,21 +1318,21 @@ const PROVINCE_DEFS = [
 [275,'france','图卢兹',654,162,'plains',0,1,0,0,0,2],
 [276,'germany','德累斯顿',699,141,'urban',0,1,1,1,0,2],
 [277,'germany','斯图加特',682,150,'hills',0,1,1,0,0,2],
-[278,'italy','威尼斯',694,152,'plains',0,1,0,0,0,2],
-[279,'italy','热那亚',682,156,'hills',0,1,0,0,0,2],
+[278,'italy','威尼斯',695,161.2,'plains',0,1,0,0,0,2],
+[279,'italy','热那亚',682.8,164.9,'hills',0,1,0,0,0,2],
 [280,'danzig','但泽',717,126,'plains',1,1,0,0,0,2],
 [281,'turkey','埃尔祖鲁姆',799,181,'hills',0,1,0,0,0,2],
-[282,'india','加尔各答',945,235,'urban',0,2,1,1,0,4],
-[283,'canada','蒙特利尔',322,152,'urban',0,1,0,0,0,2],
-[284,'brazil','萨尔瓦多',469,302,'plains',0,1,0,0,0,2],
-[285,'australia','珀斯',1162,440,'plains',0,1,0,0,0,2],
+[282,'india','加尔各答',968.7,243.6,'urban',0,2,1,1,0,4],
+[283,'canada','蒙特利尔',385.8,161,'urban',0,1,0,0,0,2],
+[284,'brazil','萨尔瓦多',512,371.7,'plains',0,1,0,0,0,2],
+[285,'australia','珀斯',1067.7,440.2,'plains',0,1,0,0,0,2],
 // ---- v1.9.8 小国省份 ----
 [286,'bhutan','廷布',973.7,225.8,'mountain',1,0,0,0,0,1],
 [287,'sikkim','甘托克',968.0,227.5,'mountain',1,0,0,0,0,1],
 [288,'maldives','马累',915.5,309.9,'plains',1,0,0,0,0,1],
 [289,'sarawak','古晋',1047.0,318.5,'plains',1,0,0,0,1,2],
 [290,'northborneo','亚庇',1070.0,302.5,'plains',1,0,0,0,0,1],
-[291,'macau','澳门',1056.5,247.5,'urban',1,0,0,0,0,1],
+[291,'macau','澳门',1059.4,245,'urban',1,0,0,0,0,1],
 [292,'andorra','安道尔城',656.0,170.0,'mountain',1,0,0,0,0,1],
 [293,'monaco','摩纳哥',677.5,166.0,'urban',1,0,0,0,0,1],
 [294,'sanmarino','圣马力诺',695.0,166.3,'hills',1,0,0,0,0,1],
@@ -2927,6 +2919,7 @@ const STARTING_NAVY = {
   bahrain: {destroyer:1},
   barbados: {destroyer:1},
   comoros: {destroyer:1},
+  caboverde: {destroyer:1},   // v2.1.4：佛得角归位到真实坐标（大西洋中部）后成了纯海路岛国，补一艘
   cuba: {destroyer:1},
   curacao: {destroyer:1},
   faeroe: {destroyer:1},
@@ -4827,6 +4820,39 @@ function mulberry32(seed){
   };
 }
 
+// v2.1.4：微型地区（香港/马耳他/关岛/塞舌尔…这些 110m 精度世界数据里根本没有的岛）
+// 以前没有国界数据时，直接用「省中心 ±26px 的正方形」当省块 —— 100% 缩放下就是一块
+// 52×52 的硬方块，比整个马耳他大十倍，玩家一眼就看出是贴图错误。
+// 现在改成按省 id 定种子生成的「不规则小岛」多边形：同一个省形状永远一致，
+// 尺寸只有几像素（放大才成形），远看是个点、近看是座岛。
+function isletPoly(cx, cy, key, radius){
+  let r0 = radius || 3.4;
+  let rnd = mulberry32((typeof key==='number' ? key*2654435761 : String(key).length*7919) + 1013904223);
+  let n = 13, pts = [];
+  let phase = rnd()*Math.PI*2;            // 起始角随机，避免所有小岛朝向一致
+  for(let i=0;i<n;i++){
+    let a = phase + i/n*Math.PI*2;
+    let r = r0 * (0.62 + rnd()*0.56);     // 半径抖动：轮廓有凹凸，像海岸线而不是圆
+    pts.push({x: cx + Math.cos(a)*r*1.12, y: cy + Math.sin(a)*r*0.88});
+  }
+  return pts;
+}
+
+// 判断某段国界环是不是「占位矩形」：只有 4~5 个点、且宽高都不超过 10 个地图单位。
+// 这类数据是早期给小国/殖民地随手补的 4.6×4.6 方框（澳门/亚丁/塞舌尔/圣赫勒拿/列支敦士登…），
+// 画出来就是一块硬邦邦的小方块 —— 用户报的「某些地区渲染成一个小方块」正是它们。
+// 返回该矩形的最大边长（用来定小岛半径），不是占位矩形则返回 null。
+function ringPlaceholderSize(ring){
+  if(!ring || !ring.length || ring.length/2 > 5) return null;
+  let minX=1e9, maxX=-1e9, minY=1e9, maxY=-1e9;
+  for(let i=0;i+1<ring.length;i+=2){
+    if(ring[i]<minX) minX=ring[i]; if(ring[i]>maxX) maxX=ring[i];
+    if(ring[i+1]<minY) minY=ring[i+1]; if(ring[i+1]>maxY) maxY=ring[i+1];
+  }
+  let w = maxX-minX, h = maxY-minY;
+  return (Math.max(w,h) <= 10) ? Math.max(w,h) : null;
+}
+
 function pointInPoly(x, y, poly){
   let inside = false;
   for(let i=0,j=poly.length-1;i<poly.length;j=i++){
@@ -4983,18 +5009,19 @@ function buildProvinceShapes(){  // 清空缓存
           if(a > bestA){ bestA = a; best = r; }
         }
       }
-      if(best){
+      let phSize = ringPlaceholderSize(best);
+      if(best && phSize !== null){
+        // 占位矩形（4.6×4.6 的方框）→ 换成同尺寸的不规则小岛，否则放大后就是一块硬方块
+        PROVINCE_SHAPES[p0.id] = isletPoly(p0.x, p0.y, p0.id, Math.max(1.2, phSize*0.55));
+      } else if(best){
         let poly = [];
         for(let i=0;i<best.length;i+=2) poly.push({x:best[i], y:best[i+1]});
         PROVINCE_SHAPES[p0.id] = poly;
       } else {
-        // 微型地区无国界数据（香港/马耳他/关岛等）：用省中心的小方块，
-        // 绝不能用 FAR 大方块 —— 那会铺满整张地图，把颜色糊掉
-        let R = 26;
-        PROVINCE_SHAPES[p0.id] = [
-          {x:p0.x-R, y:p0.y-R}, {x:p0.x+R, y:p0.y-R},
-          {x:p0.x+R, y:p0.y+R}, {x:p0.x-R, y:p0.y+R}
-        ];
+        // 微型地区无国界数据（香港/马耳他/关岛等）：画成不规则小岛。
+        // ① 不能用 FAR 大方块 —— 那会铺满整张地图，把颜色糊掉；
+        // ② 也不能用 ±26 的正方块 —— 52px 的硬方块比真实岛屿大十倍（用户报的「小方块」）。
+        PROVINCE_SHAPES[p0.id] = isletPoly(p0.x, p0.y, p0.id, p0.isletR || 3.4);
       }
       continue;
     }
@@ -5014,25 +5041,16 @@ function buildProvinceShapes(){  // 清空缓存
     if(p._outOfBorder){
       // 真飞地：单元限制在省中心附近的小方块内，绝不外溢
       let cell = clipPolyToRect(globalShapes[p.id], p.x-35, p.y-35, p.x+35, p.y+35);
-      PROVINCE_SHAPES[p.id] = (cell && cell.length >= 3) ? cell : [
-        {x:p.x-18, y:p.y-18}, {x:p.x+18, y:p.y-18}, {x:p.x+18, y:p.y+18}, {x:p.x-18, y:p.y+18}
-      ];
+      PROVINCE_SHAPES[p.id] = (cell && cell.length >= 3) ? cell : isletPoly(p.x, p.y, p.id, 7);
     }
   });
-  // 没有国界数据的微型地区（香港/马耳他/关岛/百慕大等）：global Voronoi 单元可能宽达几千像素，
-  // 又因为不裁国界会直接铺到海上 —— 统一限制在省中心的小方块内。
+  // 没有国界数据的微型地区（香港/马耳他/关岛/塞舌尔/百慕大等）：
+  // global Voronoi 单元可能宽达几千像素，不裁国界就会直接铺到海上把整片海染成国色；
+  // 而以前裁成「省中心 ±45」的方框 —— 90×90 地图单位（≈25°）的方块，比真岛大几十倍，
+  // 放大后就是一大块看着像贴图的方角。v2.1.4 起一律画成不规则小岛（半径 2.6 ≈ 1.4°）。
   provinces.forEach(p=>{
     if(borderOwnerOf(p.cid)) return;
-    let cell = PROVINCE_SHAPES[p.id];
-    if(!cell || cell.length < 3) return;
-    let minX=1e9,maxX=-1e9,minY=1e9,maxY=-1e9;
-    cell.forEach(v=>{ if(v.x<minX)minX=v.x; if(v.x>maxX)maxX=v.x; if(v.y<minY)minY=v.y; if(v.y>maxY)maxY=v.y; });
-    if(maxX-minX > 90 || maxY-minY > 90){
-      let clipped = clipPolyToRect(cell, p.x-45, p.y-45, p.x+45, p.y+45);
-      PROVINCE_SHAPES[p.id] = (clipped && clipped.length >= 3) ? clipped : [
-        {x:p.x-18, y:p.y-18}, {x:p.x+18, y:p.y-18}, {x:p.x+18, y:p.y+18}, {x:p.x-18, y:p.y+18}
-      ];
-    }
+    PROVINCE_SHAPES[p.id] = isletPoly(p.x, p.y, p.id, p.isletR || 2.6);
   });
   provinces.forEach(p=>{
     let rough = PROVINCE_SHAPES[p.id];
@@ -5473,6 +5491,13 @@ function getProvinceAtPoint(mx, my){
     let d = Math.hypot(mx-p.x, my-p.y);
     if(d >= nearD) continue;
     if(!onLand && !provOffLand(p)) continue;
+    // v2.1.4：海面上的点只认「自家小岛范围内」的微型岛国。
+    // 否则马耳他的中心一旦离西西里只有 5 个地图单位、法罗离爱丁堡只有 20 个，
+    // 在它们海岸外 1px 的海面上点一下就会被判给马耳他/法罗（小岛省块改小后暴露的问题）。
+    if(!onLand && provOffLand(p)){
+      let ib = PROVINCE_BBOXES[p.id];
+      if(ib && (mx < ib.minX-2 || mx > ib.maxX+2 || my < ib.minY-2 || my > ib.maxY+2)) continue;
+    }
     // 8px 内就是点在城市圆点上，直接认；再远就必须真的是这个国家的点
     // （这里**不给 _outOfBorder 开绿灯**，否则一个坐标跑偏的省会把整片海都算成它）
     if(d * scale > 8){
@@ -5837,7 +5862,20 @@ function drawMapStatic(){
       // v1.9.9：选中/悬停的额外描边不放静态层（否则会卡在旧省上不动），
       // 这里只保留一个中性的国土边界线
       const hasHi = false;
-      if(rings && rings.length){
+      // 占位矩形（澳门/亚丁/塞舌尔…那些 4.6×4.6 的方框）→ 画不规则小岛，不再画方块
+      let phSize = (rings && rings.length) ? ringPlaceholderSize(rings[0]) : null;
+      if(phSize !== null){
+        let blob = isletPoly(p.x, p.y, p.cid, Math.max(1.2, phSize*0.55));
+        ctx.beginPath();
+        ctx.moveTo(blob[0].x, blob[0].y);
+        for(let i=1;i<blob.length;i++) ctx.lineTo(blob[i].x, blob[i].y);
+        ctx.closePath();
+        ctx.fillStyle = col;
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(4,9,16,0.8)';
+        ctx.lineWidth = 1.0 / mapScale;
+        ctx.stroke();
+      } else if(rings && rings.length){
         ctx.beginPath();
         rings.forEach(r=>{
           if(!r || r.length<6) return;
@@ -5856,11 +5894,14 @@ function drawMapStatic(){
           ctx.stroke();
         }
       } else {
-        // 兜底：没有国界环的微国画一个「屏幕 3px」的小点（半径必须 /mapScale，不能加固定下限，
-        // 否则放大 8 倍时屏幕半径会跟着涨到 24px —— test_no_blocking_dialog 的缩放不变量会红）
-        const r = 3.0 / mapScale;
+        // 兜底：连国界环都没有的微国（关岛/帕劳/香港/塞舌尔…）以前只画一个「屏幕 3px」的小圆，
+        // 放大后就是一粒看不清的沙。改成地图单位的不规则小岛（半径 1.8 ≈ 1° 宽）：
+        // 和真岛一个量级，100% 缩放下是个点、放大后是可点击的岛屿轮廓。
+        let blob = isletPoly(p.x, p.y, p.cid, 1.8);
         ctx.beginPath();
-        ctx.arc(p.x, p.y, r, 0, Math.PI*2);
+        ctx.moveTo(blob[0].x, blob[0].y);
+        for(let i=1;i<blob.length;i++) ctx.lineTo(blob[i].x, blob[i].y);
+        ctx.closePath();
         ctx.fillStyle = col;
         ctx.fill();
         ctx.strokeStyle = 'rgba(4,9,16,0.8)';
@@ -13771,8 +13812,14 @@ setSpeed = function(s){
 // ---- 版本与更新日志 ----
 // 每次发布新版本：改 GAME_VERSION，并在 UPDATE_HISTORY 顶部加一条。
 // 玩家打开线上版时若版本号与 localStorage 记录不同，就弹「本次版本更新了以下内容」弹窗。
-const GAME_VERSION = 'v2.1.3';
+const GAME_VERSION = 'v2.1.4';
 const UPDATE_HISTORY = [
+  { ver:'v2.1.4', date:'2026-11-14', items:[
+    '🧹 **「❓ 反馈」按钮与整套反馈功能已移除**：顶栏不再有反馈入口，随之删掉反馈面板、暂停/恢复逻辑、IndexedDB 文件夹授权、本机服务器探活，以及 feedback-server.js / 启动反馈服务器.bat 两个脚本。顶栏右侧固定区现在只剩「⭐ 国策点数 / 🎯 国策树 / 日期」三样，更清爽',
+    '📍 **修掉 60 多个跑偏的省会坐标 —— 首都再也不会漂到太平洋或别国去了**：关岛 132.9°E ▸ 144.8°E、塞班 ▸ 145.8°E、帕劳 ▸ 134.6°E、南洋群岛 ▸ 151.9°E（此前这四块日美太平洋属地全挤在班达海一带）、海参崴 98.2°E ▸ 131.9°E（此前一路跑到蒙古边上）、金沙萨 23.4°E ▸ 15.3°E、拉各斯/尼亚美/达喀尔/罗安达/马普托/金沙萨/布拉柴维尔/的黎波里/阿尔及尔/喀布尔/哈瓦那/布宜诺斯艾利斯/珀斯/加尔各答/敖德萨/塔什干/阿拉木图 等全部按真实经纬度归位；澳门从珠江口外的海里挪回 113.5°E、22.2°N',
+    '🏝️ **「小方块」终于没了**：以前微型地区没有真实国界时直接用「省中心 ±26px 的正方形」当省块，单省小国用「±45px 裁剪块」，而这些国家在 WORLD_BORDERS 里的国界还是 4.6×4.6 的占位方框 —— 三者叠起来，香港/澳门/亚丁/塞舌尔/圣赫勒拿/马耳他/关岛放大后全是一块硬邦邦的方角。现在统一改成按省 id 定种子生成的**不规则小岛轮廓**（同一个地方形状永远一致），大小只有几个像素，远看是个点、放大是可点击的岛',
+    '🧪 test_disclaimer_feedback.js 重写为「免责声明 + 顶栏结构 + 反馈已移除」回归守卫（35 断言）；test_islet_render.js 追加小岛形状断言（无 4 点轴对齐矩形、占位方框识别、形状可复现）',
+  ]},
   { ver:'v2.1.3', date:'2026-11-08', items:[
     '🖥 **反馈真的存到「服务器端」= 你这台电脑的 D:\\Qst 了**：之前只有「弹一次文件夹授权」这条路（浏览器安全模型不允许网页凭空写磁盘），现在游戏目录里多了一个 **feedback-server.js**，双击「**启动反馈服务器.bat**」就会在你本机起一个小服务（127.0.0.1:8765，同时把游戏也挂在上面打开）—— 之后每次提交反馈都是 **POST 一句话，服务器自己把 txt 写进 D:\\Qst，全程零弹窗、零授权**，面板上会直接显示「✅ 已由本机服务器写入 D:\\Qst\\feedback_2026…txt」',
     '🧭 **三条通路自动降级，反馈永远不会丢**：① 本机服务器（最优，直写 D:\\Qst）→ ② 你授权过一次的文件夹句柄（IndexedDB 记住，静默写）→ ③ 浏览器下载目录兜底。服务器没开时面板会明说「本机反馈服务器未启动 → 双击启动反馈服务器.bat」，不会让你以为存进去了',
@@ -13965,375 +14012,6 @@ function showDisclaimer(){
   document.getElementById('disclaimer-ok').addEventListener('click', ()=>{ ov.remove(); });
 }
 
-// ==================== 玩家反馈（v1.9.8 → v2.1.3）====================
-// 右上角「❓ 反馈」按钮：
-//   · 断网时按钮置灰、点击提示「目前未连接网络，不可反馈」（游戏内浮层，不用原生 alert）
-//   · 点击后自动暂停游戏（冻结），输入并提交后恢复原暂停状态
-//   · 反馈**写进这台电脑（本机「服务器端」= 玩家自己这台机器）的 D:\Qst 文件夹**，三条通路按优先级：
-//       ① 本机反馈服务器 feedback-server.js（双击「启动反馈服务器.bat」启动）
-//          → POST /api/feedback → 服务器自己 fs.writeFile 落盘 D:\Qst，全程零弹窗、零授权
-//       ② 一次性授权的文件夹句柄（IndexedDB 记住 D:\Qst）→ 静默写 txt（浏览器安全模型要求选一次）
-//       ③ 最后兜底：落到浏览器下载目录
-//   · 三条通路都只写本机磁盘，不上传任何外部服务器 —— 所谓「服务器端」就是玩家这台电脑
-const FEEDBACK_DIR = 'D:\\Qst';   // 反馈最终落盘位置（本机服务器端固定目录）
-const FEEDBACK_IDB = 'ww1936_fs';
-const FEEDBACK_SRV_PORT = 8765;   // 本机反馈服务器端口（feedback-server.js / 启动反馈服务器.bat）
-const FEEDBACK_UPLOAD_URL = '';   // 想额外转发到公网服务端时填地址；留空则一个字节都不外传
-
-// ---- 轻量浮动提示（替代原生 alert，避免阻塞游戏循环）----
-function showFloatTip(msg, opts){
-  try{
-    let el = document.getElementById('float-tip');
-    if(!el){
-      el = document.createElement('div');
-      el.id = 'float-tip';
-      document.body.appendChild(el);
-    }
-    let color = (opts && opts.color) || '#c9d1d9';
-    el.innerHTML = '<span style="color:'+color+'">'+msg+'</span>';
-    el.classList.add('show');
-    if(el._hideTimer) clearTimeout(el._hideTimer);
-    el._hideTimer = setTimeout(function(){ try{ el.classList.remove('show'); }catch(e){} }, (opts && opts.ms) || 2200);
-  }catch(e){}
-}
-
-// ---- 网络状态：离线时反馈按钮自动置灰 ----
-function feedbackOnline(){
-  try{ return !(typeof navigator !== 'undefined' && navigator.onLine === false); }catch(e){ return true; }
-}
-function updateFeedbackButtonState(){
-  try{
-    let btn = document.getElementById('btn-feedback');
-    if(!btn) return;
-    if(feedbackOnline()){
-      btn.classList.remove('offline');
-      btn.title = '向我们反馈问题或建议（会自动暂停游戏，保存到本机服务器端的 D:\\Qst）';
-    } else {
-      btn.classList.add('offline');
-      btn.title = '目前未连接网络，不可反馈';
-    }
-  }catch(e){}
-}
-function initFeedbackNetworkWatch(){
-  try{
-    if(window.__fbNetWatched) return;
-    window.__fbNetWatched = true;
-    window.addEventListener('online', ()=>{ updateFeedbackButtonState(); showFloatTip('✅ 网络已连接，可以反馈了', {color:'#3fb950'}); });
-    window.addEventListener('offline', ()=>{ updateFeedbackButtonState(); showFloatTip('⚠️ 网络已断开，反馈暂不可用', {color:'#d29922'}); });
-    updateFeedbackButtonState();
-  }catch(e){}
-}
-
-// ---- IndexedDB：持久化保存目录句柄 ----
-function fbIdbOpen(){
-  return new Promise(function(res, rej){
-    try{
-      if(typeof indexedDB === 'undefined' || !indexedDB) return rej(new Error('no indexedDB'));
-      let r = indexedDB.open(FEEDBACK_IDB, 1);
-      r.onupgradeneeded = function(){ try{ r.result.createObjectStore('kv'); }catch(e){} };
-      r.onsuccess = function(){ res(r.result); };
-      r.onerror = function(){ rej(r.error || new Error('idb error')); };
-    }catch(e){ rej(e); }
-  });
-}
-function fbIdbGet(k){
-  return fbIdbOpen().then(function(db){
-    return new Promise(function(res, rej){
-      try{
-        let req = db.transaction('kv','readonly').objectStore('kv').get(k);
-        req.onsuccess = function(){ res(req.result); };
-        req.onerror = function(){ rej(req.error); };
-      }catch(e){ rej(e); }
-    });
-  });
-}
-function fbIdbSet(k, v){
-  return fbIdbOpen().then(function(db){
-    return new Promise(function(res, rej){
-      try{
-        let req = db.transaction('kv','readwrite').objectStore('kv').put(v, k);
-        req.onsuccess = function(){ res(true); };
-        req.onerror = function(){ rej(req.error); };
-      }catch(e){ rej(e); }
-    });
-  });
-}
-
-// 让玩家挑一次落盘目录（推荐 D:\Qst）。
-// 浏览器硬限制：网页不能自己创建/写入任意路径 —— 必须由玩家亲手选一次目录，
-// 这是唯一的一次性动作；句柄存进 IndexedDB 之后，后续提交全部静默写盘。
-function pickFeedbackDir(){
-  if(!window.showDirectoryPicker){
-    showFloatTip('当前浏览器不支持「记住文件夹」，只能落到下载目录', {color:'#d29922'});
-    return Promise.resolve(null);
-  }
-  let opt = {mode:'readwrite'};
-  try{ opt.id = 'ww1936_feedback'; }catch(e){}
-  return window.showDirectoryPicker(opt).then(function(dir){
-    window.__fbDirHandle = dir;
-    updateFeedbackDirState();
-    // 记住目录；IndexedDB 不可用（隐私模式/被禁用）时也不影响本次写入
-    return fbIdbSet('feedbackDir', dir).then(function(){ return dir; }).catch(function(){ return dir; });
-  }).then(function(dir){
-    showFloatTip('✅ 以后反馈直接存进「'+dir.name+'」，不再问你', {color:'#3fb950'});
-    updateFeedbackDirState();
-    return dir;
-  }).catch(function(){ return null; });   // 玩家点了取消
-}
-
-function updateFeedbackDirState(){
-  let st = document.getElementById('feedback-dir-state');
-  if(!st) return;
-  let d = window.__fbDirHandle;
-  if(d){
-    let nm = (d.name === 'Qst') ? FEEDBACK_DIR : d.name;
-    st.innerHTML = '📁 保存位置：<b style="color:#7ee787">'+nm+'</b>　（提交即写入，不再弹窗）';
-  } else {
-    st.innerHTML = '📁 首次提交时选一次文件夹（建议 '+FEEDBACK_DIR+'），之后就不用管了';
-  }
-}
-
-function feedbackFileName(){
-  let d = new Date();
-  let p = function(n){ return (n<10?'0':'')+n; };
-  return 'feedback_' + d.getFullYear() + p(d.getMonth()+1) + p(d.getDate()) + '-'
-       + p(d.getHours()) + p(d.getMinutes()) + p(d.getSeconds()) + '.txt';
-}
-
-// ---- 本机反馈服务器（v2.1.3）：真正的「保存到服务器端」，真正的 D:\Qst ----
-// 为什么需要它：浏览器安全模型不允许网页凭空写任意磁盘路径（要么弹一次文件夹授权，
-// 要么把文件丢进下载目录）。这台电脑上跑一个小服务（feedback-server.js），
-// 网页只要 POST 一句话，服务器就用 fs 直接写进 D:\Qst —— 这才是玩家说的「服务器端」。
-function feedbackServerBases(){
-  let out = [];
-  try{
-    let p = (window.location && window.location.protocol) || '';
-    // 用本机服务器打开游戏（http://127.0.0.1:8765/）时优先同源，连端口都不用猜
-    if(p === 'http:' || p === 'https:') out.push('');
-  }catch(e){}
-  out.push('http://127.0.0.1:' + FEEDBACK_SRV_PORT);
-  return out;
-}
-// 统一的带超时请求：服务器没开时要**立刻**失败（不能让玩家等），失败一律返回 null
-async function feedbackHttp(url, opt, timeoutMs){
-  if(typeof fetch !== 'function') return null;
-  let ctl = null, to = null;
-  try{
-    if(typeof AbortController === 'function'){
-      ctl = new AbortController(); opt.signal = ctl.signal;
-      to = setTimeout(function(){ try{ ctl.abort(); }catch(e){} }, timeoutMs || 2500);
-    }
-  }catch(e){}
-  try{
-    let r = await fetch(url, opt);
-    if(to) clearTimeout(to);
-    if(!r || !r.ok) return null;
-    let j = null;
-    try{ j = await r.json(); }catch(e){ return null; }
-    return (j && j.ok) ? j : null;
-  }catch(e){ if(to) clearTimeout(to); return null; }
-}
-async function pingFeedbackServer(){
-  let bases = feedbackServerBases();
-  for(let i=0;i<bases.length;i++){
-    let j = await feedbackHttp(bases[i] + '/api/feedback/ping', {method:'GET'}, 900);
-    if(j){
-      window.__fbSrvOk = true;
-      window.__fbSrvDir = j.dir || FEEDBACK_DIR;
-      return j;
-    }
-  }
-  window.__fbSrvOk = false; window.__fbSrvDir = '';
-  return null;
-}
-// 写服务器：成功返回服务器回执（含真实绝对路径），失败返回 null 让上层继续兜底
-async function saveFeedbackToServer(text, fname){
-  let bases = feedbackServerBases();
-  for(let i=0;i<bases.length;i++){
-    let j = await feedbackHttp(bases[i] + '/api/feedback', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ fname: fname, text: text, ver: GAME_VERSION })
-    }, 3000);
-    if(j && j.file){
-      window.__fbSrvOk = true;
-      window.__fbSrvDir = j.dir || FEEDBACK_DIR;
-      window.__fbLastPath = j.path || ((j.dir || FEEDBACK_DIR) + '\\' + j.file);
-      return j;
-    }
-  }
-  return null;
-}
-function updateFeedbackSrvState(){
-  let el = document.getElementById('feedback-srv-state');
-  if(!el) return;
-  if(window.__fbSrvOk){
-    el.innerHTML = '🖥 已连接本机反馈服务器　<b style="color:#7ee787">'+ (window.__fbSrvDir || FEEDBACK_DIR) +'</b>　提交即写入，无需任何授权';
-  } else {
-    el.innerHTML = '🖥 本机反馈服务器未启动 → 双击游戏目录里的「<b style="color:#58a6ff">启动反馈服务器.bat</b>」即可自动直写 '+FEEDBACK_DIR+'；不启动也行，会写进你授权过的文件夹';
-  }
-}
-
-// 把反馈写进这台电脑：① 服务器（D:\Qst，零弹窗）② 已授权文件夹 ③ 下载兜底
-// 返回 'server' | 'dir' | 'download' | 'none'
-async function saveFeedbackFile(text, fname){
-  fname = fname || feedbackFileName();
-  let srv = await saveFeedbackToServer(text, fname);
-  if(srv) return 'server';
-  let dir = window.__fbDirHandle;
-  if(dir){
-    try{
-      let perm = 'granted';
-      if(dir.queryPermission) perm = await dir.queryPermission({mode:'readwrite'});
-      if(perm !== 'granted' && dir.requestPermission) perm = await dir.requestPermission({mode:'readwrite'});
-      if(perm === 'granted'){
-        let fh = await dir.getFileHandle(fname, {create:true});
-        let w = await fh.createWritable();
-        await w.write(text);
-        if(w.close) await w.close();
-        window.__fbLastPath = dir.name + String.fromCharCode(92) + fname;
-        return 'dir';
-      }
-    }catch(e){ try{ console.warn('[feedback] 目录写入失败:', e && e.message); }catch(_){} }
-  }
-  return feedbackDownloadFallback(text, fname);
-}
-
-// 只有「浏览器完全不支持 File System Access」时才用：落到系统下载文件夹。
-// 这里**故意不调用 showSaveFilePicker** —— 那个窗口太像"另存为存档"，会让人误以为在存进度。
-function feedbackDownloadFallback(text, fname){
-  try{
-    let blob = new Blob([text], {type:'text/plain;charset=utf-8'});
-    let a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = fname;
-    if(a.style) a.style.display = 'none';
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(function(){ try{ document.body.removeChild(a); }catch(e){} }, 0);
-    window.__fbLastPath = '下载文件夹 / ' + fname;
-    return 'download';
-  }catch(e){}
-  return 'none';
-}
-
-// 可选：配置了 FEEDBACK_UPLOAD_URL 时，联网状态下把反馈也发到服务端
-function uploadFeedback(rec){
-  if(!FEEDBACK_UPLOAD_URL || !feedbackOnline()) return Promise.resolve(false);
-  try{
-    return fetch(FEEDBACK_UPLOAD_URL, {
-      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(rec)
-    }).then(function(r){ return !!(r && r.ok); }).catch(function(){ return false; });
-  }catch(e){ return Promise.resolve(false); }
-}
-
-function openFeedbackPanel(){
-  // 断网不可反馈（按钮本身也会置灰）
-  if(!feedbackOnline()){
-    showFloatTip('目前未连接网络，不可反馈', {color:'#ff7b72'});
-    return;
-  }
-  if(document.getElementById('feedback-panel')) return;
-  let wasPaused = game.paused;
-  game.paused = true;             // 冻结游戏
-  updateBottomBar();
-  let ov = document.createElement('div');
-  ov.id = 'feedback-panel';
-  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9998;display:flex;align-items:center;justify-content:center';
-  ov.innerHTML =
-    '<div style="background:#161b22;border:1px solid #3fb950;border-radius:10px;max-width:540px;width:92%;padding:20px 24px;box-shadow:0 8px 40px rgba(0,0,0,0.6)">'
-    + '<div style="font-size:17px;font-weight:bold;color:#3fb950">❓ 问题反馈</div>'
-    + '<div style="font-size:11.5px;color:#8b949e;margin:6px 0 10px">游戏已自动暂停。请描述你遇到的问题或建议（bug、平衡性、新玩法点子都可以）。提交后会<b style="color:#c9d1d9">直接写进这台电脑（服务器端）的 '+FEEDBACK_DIR+' 文件夹</b>：本机反馈服务器开着就零弹窗直写；没开则第一次提交会让你选一次文件夹（选 '+FEEDBACK_DIR+' 即可），之后永久记住。三条通路都只写本机磁盘，不上传任何外部服务器。</div>'
-    + '<textarea id="feedback-text" placeholder="请输入反馈内容（至少 5 个字）…" style="width:100%;box-sizing:border-box;height:130px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;padding:8px;font-size:13px;resize:vertical"></textarea>'
-    + '<div id="feedback-srv-state" style="font-size:10.5px;color:#8b949e;margin-top:6px;line-height:1.5">🖥 正在检测本机反馈服务器…</div>'
-    + '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:4px">'
-    + '<span id="feedback-dir-state" style="font-size:11px;color:#8b949e">📁 首次提交时选一次文件夹（建议 '+FEEDBACK_DIR+'），之后就不用管了</span>'
-    + '<button id="feedback-pickdir" style="background:#21262d;color:#58a6ff;border:1px solid #30363d;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;white-space:nowrap">换文件夹</button>'
-    + '</div>'
-    + '<div style="font-size:11px;color:#8b949e;margin-top:4px" id="feedback-hint"></div>'
-    + '<div style="text-align:right;margin-top:12px">'
-    + '<button id="feedback-cancel" style="background:#21262d;color:#8b949e;border:1px solid #30363d;border-radius:6px;padding:7px 18px;font-size:13px;cursor:pointer;margin-right:8px">取消</button>'
-    + '<button id="feedback-submit" style="background:#238636;color:#fff;border:none;border-radius:6px;padding:7px 22px;font-size:13px;cursor:pointer">提交反馈</button>'
-    + '</div></div>';
-  document.body.appendChild(ov);
-  let ta = document.getElementById('feedback-text');
-  if(ta) ta.focus();
-  // 先探一下本机反馈服务器（开着就能直写 D:\Qst，不再需要任何授权）
-  pingFeedbackServer().then(function(){ updateFeedbackSrvState(); }).catch(function(){ updateFeedbackSrvState(); });
-  // 显示已记住的落盘目录名
-  fbIdbGet('feedbackDir').then(function(dir){
-    if(dir) window.__fbDirHandle = dir;
-    updateFeedbackDirState();
-  }).catch(function(){});
-  function done(){
-    ov.remove();
-    game.paused = wasPaused;      // 恢复原暂停状态
-    updateBottomBar();
-  }
-  let pickBtn = document.getElementById('feedback-pickdir');
-  if(pickBtn) pickBtn.addEventListener('click', function(){ pickFeedbackDir(); });
-  let cancelBtn = document.getElementById('feedback-cancel');
-  if(cancelBtn) cancelBtn.addEventListener('click', done);
-  let submitBtn = document.getElementById('feedback-submit');
-  if(submitBtn) submitBtn.addEventListener('click', function(){
-    let text = (ta && ta.value ? ta.value : '').trim();
-    let hint = document.getElementById('feedback-hint');
-    if(text.length < 5){ if(hint) hint.innerHTML = '<span style="color:#ff7b72">反馈内容太短了，至少写 5 个字</span>'; return; }
-    if(!feedbackOnline()){
-      if(hint) hint.innerHTML = '<span style="color:#ff7b72">目前未连接网络，不可反馈</span>';
-      return;
-    }
-    let rec = {
-      time: new Date().toLocaleString('zh-CN'),
-      ver: GAME_VERSION,
-      country: (game.player && COUNTRY_DEFS[game.player]) ? COUNTRY_DEFS[game.player].name : (game.player||'未知'),
-      date: (game.tick!==undefined && game.date) ? fmtDate() : '',
-      text: text
-    };
-    let body = '【世界大战1936 玩家反馈】\n时间: '+rec.time+'\n版本: '+rec.ver+'\n游玩国家: '+rec.country+'\n游戏内日期: '+rec.date+'\n\n'+rec.text+'\n';
-
-    // 真正落盘的收尾动作（静默写文件，无对话框）
-    function record(){
-      // 顺便留一份游戏内历史（最多 50 条），仅作备份，不影响磁盘文件
-      try{
-        let list = JSON.parse(localStorage.getItem('ww1936_feedbacks')||'[]');
-        list.unshift(rec); if(list.length>50) list.length = 50;
-        localStorage.setItem('ww1936_feedbacks', JSON.stringify(list));
-      }catch(e){}
-      if(hint) hint.innerHTML = '<span style="color:#3fb950">✅ 正在写入 '+FEEDBACK_DIR+' …</span>';
-      saveFeedbackFile(body).then(function(how){
-        let h = document.getElementById('feedback-hint');
-        if(!h) return;
-        let where = window.__fbLastPath || FEEDBACK_DIR;
-        if(how === 'server') h.innerHTML = '<span style="color:#3fb950">✅ 已由本机服务器写入：<b>'+where+'</b></span>';
-        else if(how === 'dir') h.innerHTML = '<span style="color:#3fb950">✅ 已存到你电脑上：<b>'+where+'</b></span>';
-        else if(how === 'download') h.innerHTML = '<span style="color:#d29922">✅ 本机服务器没开、浏览器也不支持直接写文件夹，已下载到本机：<b>'+where+'</b></span>';
-        else h.innerHTML = '<span style="color:#ff7b72">✗ 写入失败：请双击「启动反馈服务器.bat」，或点「换文件夹」重新选一次</span>';
-        if(how !== 'none') setTimeout(done, 2100);
-      }).catch(function(){});
-      uploadFeedback(rec);
-      addLog('📝','感谢反馈！你的意见已记录，我们会认真阅读');
-    }
-
-    // 还没选过目录 → 就在这次点击里弹一次文件夹选择框（用户手势仍在，浏览器才允许），
-    // 选完立刻静默写入 —— 不会再有第二个「另存为」窗口。
-    // v2.1.3：本机反馈服务器在线时**不弹任何框**，直接 POST 让服务器写 D:\Qst。
-    if(!window.__fbDirHandle && !window.__fbSrvOk && typeof window.showDirectoryPicker === 'function'){
-      if(hint) hint.innerHTML = '<span style="color:#58a6ff">请选一个文件夹（建议 '+FEEDBACK_DIR+'），只需这一次</span>';
-      pickFeedbackDir().then(function(dir){
-        if(!dir){
-          let h2 = document.getElementById('feedback-hint');
-          if(h2) h2.innerHTML = '<span style="color:#ff7b72">没有选择文件夹，反馈还没写进电脑（内容还在，再点一次「提交反馈」即可）</span>';
-          return;
-        }
-        record();
-      });
-      return;
-    }
-    record();
-  });
-}
-
 // 🥚 彩蛋：游玩中国时，连续输入 LRY（不分大小写）→ 无限人力、无限金钱、无限石油
 // 处理器暴露在 initLRYCheat._onKey 上，方便自动化测试直接派发按键
 function initLRYCheat(){
@@ -14374,9 +14052,6 @@ function init(){
 
   // 免责声明（v1.9.7：每次进入游戏前强制弹出，必须同意才能开始）
   showDisclaimer();
-
-  // 网络状态监听：断网时反馈按钮置灰（v1.9.8）
-  initFeedbackNetworkWatch();
 
   // 版本更新弹窗（localStorage 记录的上次版本 ≠ 当前版本时弹出）
   showUpdateModal();
