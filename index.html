@@ -133,6 +133,10 @@ canvas{display:block}
 #guide-panel .g-step.done{background:#238636}
 #guide-panel .g-step.active{background:#ffd700;animation:pulse 1s infinite}
 #guide-panel .g-sep{width:1px;height:8px;background:#484f58;flex:0 0 1px;margin:0 3px}
+/* v2.1.5：引导面板的「跳过本步」按钮（overlay 是 pointer-events:none，按钮单独放行） */
+#guide-panel .g-actions{display:flex;justify-content:flex-end;margin-top:6px}
+#guide-panel .g-skip{pointer-events:auto;cursor:pointer;background:#161b22;color:#8b949e;border:1px solid #30363d;border-radius:6px;padding:2px 10px;font-size:11px}
+#guide-panel .g-skip:hover{color:#c9d1d9;border-color:#58a6ff}
 #guide-panel .g-tip{display:block;margin-top:8px;padding:8px 10px;background:#161b22;
   border-left:2px solid #1f6feb;border-radius:0 4px 4px 0;font-size:11.5px;line-height:1.65;color:#9da7b3}
 #guide-panel .g-tip b{color:#e6edf3}
@@ -231,10 +235,6 @@ canvas{display:block}
 </div>
 </div>
 
-<div class="modal-overlay" id="tutorial-overlay" style="display:none">
-  <div class="modal" id="tutorial-modal"></div>
-</div>
-
 <div class="modal-overlay" id="country-overlay">
   <div class="modal">
     <h2>🌍 选择你的国家 — 1936年</h2>
@@ -250,7 +250,6 @@ canvas{display:block}
     <div class="country-select-list" id="country-list"></div>
     <div id="country-info" style="font-size:12px;color:#8b949e;margin-top:8px;min-height:80px"></div>
     <div style="text-align:right">
-      <button class="btn btn-skip" onclick="startTutorial()">📖 新手教程</button>
       <button class="btn btn-skip" onclick="openLoadModal()">📂 读取存档</button>
       <button class="btn btn-go" id="btn-start" disabled onclick="startGame()">开始游戏</button>
     </div>
@@ -2696,8 +2695,6 @@ let game = {
   wars:[], // [{attacker, defender, startDate}]
   alliances:[], // [{members:[]}]
   log:[],
-  tutorialStep:0,
-  tutorialActive:false,
   paused:false,
   defeated:false,      // 玩家已战败（失去全部领土+部队）
   victoryShown:false,  // 胜利结算画面已展示过（防重复触发）
@@ -2859,8 +2856,6 @@ function initGame(){
   game.speed = 2;
   game.player = null;
   game.selectedProvince = null;
-  game.tutorialStep = 0;
-  game.tutorialActive = false;
   game.paused = false;
   game.nukeTargeting = false;
   firedEvents = new Set();
@@ -4523,11 +4518,15 @@ function setZoom(newScale){
   mapOffsetY = cy - wy * mapScale;
   clampView();
   updateZoomLabel();
+  // v2.1.5：引导关卡里「缩放看阵营」这一步靠缩放触发完成判定
+  if(game.guidedMission) checkGuideProgress();
   drawMap();
 }
 function updateZoomLabel(){
   let el = document.getElementById('zoom-label');
-  if(el) el.textContent = Math.round(mapScale * 100) + '%';
+  if(!el) return;
+  // v2.1.5：≤150% 进入阵营配色模式时，缩放标签给出提示，玩家知道颜色变了是刻意的
+  el.textContent = Math.round(mapScale * 100) + '%' + (inFactionMapMode() ? ' ⚑阵营视图' : '');
 }
 // v1.9.9：帧率显示（右上缩放条下面一行小字）。有动画时才刷新，空闲显示「待机」
 function updateFpsLabel(){
@@ -5552,6 +5551,7 @@ function mapBaseSignature(){
   // 用季节名做键就够了；以前把 tick 塞进来会导致每 3 秒（最快档）就白烘焙一次。
   let s = canvas.width + 'x' + canvas.height;
   s += '|z' + getSeasonName().name + '|p' + (game.player || '') + '|n' + (game.nukeTargeting ? 1 : 0);
+  s += '|fm' + (inFactionMapMode() ? 1 : 0);   // v2.1.5 阵营配色模式切换时要重烘焙
   s += '|x' + (game.highlightCid || '');   // 微国描边会因定位高亮变色（静态层里）
   // 战争虚线依赖参战双方（不只是条数：一场结束一场开始条数不变）
   let hw = 0;
@@ -5585,6 +5585,25 @@ function mapBaseSignature(){
   return s;
 }
 function invalidateMapBase(){ _mapBaseSig = ''; }
+
+// ==================== 阵营总览配色（v2.1.5）====================
+// 用户需求：把视野缩放到很小（≤150%）时，所有国家不再按本国国旗色显示，
+// 而是统一换成阵营色 —— ⚪白=中立 ⚫黑=轴心 🔵蓝=同盟 🔴红=共产国际。
+// 这样一屏扫过整个世界时，敌我阵营一目了然；放大后（>150%）恢复国旗色。
+const FACTION_MAP_ZOOM = 1.5;          // ≤150% 视野 → 阵营配色模式
+const FACTION_MAP_COLORS = {
+  neutral:   '#d8dee6',                // ⚪ 中立（浅灰白，别用纯白刺眼）
+  axis:      '#14161a',                // ⚫ 轴心
+  allies:    '#2f81f7',                // 🔵 同盟
+  comintern: '#da3633',                // 🔴 共产国际
+};
+function inFactionMapMode(){ return mapScale <= FACTION_MAP_ZOOM; }
+function factionMapColor(cid){
+  if(!inFactionMapMode()) return null;
+  let f = getFaction(cid);
+  if(f==='axis' || f==='allies' || f==='comintern') return FACTION_MAP_COLORS[f];
+  return FACTION_MAP_COLORS.neutral;   // 无阵营 / 中立国
+}
 
 // 同一帧内多次请求只画一次（拖动/滚轮会连发几十个事件，逐个重绘就是卡顿来源）
 function requestDraw(){
@@ -5736,16 +5755,19 @@ function drawMapStatic(){
     });
     // v1.9.9：这里只画「国家基色」——选中/悬停/可攻击/国家定位脉冲全部交给动态层，
     // 否则鼠标划过省界就要重烘焙一次几十毫秒的底图。
+    // v2.1.5：≤150% 视野时换成阵营配色（白=中立 黑=轴心 蓝=同盟 红=共产），不透明度也提高，
+    // 让黑色轴心在深色海面上仍能读出轮廓。
     list.forEach(p=>{
       if(!inViewBox(PROVINCE_BBOXES[p.id])) return;   // v1.9.9 视口裁剪
       let poly = PROVINCE_SHAPES[p.id];
       if(!poly || poly.length<3) return;
-      let color = COUNTRY_DEFS[p.controller]?COUNTRY_DEFS[p.controller].color:'#666';
+      let fcol = factionMapColor(p.controller);
+      let color = fcol || (COUNTRY_DEFS[p.controller]?COUNTRY_DEFS[p.controller].color:'#666');
       ctx.beginPath();
       ctx.moveTo(poly[0].x, poly[0].y);
       for(let i=1;i<poly.length;i++) ctx.lineTo(poly[i].x, poly[i].y);
       ctx.closePath();
-      ctx.fillStyle = hexToRgba(color, 0.68);
+      ctx.fillStyle = hexToRgba(color, fcol ? 0.92 : 0.68);
       ctx.strokeStyle = 'rgba(6,12,20,0.35)';
       ctx.lineWidth = 0.7 / mapScale;
       ctx.fill();
@@ -5858,7 +5880,7 @@ function drawMapStatic(){
       if(!inViewPt(p.x, p.y)) return;
       const def = COUNTRY_DEFS[p.controller];
       const rings = WORLD_BORDERS[p.cid] || (borderOwnerOf(p.cid) ? WORLD_BORDERS[borderOwnerOf(p.cid)] : null);
-      const col = def ? def.color : '#666';
+      const col = factionMapColor(p.controller) || (def ? def.color : '#666');
       // v1.9.9：选中/悬停的额外描边不放静态层（否则会卡在旧省上不动），
       // 这里只保留一个中性的国土边界线
       const hasHi = false;
@@ -5962,19 +5984,26 @@ function drawMapStatic(){
   // ---- 城市标记（小圆点 + 首都星标）----
   // 尺寸按缩放折算（/mapScale）：保持屏幕上的大小恒定，否则高倍放大下圆点会变成巨型圆
   // v1.9.9：光晕/地名等随鼠标与选中态变化的部分已移到动态层（drawSelectionOverlay）
-  provinces.forEach(p=>{
-    if(!inViewPt(p.x, p.y)) return;   // v1.9.9 视口裁剪
-    let color = COUNTRY_DEFS[p.controller]?COUNTRY_DEFS[p.controller].color:'#888';
-    let radius = (p.capital ? 5.5 : 4) / mapScale;
-    
-    // 城市点（白芯 + 国家色描边）
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, radius, 0, Math.PI*2);
-    ctx.fillStyle = p.capital ? '#ffd75e' : '#f2f6fb';
-    ctx.fill();
-    ctx.strokeStyle = hexToRgba(color, 0.9);
-    ctx.lineWidth = 1.6 / mapScale;
-    ctx.stroke();
+    provinces.forEach(p=>{
+      if(!inViewPt(p.x, p.y)) return;   // v1.9.9 视口裁剪
+      let fcol = factionMapColor(p.controller);
+      let color = fcol || (COUNTRY_DEFS[p.controller]?COUNTRY_DEFS[p.controller].color:'#888');
+      let radius = (p.capital ? 5.5 : 4) / mapScale;
+
+      // 城市点（白芯 + 国家色描边；阵营模式下反过来——阵营色芯 + 白描边，
+      // 否则轴心的黑色描边画在深色海面/省块上就隐形了）
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, radius, 0, Math.PI*2);
+      if(fcol){
+        ctx.fillStyle = p.capital ? '#ffd75e' : fcol;
+        ctx.strokeStyle = 'rgba(240,246,252,0.9)';
+      } else {
+        ctx.fillStyle = p.capital ? '#ffd75e' : '#f2f6fb';
+        ctx.strokeStyle = hexToRgba(color, 0.9);
+      }
+      ctx.fill();
+      ctx.lineWidth = 1.6 / mapScale;
+      ctx.stroke();
     
     // 首都星标
     if(p.capital){
@@ -6052,7 +6081,8 @@ function drawMapStatic(){
     ctx.lineWidth = labelPx(4)/mapScale;
     ctx.strokeStyle = 'rgba(5,12,22,0.85)';
     ctx.strokeText(name, pick.x, pick.y);
-    ctx.fillStyle = hexToRgba(COUNTRY_DEFS[cid].color, 0.95);
+    // v2.1.5：阵营模式下国名统一浅色（有深描边兜底可读性）——黑色国名写在海/省上会看不见
+    ctx.fillStyle = inFactionMapMode() ? '#e6edf3' : hexToRgba(COUNTRY_DEFS[cid].color, 0.95);
     ctx.fillText(name, pick.x, pick.y);
   });
   
@@ -11534,65 +11564,6 @@ function startGame(){
   }catch(e){ console.error('focus/highlight error:', e); }
   updateUI();
   drawMap();
-  
-  // Show tutorial
-  startTutorial();
-}
-
-// ==================== 教程系统 ====================
-function startTutorial(){
-  game.tutorialActive = true;
-  game.tutorialStep = 0;
-  showTutorialStep();
-}
-
-const TUTORIAL_STEPS = [
-  {title:'欢迎来到世界大战！',text:'你将在1936年的世界中领导一个国家，走向战争与征服。让我们快速了解一下基本操作。',highlight:null},
-  {title:'地图与省份',text:'地图上的每个<strong>彩色圆点</strong>代表一个省份。★标记的是首都。点击任意圆点选中省份。',highlight:'province'},
-  {title:'移动与进攻',text:'选中你的省份后，点击<strong>相邻的省份</strong>（有连线）即可移动部队。如果是敌国领土且处于战争状态，就会发动<strong>进攻</strong>。',highlight:'move'},
-  {title:'建造与生产',text:'在左侧<strong>建造面板</strong>建造民用工厂（加速建设）和军用工厂（生产装备）。然后在<strong>训练面板</strong>用装备和人力训练部队。',highlight:'build'},
-  {title:'科研与军事',text:'在<strong>科技面板</strong>研究新技术提升军事实力。每项科技都有独特加成。',highlight:'tech'},
-  {title:'外交与战争',text:'在<strong>外交面板</strong>查看各国关系（红=敌对，绿=友好）。关系差的国家可以<strong>宣战</strong>。开局中日、德法已高度紧张！',highlight:'dip'},
-  {title:'国策点数',text:'每攻占一个敌方省份获得<strong>1点国策点数⭐</strong>。在<strong>国策面板</strong>中升级生命力、攻击力、生产速度等能力。',highlight:'skill'},
-  {title:'准备战斗！',text:'现在你已经掌握了基本操作。记住：建造工厂→生产装备→训练部队→研究科技→宣战→征服！祝你统治世界！🏆',highlight:null},
-];
-
-function showTutorialStep(){
-  let overlay = document.getElementById('tutorial-overlay');
-  let modal = document.getElementById('tutorial-modal');
-  let step = TUTORIAL_STEPS[game.tutorialStep];
-  if(!step) {
-    overlay.style.display = 'none';
-    game.tutorialActive = false;
-    return;
-  }
-  
-  overlay.style.display = 'flex';
-  modal.innerHTML = `
-    <h2>📖 新手教程 (${game.tutorialStep+1}/${TUTORIAL_STEPS.length})</h2>
-    <h3 style="color:#f0c040;margin-bottom:10px">${step.title}</h3>
-    <p>${step.text}</p>
-    <div style="text-align:right;margin-top:15px">
-      <button class="btn btn-skip" onclick="skipTutorial()">跳过教程</button>
-      <button class="btn btn-go" onclick="nextTutorial()">${game.tutorialStep>=TUTORIAL_STEPS.length-1?'开始游戏！':'下一步 →'}</button>
-    </div>
-  `;
-}
-
-function nextTutorial(){
-  game.tutorialStep++;
-  if(game.tutorialStep >= TUTORIAL_STEPS.length){
-    document.getElementById('tutorial-overlay').style.display = 'none';
-    game.tutorialActive = false;
-    addLog('📖','教程完成。开始你的征程吧！');
-    return;
-  }
-  showTutorialStep();
-}
-
-function skipTutorial(){
-  game.tutorialActive = false;
-  document.getElementById('tutorial-overlay').style.display = 'none';
 }
 
 // ==================== 引导关卡系统 ====================
@@ -11798,10 +11769,40 @@ const GUIDE_STEPS = [
     preAction:()=>{ setSpeed(0); }
   },
 
+  // ==================== 第五篇：战略工具（v2.1.5 新增） ====================
+  {
+    id:'faction-map',
+    phase:'strategy',
+    title:'阵营总览地图',
+    desc:'用滚轮把地图<strong>缩小到 150% 及以下</strong>（右下角缩放标签会出现「⚑阵营视图」）。<br><br>'
+      + '<span class="g-tip">🗺️ 缩小视野后，所有国家不再显示国旗色，而是统一换成<strong>阵营色</strong>：<br>'
+      + '⚪ <b>白色</b> = 中立国　⚫ <b>黑色</b> = 轴心国　🔵 <b>蓝色</b> = 同盟国　🔴 <b>红色</b> = 共产国际<br><br>'
+      + '一屏扫过整个世界时敌我阵营一目了然——谁已经卷进战争、哪些中立国还是「肥肉」，'
+      + '在这个视角下看得最清楚。放大到 150% 以上就会恢复各国国旗色。</span>',
+    check:()=>mapScale <= 1.5,
+    highlight:null,
+    uiHighlight:null,
+    preAction:()=>{ setSpeed(0); }
+  },
+  {
+    id:'focus-tree',
+    phase:'strategy',
+    title:'推行历史国策',
+    desc:'点击顶栏的<strong>🎯 国策树</strong>，选一个亮起来的国策节点，点「🎯 开始推行」。<br><br>'
+      + '<span class="g-tip">🏛️ <b>国策树</b>是按历史路线设计的增益链：苏德互不条约、吞并奥地利、'
+      + '巴巴罗萨计划……每个节点要推 <b>N 天</b>（右上角有进度条），完成后效果永久生效，'
+      + '有的节点还会直接<strong>触发宣战</strong>。<br><br>'
+      + '同时推的国策只能有一个——先推便宜的增益，宣战类国策留到你准备好开战的时候。</span>',
+    check:()=>{ let gc = countries['germany']; return !!(gc && gc.focus); },
+    highlight:null,
+    uiHighlight:'#btn-focus',
+    preAction:()=>{ try{ resetView(); }catch(e){} setSpeed(0); updateUI(); }
+  },
+
   // ==================== 第四篇：收尾 ====================
   {
     id:'save-game',
-    phase:'advanced',
+    phase:'strategy',
     title:'保存游戏',
     desc:'点击顶栏的<strong>「💾 存档」</strong>，选一个空存档位保存。<br><br>'
       + '<span class="g-tip">💡 共 10 个存档位，存在浏览器本地。'
@@ -11826,7 +11827,8 @@ const GUIDE_STEPS = [
     desc:'你已经掌握全部核心机制：<br><br>'
       + '<span style="color:#3fb950">✅ 基础</span> 选中 · 建造 · 训练 · 宣战 · 进攻 · 国策<br>'
       + '<span style="color:#58a6ff">✅ 军事</span> 科研 · 海军 · 空军 · 护航跨海 · 两栖登陆<br>'
-      + '<span style="color:#d29922">✅ 外交</span> 同盟号召 · 保证独立 · 扶植傀儡 · 战争经济学<br><br>'
+      + '<span style="color:#d29922">✅ 外交</span> 同盟号召 · 保证独立 · 扶植傀儡 · 战争经济学<br>'
+      + '<span style="color:#d2a8ff">✅ 战略</span> 阵营总览地图 · 历史国策树 · 存档<br><br>'
       + '<strong>现在你可以选择任意国家开始真正的征服之旅！</strong><br>'
       + '<span class="g-tip">提示：182 个国家全部有完整的攻击路线、开局部队和外交能力——'
       + '包括新西兰、爱尔兰、汤加、瑙鲁这些小岛国，以及埃塞俄比亚、蒙古、不丹这些内陆国；连安道尔、摩纳哥、但泽这种弹丸小国都能玩，选谁都不会卡死。</span>',
@@ -11943,6 +11945,7 @@ function showGuideStep(idx){
   let phaseLabel = step.phase==='basic' ? '🟢 基础篇'
                  : step.phase==='advanced' ? '🟡 军事篇'
                  : step.phase==='diplomacy' ? '🔵 外交篇'
+                 : step.phase==='strategy' ? '🟣 战略篇'
                  : '';
   // 分篇章画进度点：不同篇章之间加分隔
   let dots = '';
@@ -11967,6 +11970,7 @@ function showGuideStep(idx){
     <div class="g-title">🎯 引导关卡 — 第${idx+1}/${GUIDE_STEPS.length}步 ${phaseLabel?'<span style="font-size:11px;margin-left:6px">'+phaseLabel+phaseProg+'</span>':''}</div>
     <div class="g-desc">${step.title}: ${step.desc}</div>
     <div class="g-steps">${dots}</div>
+    ${step.phase==='complete' ? '' : '<div class="g-actions"><button class="g-skip" onclick="skipGuideStep()" title="已经会这一步了，直接进入下一步">⏭ 跳过本步</button></div>'}
   `;
   overlay.style.display = 'block';
   
@@ -12064,6 +12068,18 @@ function advanceGuideStep(){
 }
 advanceGuideStep._busy = false;
 
+// v2.1.5：跳过当前步 —— 老玩家已经会的操作不必等，直接进下一步。
+// 只跳过「教学」，不改任何游戏状态（下一步的 preAction 会自己摆好场景）。
+function skipGuideStep(){
+  if(!game.guidedMission) return;
+  let idx = game.guidedMission.step;
+  let step = GUIDE_STEPS[idx];
+  if(!step) return;
+  if(idx >= GUIDE_STEPS.length-1){ completeGuidedMission(); return; }
+  addLog('⏭','已跳过引导步骤：'+step.title);
+  advanceGuideStep();
+}
+
 function completeGuidedMission(){
   document.getElementById('guide-overlay').style.display = 'none';
   clearGuideHighlights();
@@ -12075,7 +12091,8 @@ function completeGuidedMission(){
     <div class="g-desc">
       <span style="color:#3fb950">✅ 基础</span> 选中省份 · 建造工厂 · 训练部队 · 宣战 · 进攻 · 国策点数<br>
       <span style="color:#58a6ff">✅ 军事</span> 科技研究 · 建造海军 · 组建空军 · 护航跨海 · 两栖登陆<br>
-      <span style="color:#d29922">✅ 外交</span> 同盟号召 · 保证独立 · 扶植傀儡政权 · 战争经济学<br><br>
+      <span style="color:#d29922">✅ 外交</span> 同盟号召 · 保证独立 · 扶植傀儡政权 · 战争经济学<br>
+      <span style="color:#d2a8ff">✅ 战略</span> 阵营总览地图（≤150%）· 历史国策树 · 存档<br><br>
       现在可以自由选择国家，征服世界！
       <br><br>
       <button class="btn btn-go" onclick="returnToCountrySelect()" style="pointer-events:auto">🏴 选择国家开始游戏</button>
@@ -12338,7 +12355,6 @@ function doLoadFromSlot(slot){
     game.skillPoints = save.skillPoints || 0;
     game.skillLevels = save.skillLevels || {};
     game.log = save.log || [];
-    game.tutorialStep = save.tutorialStep || 0;
     game.paused = false;
     game.selectedProvince = null;
     game.seaControl = save.seaControl || {};
@@ -12510,7 +12526,6 @@ function buildSaveData(){
     skillPoints: game.skillPoints,
     skillLevels: game.skillLevels,
     log: game.log.slice(0, 30),
-    tutorialStep: game.tutorialStep,
     unitNextId: unitNextId,
     firedEvents: [...firedEvents],
     seaControl: game.seaControl || {},
@@ -13812,8 +13827,13 @@ setSpeed = function(s){
 // ---- 版本与更新日志 ----
 // 每次发布新版本：改 GAME_VERSION，并在 UPDATE_HISTORY 顶部加一条。
 // 玩家打开线上版时若版本号与 localStorage 记录不同，就弹「本次版本更新了以下内容」弹窗。
-const GAME_VERSION = 'v2.1.4';
+const GAME_VERSION = 'v2.1.5';
 const UPDATE_HISTORY = [
+  { ver:'v2.1.5', date:'2026-11-21', items:[
+    '🗺️ **阵营总览地图（全新）**：把视野缩放到 **150% 及以下**，所有国家自动换成阵营配色 —— ⚪白=中立、⚫黑=轴心、🔵蓝=同盟、🔴红=共产国际，一屏扫过整个世界时敌我阵营一目了然；右下角缩放标签会显示「⚑阵营视图」。放大回 150% 以上即恢复各国国旗色。省块、微型岛国、城市圆点、国名全部跟随切换',
+    '📖 **引导关卡新增「🟣 战略篇」**：两步新教学 —— 「阵营总览地图」（亲手缩放一次体验阵营配色）和「推行历史国策」（国策树入门），加在收尾之前；结业清单同步更新',
+    '🧹 **删除了普通开局每次都弹的「📖 新手教程」弹窗**：现在想学玩法只有两个入口 —— 国选界面的「🎮 开始引导关卡」（独立关卡，德国 vs 波兰全流程）依然完好；正常开局直接进入游戏，不再有任何打断',
+  ]},
   { ver:'v2.1.4', date:'2026-11-14', items:[
     '🧹 **「❓ 反馈」按钮与整套反馈功能已移除**：顶栏不再有反馈入口，随之删掉反馈面板、暂停/恢复逻辑、IndexedDB 文件夹授权、本机服务器探活，以及 feedback-server.js / 启动反馈服务器.bat 两个脚本。顶栏右侧固定区现在只剩「⭐ 国策点数 / 🎯 国策树 / 日期」三样，更清爽',
     '📍 **修掉 60 多个跑偏的省会坐标 —— 首都再也不会漂到太平洋或别国去了**：关岛 132.9°E ▸ 144.8°E、塞班 ▸ 145.8°E、帕劳 ▸ 134.6°E、南洋群岛 ▸ 151.9°E（此前这四块日美太平洋属地全挤在班达海一带）、海参崴 98.2°E ▸ 131.9°E（此前一路跑到蒙古边上）、金沙萨 23.4°E ▸ 15.3°E、拉各斯/尼亚美/达喀尔/罗安达/马普托/金沙萨/布拉柴维尔/的黎波里/阿尔及尔/喀布尔/哈瓦那/布宜诺斯艾利斯/珀斯/加尔各答/敖德萨/塔什干/阿拉木图 等全部按真实经纬度归位；澳门从珠江口外的海里挪回 113.5°E、22.2°N',
