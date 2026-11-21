@@ -77,10 +77,13 @@ canvas{display:block}
 .tab-btn:hover{color:#c9d1d9}
 .tab-btn.active{background:#1f6feb;color:#fff;border-color:#1f6feb}
 
-#tooltip{position:absolute;background:rgba(22,27,34,0.95);border:1px solid #58a6ff;border-radius:6px;padding:8px 12px;font-size:12px;pointer-events:none;z-index:100;display:none;max-width:220px}
-#tooltip .t-name{color:#f0c040;font-size:14px;font-weight:bold}
-#tooltip .t-info{color:#8b949e;margin-top:2px}
-#tooltip .t-flag{color:#ff7b72;font-size:11px}
+/* v2.2.0：悬停 tooltip 已废除 → 左上角「省份信息」面板（点击省份固定显示，点海面/✕ 关闭） */
+#prov-info{position:absolute;top:10px;left:10px;background:rgba(22,27,34,0.95);border:1px solid #58a6ff;border-radius:6px;padding:8px 12px;font-size:12px;z-index:100;display:none;max-width:300px;pointer-events:auto}
+#prov-info .t-name{color:#f0c040;font-size:14px;font-weight:bold;padding-right:18px}
+#prov-info .t-info{color:#8b949e;margin-top:2px}
+#prov-info .t-flag{color:#ff7b72;font-size:11px}
+#prov-info .t-close{position:absolute;top:4px;right:6px;background:none;border:none;color:#8b949e;font-size:13px;cursor:pointer;padding:2px 4px}
+#prov-info .t-close:hover{color:#f85149}
 
 .modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:200;display:flex;align-items:center;justify-content:center}
 .modal{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:20px;max-width:500px;width:90%;max-height:80vh;overflow-y:auto}
@@ -215,7 +218,7 @@ canvas{display:block}
       <button onclick="resetView()" title="重置视图" style="font-size:12px">⟳</button>
       <button onclick="locatePlayer()" title="跳到本国并高亮闪烁" style="font-size:13px">⌖</button>
     </div>
-    <div id="tooltip"></div>
+    <div id="prov-info"></div>
     <div id="guide-overlay"><div id="guide-panel"></div></div>
     <div id="guide-highlights"></div>
   </div>
@@ -2688,6 +2691,7 @@ let game = {
   tick:0,
   player:null,
   selectedProvince:null,
+  pinnedProvince:null,  // v2.2.0：左上角省份信息面板固定的省（点击省份设置，点海面/✕ 清空）
   activeTab:'build',
   skillPoints:0,
   skillLevels:{},
@@ -2856,6 +2860,7 @@ function initGame(){
   game.speed = 2;
   game.player = null;
   game.selectedProvince = null;
+  game.pinnedProvince = null;
   game.paused = false;
   game.nukeTargeting = false;
   firedEvents = new Set();
@@ -6664,7 +6669,6 @@ canvas.addEventListener('mousemove',(e)=>{
   
   if(found!==hoverProvince){
     hoverProvince = found;
-    updateTooltip(e.clientX, e.clientY);
     requestDraw();
   }
 });
@@ -6691,7 +6695,6 @@ canvas.addEventListener('mouseup',(e)=>{
     let cp = getCanvasPos(e);
     let mp = screenToMap(cp.x, cp.y);
     hoverProvince = getProvinceAtPoint(mp.x, mp.y);
-    updateTooltip(e.clientX, e.clientY);
     drawMap();
   }
 });
@@ -6702,7 +6705,6 @@ canvas.addEventListener('mouseleave',(e)=>{
     document.getElementById('canvas-wrap').classList.remove('panning');
   }
   hoverProvince = null;
-  updateTooltip(0,0);
   drawMap();
 });
 
@@ -6734,6 +6736,10 @@ canvas.addEventListener('click',(e)=>{
   let cp = getCanvasPos(e);
   let mp = screenToMap(cp.x, cp.y);
   let clickedProvince = getProvinceAtPoint(mp.x, mp.y);
+  // v2.2.0：点击省份 → 左上角固定显示该省信息；点海面 → 关闭面板
+  let prevPin = game.pinnedProvince;
+  game.pinnedProvince = (clickedProvince===null) ? null : clickedProvince;
+  if(game.pinnedProvince !== prevPin) renderProvPanel();
   if(clickedProvince===null){
     // Clicked empty space in nuke mode — cancel
     if(game.nukeTargeting){ game.nukeTargeting = false; updateUI(); drawMap(); addLog('⚠️','取消原子弹投放'); }
@@ -6852,22 +6858,49 @@ function foreignGarrisonsIn(provinceId){
   return out;
 }
 
-function updateTooltip(mx, my){
-  let tip = document.getElementById('tooltip');  if(hoverProvince===null){
-    tip.style.display = 'none';
+// ==================== 左上角省份信息面板（v2.2.0） ====================
+// 原悬停 tooltip 已废除：信息一律改为「点击省份 → 左上角固定显示」。
+// 每个游戏 tick 由 updateUI() 自动刷新（部队到达/建造进度/季节变化都会跟着更新）。
+let _provPanelHtml = '';
+function closeProvInfo(){
+  game.pinnedProvince = null;
+  renderProvPanel();
+}
+
+function renderProvPanel(){
+  let el = document.getElementById('prov-info');
+  if(!el) return;
+  let pid = game.pinnedProvince;
+  if(pid===null || pid===undefined || !provinces[pid] || !game.player){
+    if(_provPanelHtml !== ''){ _provPanelHtml=''; el.style.display='none'; el.innerHTML=''; }
     return;
   }
-  let p = provinces[hoverProvince];
+  let p = provinces[pid];
   let c = countries[p.controller] || COUNTRY_DEFS[p.controller];
   if(!c) return;
-  
-  let myUnits = (game.player) ? getUnitsAt(p.id, game.player) : [];
-  let enemyUnits = (game.player) ? getEnemyUnitsAt(p.id, game.player) : [];
+
+  let myUnits = getUnitsAt(p.id, game.player);
+  let enemyUnits = getEnemyUnitsAt(p.id, game.player);
   let allUnits = units.filter(u=>u.provinceId===p.id);
-  
-  let html = `<div class="t-name">${c.flag||''} ${p.name} ${p.capital?'★':''}</div>`;
+
+  let html = `<button class="t-close" title="关闭" onclick="closeProvInfo()">✕</button>`;
+  html += `<div class="t-name">${c.flag||''} ${p.name} ${p.capital?'★':''}</div>`;
   html += `<div class="t-info">${c.name}</div>`;
-  html += `<div class="t-info">地形: ${terrainName(p.terrain)} | 要塞Lv${p.fortLevel}</div>`;
+  // ⚑ 占领区：当前控制国不是该省法理归属国（_origOwner，旧存档兼容 cid）→ 标注从哪个（原本的）国家占领
+  let legal = p._origOwner || p.cid;
+  if(legal && p.controller !== legal){
+    let oc = COUNTRY_DEFS[legal];
+    html += `<div class="t-info" style="color:#ff7b72">⚑ 占领区 · 从 ${(oc&&oc.name)?oc.name:legal} 占领</div>`;
+  }
+  html += `<div class="t-info">地形: ${terrainName(p.terrain)} | 🏰 要塞: ${p.fortLevel>0?('Lv'+p.fortLevel):'无'}</div>`;
+  // 💰 税收：与经济结算同口径（民用×3 + 军用×2 /天）；军阀辖区只上缴部分
+  let tax = p.civFactories*3 + p.milFactories*2;
+  if(isWarlordZone(p)){
+    let real = Math.round(tax*WARLORD_TITHE);
+    html += `<div class="t-info">💰 税收: +${tax}/天 <span style="color:#8b949e">（地方辖区 · 实缴 +${real}/天）</span></div>`;
+  } else {
+    html += `<div class="t-info">💰 税收: +${tax}/天</div>`;
+  }
   // 季节影响提示
   let season = getSeasonName();
   let seasonTip = '';
@@ -6884,13 +6917,13 @@ function updateTooltip(mx, my){
           + (done ? '· 已整编' : ('· 忠诚 '+Math.floor(wst?wst.loyalty:0))) + `</div>`;
     if(!done) html += `<div class="t-info" style="color:#8b949e">地方辖区：产出仅 ${Math.round(WARLORD_TITHE*100)}% 上缴中央</div>`;
   }
-  
+
   // Show air power if controller has fighter tech
   let ctrlAir = getAirPower(p.controller);
   if(ctrlAir > 0){
     html += `<div class="t-info" style="color:#58a6ff">✈️ 制空力: ${Math.floor(ctrlAir)}</div>`;
   }
-  
+
   if(allUnits.length>0){
     html += `<div class="t-info">部队: `;
     let counts = {};
@@ -6938,24 +6971,19 @@ function updateTooltip(mx, my){
   if(game.player && p.controller !== game.player && hasMilitaryAccess(game.player, p.controller) && !areAtWar(game.player, p.controller)){
     let left = accessExpiry(p.controller, game.player);
     let leftTxt = (left === 0) ? '永久' : ('剩 ' + Math.max(0, left - game.tick) + ' 天');
-    html += `<div class="t-info" style="color:#7ee787">🎫 你有 '+COUNTRY_DEFS[p.controller].short+' 的军队通行证（'+leftTxt+'）——可驻停/借道</div>`;
+    html += `<div class="t-info" style="color:#7ee787">🎫 你有 ${COUNTRY_DEFS[p.controller].short} 的军队通行证（${leftTxt}）——可驻停/借道</div>`;
   }
-  
+
   if(p.buildQueue.length>0){
     html += `<div class="t-info" style="color:#f0c040">建造中: ${p.buildQueue[0].type==='civ'?'民用工厂':p.buildQueue[0].type==='mil'?'军用工厂':'要塞'} ${Math.floor(p.buildQueue[0].progress/p.buildQueue[0].total*100)}%</div>`;
   }
-  
-  tip.innerHTML = html;
-  tip.style.display = 'block';
-  // Boundary check: keep tooltip on screen
-  let tw = tip.offsetWidth, th = tip.offsetHeight;
-  let tx = mx + 15;
-  let ty = my - 10;
-  if(tx + tw > window.innerWidth - 10) tx = mx - tw - 15;
-  if(ty + th > window.innerHeight - 10) ty = window.innerHeight - th - 10;
-  if(ty < 5) ty = 5;
-  tip.style.left = tx + 'px';
-  tip.style.top = ty + 'px';
+
+  // _lastHtml 短路：内容没变就不动 DOM（面板每个 tick 都会刷新）
+  if(html !== _provPanelHtml){
+    _provPanelHtml = html;
+    el.innerHTML = html;
+    el.style.display = 'block';
+  }
 }
 
 function terrainName(t){
@@ -7353,6 +7381,7 @@ function gameTick(){
   
   // Update display — throttle expensive DOM rebuild to every 3 ticks
   updateTopBar();
+  renderProvPanel();   // v2.2.0：左上角省份信息卡每天刷新（内容没变时 _lastHtml 短路，不动 DOM）
   if(game.tick % 3 === 0){
     updateUI();
   }
@@ -10744,7 +10773,10 @@ function updateUI(){
     `<div style="padding:3px 0;border-bottom:1px solid #21262d;line-height:1.5"><span style="color:#f0c040">${l.emoji}</span> ${l.text} <span style="color:#484f58;font-size:10px">${l.time}</span></div>`
   ).join('');
   if(logNearTop) logDiv.scrollTop = 0;
-  
+
+  // v2.2.0：左上角省份信息面板（点了省份才显示），随 tick 自动刷新内容
+  renderProvPanel();
+
   // Equipment display
   renderEquipment();
 }
@@ -12139,6 +12171,7 @@ function returnToCountrySelect(){
   game.wars = [];
   game.log = [];
   game.selectedProvince = null;
+  game.pinnedProvince = null;
   
   // 清盘后必须重新发初始舰队和初始陆军，否则重开局变成"全世界零部队"
   units = [];
@@ -12357,6 +12390,7 @@ function doLoadFromSlot(slot){
     game.log = save.log || [];
     game.paused = false;
     game.selectedProvince = null;
+  game.pinnedProvince = null;
     game.seaControl = save.seaControl || {};
     game.nukeTargeting = false;
     game._preModalPaused = null;
@@ -12585,6 +12619,7 @@ function toggleNukeMode(){
   if(game.nukeTargeting){
     addLog('☢️','已进入核弹瞄准模式——点击敌方领土投放');
     game.selectedProvince = null;
+  game.pinnedProvince = null;
   } else {
     addLog('⚠️','取消核弹瞄准');
   }
@@ -13827,8 +13862,14 @@ setSpeed = function(s){
 // ---- 版本与更新日志 ----
 // 每次发布新版本：改 GAME_VERSION，并在 UPDATE_HISTORY 顶部加一条。
 // 玩家打开线上版时若版本号与 localStorage 记录不同，就弹「本次版本更新了以下内容」弹窗。
-const GAME_VERSION = 'v2.1.5';
+const GAME_VERSION = 'v2.2.0';
 const UPDATE_HISTORY = [
+  { ver:'v2.2.0', date:'2026-11-21', items:[
+    '📌 **省份信息搬到左上角、改成「点击显示」**：原来跟着鼠标跑的悬停提示框整个废除 —— 现在你**点一下任何省份**，左上角就会固定弹出这张省的信息卡（国家、地形、工厂资源、季节、驻军、建造进度……原悬停有的这里全有），点海面或点卡片右上角 ✕ 关闭；选别的省卡片自动切换，不用一直按着鼠标',
+    '💰 信息卡新增**税收**一行：按与经济结算同口径算（民用工厂×3 + 军用工厂×2 每天入账），军阀辖区会注明「实缴 +X/天」（只有 35% 上缴中央）；**🏰 要塞**单独列出：无要塞显示「无」，有则显示「Lv几」',
+    '⚑ **占领区标注来历**：省份当前控制国不是它的法理归属国（打下来的地盘）时，卡片会显示红字「**占领区 · 从某某国占领**」—— 某某国就是这个省原本属于的国家；本国法理领土不显示',
+    '🔄 卡片内容**每个游戏日自动刷新**：部队开到/开走、要塞建成、建造进度推进，卡片上的数字都会自己跟着变，不用重新点一遍',
+  ]},
   { ver:'v2.1.5', date:'2026-11-21', items:[
     '🗺️ **阵营总览地图（全新）**：把视野缩放到 **150% 及以下**，所有国家自动换成阵营配色 —— ⚪白=中立、⚫黑=轴心、🔵蓝=同盟、🔴红=共产国际，一屏扫过整个世界时敌我阵营一目了然；右下角缩放标签会显示「⚑阵营视图」。放大回 150% 以上即恢复各国国旗色。省块、微型岛国、城市圆点、国名全部跟随切换',
     '📖 **引导关卡新增「🟣 战略篇」**：两步新教学 —— 「阵营总览地图」（亲手缩放一次体验阵营配色）和「推行历史国策」（国策树入门），加在收尾之前；结业清单同步更新',
